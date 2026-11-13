@@ -74,6 +74,9 @@ var backupPinnedEnvVarNames = []string{
 	config.ClickHouseBackupEnvClickHouseRestartCommand,
 	config.ClickHouseBackupEnvRestoreDatabaseMapping,
 	config.ClickHouseBackupEnvRestoreTableMapping,
+	config.ClickHouseBackupEnvBackupsToKeepRemote,
+	config.ClickHouseBackupEnvRebaseDuringDelete,
+	config.ClickHouseBackupEnvRebaseBeforeRemoveOldRemote,
 }
 
 // backupConfigFileEnvVarNames are the env vars the base container must not set: the credentials, which the
@@ -122,7 +125,19 @@ func (cm *ContainerManager) getContainerClickHouseBackup(statefulSet *apps.State
 // the operator generates for the cluster, mounted where clickhouse-backup looks for it. The operator's command
 // waits for the file, so a sidecar started before the Secret exists serves nothing until then. Any other command
 // might serve the REST API to everybody without the file, so it gets the Secret as mandatory.
+//
+// A cluster whose backup runs in backup Pods, backup.mode pod, gets no sidecar: see NewBackupServerContainer.
 func (cm *ContainerManager) NewBackupContainer(host *chi.Host) (core.Container, bool) {
+	if host.GetCluster().GetBackup().IsPodMode() {
+		return core.Container{}, false
+	}
+	return cm.NewBackupServerContainer(host)
+}
+
+// NewBackupServerContainer builds the clickhouse-backup container that serves the REST API of a host of a
+// backup-enabled cluster, whatever runs it: the sidecar of the host in backup.mode sidecar, the backup Pod of its
+// shard in backup.mode pod. See NewBackupContainer for how it is built.
+func (cm *ContainerManager) NewBackupServerContainer(host *chi.Host) (core.Container, bool) {
 	backup := host.GetCluster().GetBackup()
 	if !backup.IsEnabled() {
 		return core.Container{}, false
@@ -141,6 +156,9 @@ func (cm *ContainerManager) NewBackupContainer(host *chi.Host) (core.Container, 
 
 	if container.Image == "" {
 		container.Image = config.DefaultClickHouseBackupDockerImage
+	}
+	if container.ImagePullPolicy == "" {
+		container.ImagePullPolicy = core.PullPolicy(config.DefaultClickHouseBackupImagePullPolicy)
 	}
 	if (len(container.Command) == 0) && (len(container.Args) == 0) {
 		container.Command = newBackupSidecarCommand()
@@ -228,7 +246,7 @@ func (cm *ContainerManager) statefulSetEnsureBackupConfigVolume(statefulSet *app
 // ensureContainerVolumeMountsClickHouseBackup mounts every volume of the ClickHouse container into the
 // clickhouse-backup sidecar as well, as the sidecar works on all disks of the server directly
 func (cm *ContainerManager) ensureContainerVolumeMountsClickHouseBackup(statefulSet *apps.StatefulSet, host *chi.Host) {
-	if !host.GetCluster().GetBackup().IsEnabled() {
+	if backup := host.GetCluster().GetBackup(); !backup.IsEnabled() || backup.IsPodMode() {
 		return
 	}
 	backup, ok := cm.getContainerClickHouseBackup(statefulSet)
@@ -319,7 +337,7 @@ func newBackupEnvVars(host *chi.Host) []core.EnvVar {
 		},
 		{
 			Name:  config.ClickHouseBackupEnvClickHouseRestartCommand,
-			Value: config.ClickHouseBackupRestartCommandReloadUsers,
+			Value: config.ClickHouseBackupRestartCommandReload,
 		},
 		// Set, and empty, so that nothing else sets them, see backupPinnedEnvVarNames
 		{
@@ -333,6 +351,19 @@ func newBackupEnvVars(host *chi.Host) []core.EnvVar {
 		{
 			Name:  config.ClickHouseBackupEnvBackupsToKeepLocal,
 			Value: config.ClickHouseBackupBackupsToKeepLocalDeleteAfterUpload,
+		},
+		// Retention is the orchestrator's alone, see backupPinnedEnvVarNames: the configuration file forces the same
+		{
+			Name:  config.ClickHouseBackupEnvBackupsToKeepRemote,
+			Value: "0",
+		},
+		{
+			Name:  config.ClickHouseBackupEnvRebaseDuringDelete,
+			Value: strconv.FormatBool(true),
+		},
+		{
+			Name:  config.ClickHouseBackupEnvRebaseBeforeRemoveOldRemote,
+			Value: strconv.FormatBool(true),
 		},
 		{
 			Name:  config.ClickHouseBackupEnvAllowEmptyBackups,
@@ -364,6 +395,13 @@ func newBackupEnvVars(host *chi.Host) []core.EnvVar {
 	}
 
 	return envVars
+}
+
+// HostServesBackupAPI reports whether the pod of the host serves the clickhouse-backup REST API, which its Service
+// then publishes: the pods of a cluster backed up by sidecars do, those of a cluster backed up by backup Pods do not
+func HostServesBackupAPI(host *chi.Host) bool {
+	backup := host.GetCluster().GetBackup()
+	return backup.IsEnabled() && !backup.IsPodMode()
 }
 
 // ServiceHasBackupPort reports whether the host Service publishes the clickhouse-backup REST API the backup

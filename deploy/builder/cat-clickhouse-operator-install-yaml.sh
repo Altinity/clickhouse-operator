@@ -59,6 +59,11 @@ TMP_CHI_TEMPLATESD_DIR="${TMP_CONFIG_DIR}/chi/templates.d"
 # as content of /etc/clickhouse-server/chi/users.d folder
 TMP_CHI_USERSD_DIR="${TMP_CONFIG_DIR}/chi/users.d"
 
+# Local path to folder with the backup orchestrator script which will be injected into .yaml
+# as content of /etc/clickhouse-operator/backup folder
+TMP_BACKUP_DIR="${TMP_CONFIG_DIR}/backup"
+
+
 # Local path to folder with Keeper's .xml configuration files which will be injected into .yaml
 # as content of /etc/clickhouse-server/chk/conf.d folder
 TMP_CHK_CONFD_DIR="${TMP_CONFIG_DIR}/chk/conf.d"
@@ -336,6 +341,30 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
                 render_configmap_data_section_file "${FILE}"
             done
         fi
+
+        # Render backup files of one folder in two ConfigMaps, split by type: the bash orchestrator script, *.sh, in
+        # one, the Python one, *.py, in the other, mounted in the folder python of the first. dev/generate_helm_chart.sh
+        # passes the data of a ConfigMap in a single argument, which Linux bounds to 128 KiB: both scripts would not fit.
+        # A templated manifest, whose namespace is a placeholder, is rendered in turn by envsubst, terraform
+        # templatefile or Jinja, which would rewrite the variables and braces of a script: there the files go
+        # base64-encoded in binaryData
+        for BACKUP_FILES in "etc-clickhouse-operator-backup-files sh" "etc-clickhouse-operator-backup-python-files py"; do
+            read -r BACKUP_CONFIGMAP BACKUP_TYPE <<< "${BACKUP_FILES}"
+            render_separator
+            if [[ "${OPERATOR_NAMESPACE}" == *'$'* ]] || [[ "${OPERATOR_NAMESPACE}" == *'{'* ]]; then
+                render_configmap_header "${BACKUP_CONFIGMAP}" | sed '$ s/^data:$/binaryData:/'
+                for FILE in "${TMP_BACKUP_DIR}"/*."${BACKUP_TYPE}"; do
+                    [[ -f "${FILE}" ]] && echo "  $(basename "${FILE}"): $(base64 < "${FILE}" | tr -d '\n')"
+                done
+            else
+                render_configmap_header "${BACKUP_CONFIGMAP}"
+                for FILE in "${TMP_BACKUP_DIR}"/*."${BACKUP_TYPE}"; do
+                    if [[ -f "${FILE}" ]]; then
+                        render_configmap_data_section_file "${FILE}"
+                    fi
+                done
+            fi
+        done
 
         # Render chi/users.d files
         render_separator

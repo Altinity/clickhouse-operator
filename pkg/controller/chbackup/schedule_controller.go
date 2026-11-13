@@ -84,14 +84,147 @@ func (c *ScheduleController) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	if err := c.refreshEntries(ctx, next); err != nil {
+		return ctrl.Result{}, err
+	}
+	c.refreshPhase(next, &out)
+	if delay := c.refreshNextScheduleTime(next); delay > 0 {
+		result.RequeueAfter = shorterDelay(result.RequeueAfter, delay)
+	}
 	return c.commitStatus(ctx, next, !apiEquality.Semantic.DeepEqual(cur.Status, next.Status), result, out)
+}
+
+// abortsSchedule reports whether the schedule cannot run for a reason the Validated condition tells: only a change of
+// the spec, of the installation, or of the operator configuration brings it back.
+func abortsSchedule(reason string) bool {
+	switch reason {
+	case api.BackupReasonInvalidSpec, api.BackupReasonCHINotFound, api.BackupReasonCHIStopped, api.BackupReasonClusterNotFound,
+		api.BackupReasonBackupDisabled, api.BackupReasonNoBackupStorage, api.BackupReasonNoTargetHosts, reasonOrchestratorScriptMissing,
+		reasonOrchestratorScriptMismatch:
+		return true
+	}
+	return false
+}
+
+// refreshPhase records the phase of the schedule, and announces every change of it: Suspended while the spec suspends
+// it; Aborted, with why, while it cannot run, or once the last scheduled run failed, until a later run succeeds;
+// Active otherwise, holds for a restore included, which the Ready condition tells.
+func (c *ScheduleController) refreshPhase(chbs *api.ClickHouseBackupSchedule, out *announcements) {
+	previous := chbs.Status.Phase
+	validated := apiMeta.FindStatusCondition(chbs.Status.Conditions, api.BackupConditionValidated)
+	lastRun := apiMeta.FindStatusCondition(chbs.Status.Conditions, api.BackupConditionLastBackupSucceeded)
+	ready := apiMeta.FindStatusCondition(chbs.Status.Conditions, api.BackupConditionReady)
+	phase, reason, message := api.SchedulePhaseActive, reasonScheduleActive, "the CronJobs run the schedule"
+	switch {
+	case chbs.Spec.IsSuspended():
+		phase, reason, message = api.SchedulePhaseSuspended, api.BackupReasonSuspended, "the schedule is suspended"
+	case (validated != nil) && (validated.Status == meta.ConditionFalse) && abortsSchedule(validated.Reason):
+		phase, reason, message = api.SchedulePhaseAborted, validated.Reason, validated.Message
+	case (ready != nil) && (ready.Status == meta.ConditionFalse) &&
+		((ready.Reason == api.BackupReasonNameConflict) || (ready.Reason == api.BackupReasonSharesSourcePrefix)):
+		// Held until somebody renames a resource, or sets the backup name prefix
+		phase, reason, message = api.SchedulePhaseAborted, ready.Reason, ready.Message
+	case (lastRun != nil) && (lastRun.Status == meta.ConditionFalse):
+		phase, reason, message = api.SchedulePhaseAborted, api.BackupReasonLastBackupFailed, lastRun.Message
+	case ready != nil:
+		reason, message = ready.Reason, ready.Message
+	}
+	chbs.Status.Phase, chbs.Status.Reason, chbs.Status.Message = phase, reason, message
+	if previous == phase {
+		return
+	}
+	switch phase {
+	case api.SchedulePhaseAborted:
+		out.add(c.warning(chbs, a.EventActionUpdate, reasonScheduleAborted, "schedule aborted (%s): %s", reason, message))
+	case api.SchedulePhaseSuspended:
+		out.add(c.info(chbs, a.EventActionUpdate, reasonScheduleSuspended, "schedule suspended"))
+	default:
+		out.add(c.info(chbs, a.EventActionUpdate, reasonScheduleActive, "schedule active: %s", message))
+	}
+}
+
+// refreshNextScheduleTime records the next time a run matches an entry of the schedule, none while it does not run,
+// and returns when to reconcile again to move it on, 0 for never.
+func (c *ScheduleController) refreshNextScheduleTime(chbs *api.ClickHouseBackupSchedule) time.Duration {
+	chbs.Status.NextScheduleTime = nil
+	location, err := chbs.Spec.GetLocation()
+	aborted := (chbs.Status.Phase == api.SchedulePhaseAborted) && (chbs.Status.Reason != api.BackupReasonLastBackupFailed)
+	if (chbs.Status.Phase == api.SchedulePhaseSuspended) || (err != nil) || aborted {
+		return 0
+	}
+	now := c.clock.Now()
+	next := model.NextScheduleTime(chbs.Spec.Schedules, location, now)
+	if next.IsZero() {
+		return 0
+	}
+	chbs.Status.NextScheduleTime = &meta.Time{Time: next.UTC()}
+	return next.Sub(now) + dueRecheckDelay
+}
+
+// refreshEntries records, of every entry of the schedule, the newest run of the CronJobs whose slot matches it, and
+// the backup of the newest such run that completed: the runs of one slot make the same backup on every cluster.
+// Entries the spec no longer has go.
+func (c *ScheduleController) refreshEntries(ctx context.Context, chbs *api.ClickHouseBackupSchedule) error {
+	location, err := chbs.Spec.GetLocation()
+	if (err != nil) || (len(chbs.Spec.Schedules) == 0) {
+		return nil
+	}
+	runs, err := c.scheduledRuns(ctx, chbs)
+	if err != nil {
+		return err
+	}
+	type observed struct {
+		scheduled, completed time.Time
+		backupName           string
+	}
+	byPeriod := map[api.BackupPeriod]*observed{}
+	for _, jobs := range runs {
+		for _, job := range jobs {
+			slot, ok := model.ScheduledSlot(job)
+			if !ok {
+				continue
+			}
+			for _, entry := range model.MatchingEntries(chbs.Spec.Schedules, slot.In(location)) {
+				seen := byPeriod[entry.Period]
+				if seen == nil {
+					seen = &observed{}
+					byPeriod[entry.Period] = seen
+				}
+				if slot.After(seen.scheduled) {
+					seen.scheduled = slot
+				}
+				if (stateOf(job) == jobSucceeded) && slot.After(seen.completed) {
+					seen.completed, seen.backupName = slot, model.ScheduledBackupName(job)
+				}
+			}
+		}
+	}
+	var entries []api.ScheduleEntryStatus
+	for _, entry := range chbs.Spec.Schedules {
+		status := api.ScheduleEntryStatus{Period: entry.Period}
+		if recorded := chbs.Status.GetEntry(entry.Period); recorded != nil {
+			status = *recorded.DeepCopy()
+		}
+		if seen := byPeriod[entry.Period]; seen != nil {
+			if scheduled := (meta.Time{Time: seen.scheduled.UTC()}); later(&scheduled, status.LastScheduleTime) {
+				status.LastScheduleTime = &scheduled
+			}
+			if seen.backupName != "" {
+				status.LastBackupName = seen.backupName
+			}
+		}
+		entries = append(entries, status)
+	}
+	chbs.Status.Entries = entries
+	return nil
 }
 
 // clusterCronJob is the CronJob of a schedule on a cluster.
 type clusterCronJob struct {
-	cluster  string
-	topology *model.Topology
-	existing *batch.CronJob
+	cluster      string
+	topology     *model.Topology
+	orchestrator model.Orchestrator
+	existing     *batch.CronJob
 	// ranOn are the hosts the runs of the existing CronJob prune on, before the reconcile updates it
 	ranOn   []string
 	suspend bool
@@ -122,6 +255,13 @@ func (c *ScheduleController) reconcile(ctx context.Context, chbs *api.ClickHouse
 		}
 		return c.hold(ctx, chbs, nil, owned, runs, outcomes, &pending{reason: api.BackupReasonInvalidSpec, message: err.Error()},
 			heldWithoutStorage(chbs, chi), out)
+	}
+	// The CronJobs built from here on apply the spec: a change of what retention keeps by is held, as the spec asks
+	if changeID := model.TrackScheduleRetention(chbs, c.clock.Now()); changeID != "" {
+		out.add(c.warning(chbs, a.EventActionReconcile, api.BackupReasonRetentionHeld,
+			"the entries or the time zone of the schedule changed: retention keeps every backup the schedule kept before, "+
+				"as status.retention.previous records it, and lists in status.clusters[].heldBackups those it would delete now; "+
+				"keep those to keep in spec.retention.keepBackups and release the change with spec.retention.releaseHeld: %s", changeID))
 	}
 
 	chi, wait, err := c.readInstallation(ctx, chbs.GetNamespace(), chbs.Spec.ClickHouseInstallation, true)
@@ -181,12 +321,22 @@ func (c *ScheduleController) reconcile(ctx context.Context, chbs *api.ClickHouse
 		if err != nil {
 			return ctrl.Result{}, err
 		}
+		orchestrator, missing, err := c.orchestrator(ctx, target.chi, cluster, chbs.Spec.GetOrchestratorConfigMapName())
+		switch {
+		case err != nil:
+			return ctrl.Result{}, err
+		case missing != nil:
+			// No run could do anything: the CronJobs are held until there is a script to run
+			return c.hold(ctx, chbs, nil, owned, runs, outcomes, missing, heldWithoutStorage(chbs, target.chi), out)
+		}
+		orchestrator.RestoreInProgress = holds[cluster] != nil
 		plan := &clusterCronJob{
-			cluster:  cluster,
-			topology: topology,
-			existing: existing,
-			ranOn:    model.CronJobRetentionHosts(existing),
-			suspend:  chbs.Spec.IsSuspended() || (guard != nil) || (holds[cluster] != nil),
+			cluster:      cluster,
+			topology:     topology,
+			orchestrator: orchestrator,
+			existing:     existing,
+			ranOn:        model.CronJobRetentionHosts(existing),
+			suspend:      chbs.Spec.IsSuspended() || (guard != nil) || (holds[cluster] != nil),
 		}
 		if !plan.suspend && ((existing == nil) || cronJobSuspended(existing)) {
 			resuming = append(resuming, cluster)
@@ -204,7 +354,7 @@ func (c *ScheduleController) reconcile(ctx context.Context, chbs *api.ClickHouse
 	recheck := time.Duration(0)
 	for _, plan := range planned {
 		cluster := scheduleCluster(chbs, plan.cluster)
-		if err := c.recordRetentionHosts(chbs, cluster, runs[plan.applied.GetUID()], plan.ranOn, model.RetentionHosts(chbs, plan.topology), out); err != nil {
+		if err := c.recordRetentionHosts(chbs, cluster, runs[plan.applied.GetUID()], plan.ranOn, model.RetentionHosts(chbs, plan.topology, plan.orchestrator), out); err != nil {
 			return ctrl.Result{}, err
 		}
 		delay, err := c.observeScheduledJobs(ctx, chbs, cluster, runs[plan.applied.GetUID()], outcomes)
@@ -258,8 +408,8 @@ func (c *ScheduleController) applyCronJobs(
 	out *announcements,
 ) (ctrl.Result, bool, error) {
 	apply := func(plan *clusterCronJob) error {
-		desired := model.BuildBackupCronJob(chbs, chi, plan.topology, plan.suspend)
-		applied, err := c.applyCronJob(ctx, chbs, plan.existing, desired)
+		desired := model.BuildBackupCronJob(chbs, chi, plan.topology, plan.orchestrator, plan.suspend)
+		applied, err := c.applyCronJob(ctx, chbs, plan.existing, desired, out)
 		plan.applied = applied
 		return err
 	}
@@ -522,7 +672,8 @@ func (c *ScheduleController) recordRetentionHosts(
 
 	unpruned := cluster.UnprunedHosts
 	var left []string
-	if chbs.Spec.Retention.GetKeepLast() > 0 {
+	// Every entry keeps at least one backup, so retention is on whenever the schedule has an entry
+	if len(chbs.Spec.Schedules) > 0 {
 		for _, host := range recorded {
 			if !slices.Contains(hosts, host) && !slices.Contains(left, host) && !slices.Contains(unpruned, host) {
 				left = append(left, host)
@@ -748,7 +899,7 @@ func (c *ScheduleController) restoreHolds(
 			restored := cmp.Or(restore.TargetCluster(), cluster)
 			switch {
 			case (held != "") && (held != cluster):
-			case restore.Status.Phase == api.OperationPhaseFailed:
+			case failedPhase(restore.Status.Phase):
 				failed[cluster] = cmpPending(failed[cluster], failedRestoreHold(chiName, cluster, restored, restore.GetName()))
 			default:
 				inProgress[cluster] = cmpPending(inProgress[cluster], restoreInProgress(chiName, cluster, restored))
@@ -974,6 +1125,7 @@ func (c *ScheduleController) applyCronJob(
 	chbs *api.ClickHouseBackupSchedule,
 	existing *batch.CronJob,
 	desired *batch.CronJob,
+	out *announcements,
 ) (*batch.CronJob, error) {
 	suspend := cronJobSuspended(desired)
 	if existing == nil {
@@ -986,7 +1138,8 @@ func (c *ScheduleController) applyCronJob(
 		if err := c.Create(ctx, desired); err != nil {
 			return nil, err
 		}
-		log.V(1).M(c.meta(chbs)).F().Info("created CronJob %s", desired.GetName())
+		out.add(c.info(chbs, a.EventActionCreate, reasonCronJobCreated, "created CronJob %s of cluster %s, schedule %q",
+			desired.GetName(), model.ObjectCluster(desired), desired.Spec.Schedule))
 		return desired, nil
 	}
 
@@ -1016,7 +1169,8 @@ func (c *ScheduleController) applyCronJob(
 	if err := c.Update(ctx, updated); err != nil {
 		return nil, err
 	}
-	log.V(1).M(c.meta(chbs)).F().Info("updated CronJob %s", updated.GetName())
+	out.add(c.info(chbs, a.EventActionUpdate, reasonCronJobUpdated, "updated CronJob %s of cluster %s, schedule %q, suspended %t",
+		updated.GetName(), model.ObjectCluster(updated), updated.Spec.Schedule, suspend))
 	return updated, nil
 }
 
@@ -1308,6 +1462,10 @@ func (c *ScheduleController) observeScheduledJob(
 		if withoutData, err = c.backupHoldsNoData(ctx, job); err != nil {
 			return err
 		}
+		// The backups retention held, which the last run tells, replace those an earlier one told
+		if cluster.HeldBackups, err = c.backupHeld(ctx, job); err != nil {
+			return err
+		}
 		completed = c.recordCompletion(chbs, cluster, job, withoutData, outcomes)
 	case api.OperationPhaseFailed:
 		failure, err := c.describeFailure(ctx, job, reason)
@@ -1341,7 +1499,8 @@ func (c *ScheduleController) observeScheduledJob(
 		completed()
 	case api.OperationPhaseFailed:
 		metrics.BackupFailed(ctx, namespace, chiName, clusterName, failed.Time)
-		c.warning(chbs, a.EventActionReconcile, reason, "scheduled backup of cluster %s failed: %s", clusterName, message)()
+		c.warning(chbs, a.EventActionReconcile, reasonScheduledBackupFailed, "scheduled backup of cluster %s failed (%s): %s",
+			clusterName, reason, message)()
 	}
 	return nil
 }
@@ -1368,19 +1527,14 @@ func (c *ScheduleController) recordCompletion(
 		message = fmt.Sprintf("scheduled backup %s completed in Job %s", backupName, job.GetName())
 	}
 	if noData == "" {
-		return c.info(chbs, a.EventActionReconcile, api.BackupReasonCompleted, "%s", message)
+		return c.info(chbs, a.EventActionReconcile, reasonScheduledBackupSucceeded, "%s", message)
 	}
 	return c.warning(chbs, a.EventActionReconcile, api.BackupReasonCompletedWithoutData, "%s, but the backup holds no data: %s", message, noData)
 }
 
-// scheduledNoDataCause tells why the backup a scheduled run made holds no data, and that retention
-// does not count it among the backups with data it keeps, as the Job of the run was built.
+// scheduledNoDataCause tells why the backup a scheduled run made holds no data, as the Job of the run was built.
 func scheduledNoDataCause(job *batch.Job) string {
-	cause := noDataCause(job)
-	if keep := model.JobKeepLast(job); keep > 0 {
-		return fmt.Sprintf("%s; it does not count toward the %d backups with data that retention keeps", cause, keep)
-	}
-	return cause
+	return noDataCause(job)
 }
 
 // observedWithoutData reports whether a scheduled run was reported completed with a backup that

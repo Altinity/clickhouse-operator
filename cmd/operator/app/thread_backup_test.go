@@ -125,13 +125,26 @@ func TestBackupCacheOptionsNarrowsJobsAndCronJobs(t *testing.T) {
 	for obj, byObject := range opts.ByObject {
 		narrowed[fmt.Sprintf("%T", obj)] = byObject
 	}
-	require.Len(t, narrowed, 3, "narrowed set changed - update this test deliberately")
+	require.Len(t, narrowed, 5, "narrowed set changed - update this test deliberately")
 	for _, typeName := range []string{"*v1.Job", "*v1.CronJob"} {
 		byObject, ok := narrowed[typeName]
 		require.True(t, ok, "%s must be narrowed - an unfiltered type caches every instance in scope", typeName)
 		require.Equal(t, chbackup.JobSelector().String(), byObject.Label.String())
 		require.Nil(t, byObject.Namespaces, "%s must inherit DefaultNamespaces", typeName)
 	}
+
+	pods, ok := narrowed["*v1.Pod"]
+	require.True(t, ok, "pods must be narrowed - an unfiltered cache would hold every pod in scope")
+	require.Equal(t, chbackup.PodSelector().String(), pods.Label.String())
+	require.Equal(t, "clickhouse.altinity.com/app in (chop,chop-backup)", pods.Label.String(),
+		"the pods of the installations and the backup Pods of their shards")
+	require.Nil(t, pods.Namespaces)
+
+	services, ok := narrowed["*v1.Service"]
+	require.True(t, ok, "services must be narrowed - an unfiltered cache would hold every Service in scope")
+	require.Equal(t, "clickhouse.altinity.com/backup-component=shard-service", services.Label.String(),
+		"the headless Services of the backup Pods alone")
+	require.Nil(t, services.Namespaces)
 
 	installations, ok := narrowed["*v1.ClickHouseInstallation"]
 	require.True(t, ok, "installations must be trimmed - the CHI controller caches them in full already")

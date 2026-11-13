@@ -104,9 +104,9 @@ func (o *operation) refuse(reason, message string) {
 	o.fail(reason, message)
 }
 
-// fail records the operation as failed, for good: nothing is ever retried.
+// fail records the operation as failed, or aborted when the operator stops it, for good: nothing is ever retried.
 func (o *operation) fail(reason, message string) {
-	*o.phase = api.OperationPhaseFailed
+	*o.phase = failurePhase(reason)
 	o.finish(meta.Now())
 	o.setCondition(api.BackupConditionReady, meta.ConditionFalse, reason, message)
 }
@@ -157,10 +157,10 @@ func completeOn(cluster *api.OperationClusterStatus, job *batch.Job, reason, mes
 	return true
 }
 
-// failOn records the operation as failed on a cluster, for good.
+// failOn records the operation as failed on a cluster, or aborted when the operator stops it there, for good.
 func failOn(cluster *api.OperationClusterStatus, reason, message string) {
 	now := meta.Now()
-	cluster.Phase = api.OperationPhaseFailed
+	cluster.Phase = failurePhase(reason)
 	cluster.CompletionTime = &now
 	cluster.Reason = reason
 	cluster.Message = message
@@ -172,6 +172,20 @@ type operationOutcome struct {
 	finished  bool
 	completed []*api.OperationClusterStatus
 	failed    []*api.OperationClusterStatus
+}
+
+// failurePhase returns the phase of an operation that finished and failed on some of its clusters: Failed when a Job
+// failed on any of them, or it succeeded on others, Aborted when the operator stopped it on every one that failed.
+func (out operationOutcome) failurePhase() api.OperationPhase {
+	if len(out.completed) > 0 {
+		return api.OperationPhaseFailed
+	}
+	for _, cluster := range out.failed {
+		if cluster.Phase == api.OperationPhaseFailed {
+			return api.OperationPhaseFailed
+		}
+	}
+	return api.OperationPhaseAborted
 }
 
 // succeeded reports whether the operation finished successfully on every cluster.
@@ -197,7 +211,7 @@ func (o *operation) aggregate() operationOutcome {
 		switch cluster.Phase {
 		case api.OperationPhaseCompleted:
 			out.completed = append(out.completed, cluster)
-		case api.OperationPhaseFailed:
+		case api.OperationPhaseFailed, api.OperationPhaseAborted:
 			out.failed = append(out.failed, cluster)
 		case api.OperationPhasePending:
 			// A cluster whose Job was found created meanwhile waits for nothing the condition could tell
@@ -233,7 +247,7 @@ func (o *operation) aggregate() operationOutcome {
 		o.finish(finished)
 		*o.phase = api.OperationPhaseRunning
 		if len(out.failed) > 0 {
-			*o.phase = api.OperationPhaseFailed
+			*o.phase = out.failurePhase()
 		}
 	case out.finished:
 	case started:

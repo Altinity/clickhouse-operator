@@ -18,6 +18,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -29,6 +30,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -92,15 +94,18 @@ type stubHost struct {
 	rawTables []string
 	// busyPolls is the number of /backup/actions answers that report an operation in progress
 	busyPolls int
-	// lockedPosts is the number of POSTs answered 423 Locked
-	lockedPosts int
+	// lockedPosts is the number of POSTs answered 423 Locked, lockedActions that of the commands of the actions endpoint
+	lockedPosts   int
+	lockedActions int
 	// unavailable is the number of requests answered 503, a negative value means every request
 	unavailable int
 	// unavailableAfterPost is the number of requests answered 503 once the host accepted a POST, a
 	// negative value means every request
 	unavailableAfterPost int
-	// posted tells whether the host accepted a POST
-	posted bool
+	// posted tells whether the host accepted a POST, or postsBeforePosted of them when set
+	posted            bool
+	posts             int
+	postsBeforePosted int
 	// hangUpPosts makes the host accept every POST and close the connection without answering
 	hangUpPosts bool
 	// emptyBackups makes every backup the host creates hold no data, as of tables that match nothing
@@ -115,6 +120,10 @@ type stubHost struct {
 	// listsUnavailableAfterPost makes the host answer every remote backup list 503 once it accepted a
 	// POST, as a sidecar that went away right after the backup
 	listsUnavailableAfterPost bool
+	// failSubmit, when set, is the error the host refuses every asynchronous operation with, HTTP 500
+	failSubmit string
+	// failPostsAfter is the number of POSTs hangUpPosts and proxyFailsPosts let through first
+	failPostsAfter int
 	// proxyFailsPosts makes a proxy in front of the host answer every POST 503, which tells nothing
 	// about whether the host received it
 	proxyFailsPosts bool
@@ -141,6 +150,9 @@ type stubHost struct {
 	restartAgainAfter time.Duration
 	// deleteFail maps a backup name to the error its remote deletion fails with
 	deleteFail map[string]string
+	// leavesFailedUpload makes a create_remote that fails leave what clickhouse-backup 2.8.3 leaves of an upload
+	// that fails: the local backup, and the remote one listed as broken
+	leavesFailedUpload bool
 	// noLocalOnDownload makes a download finish without a local copy
 	noLocalOnDownload bool
 	// backupTables lists the "db.table" names GET /backup/tables?remote_backup= reports of the backup
@@ -153,8 +165,8 @@ type stubHost struct {
 	actions []*stubAction
 	// failAction is the error every command POST /backup/actions accepts ends with
 	failAction string
-	// failRestoreAction is the error every restore_remote command of the actions endpoint ends with once it
-	// downloaded the backup, which leaves the downloaded copy behind
+	// failRestoreAction is the error every restore or restore_remote command of the actions endpoint ends with,
+	// once restore_remote downloaded the backup, which leaves the downloaded copy behind
 	failRestoreAction string
 	// remoteListStatus, when set, answers every list of the remote backups with this HTTP status
 	remoteListStatus int
@@ -184,6 +196,8 @@ type stubOp struct {
 	polls  int
 	done   bool
 	epoch  int
+	// fails is the error the operation ends with, as the host was when it accepted it
+	fails string
 }
 
 // stubAction is a row of the actions log of a command POST /backup/actions accepted: it has a
@@ -243,11 +257,7 @@ type sidecarStub struct {
 
 func newSidecarStub(t *testing.T, hosts map[string]*stubHost) *sidecarStub {
 	t.Helper()
-	for _, tool := range []string{"bash", "curl", "base64", "sort", "awk", "tr", "date"} {
-		if _, err := exec.LookPath(tool); err != nil {
-			t.Skipf("%s is required to run the Job script: %v", tool, err)
-		}
-	}
+	requireOrchestrator(t)
 	s := &sidecarStub{t: t, hosts: hosts, ops: map[string]*stubOp{}}
 	s.server = httptest.NewServer(s)
 	t.Cleanup(s.server.Close)
@@ -325,6 +335,11 @@ func (s *sidecarStub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		s.serveGet(w, h, call, segments)
 	case http.MethodPost:
+		if (h.lockedActions > 0) && (segments[0] == "actions") {
+			h.lockedActions--
+			writeError(w, http.StatusInternalServerError, segments[0], "another operation is currently running")
+			return
+		}
 		if h.lockedPosts > 0 {
 			h.lockedPosts--
 			// clickhouse-backup 2.8.1 refuses a command of the actions endpoint with 500, others with 423
@@ -335,12 +350,15 @@ func (s *sidecarStub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			writeError(w, code, segments[0], "another operation is currently running")
 			return
 		}
-		if h.proxyFailsPosts {
+		failing := h.posts >= h.failPostsAfter
+		if h.proxyFailsPosts && failing {
+			h.posts++
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
-		h.posted = true
-		if h.hangUpPosts {
+		h.posts++
+		h.posted = h.posts >= h.postsBeforePosted
+		if h.hangUpPosts && failing {
 			conn, _, err := w.(http.Hijacker).Hijack()
 			if err != nil {
 				s.t.Errorf("cannot hang up on %s %s: %v", r.Method, r.URL, err)
@@ -417,7 +435,7 @@ func (s *sidecarStub) serveGet(w http.ResponseWriter, h *stubHost, call stubCall
 					a.polls--
 				} else {
 					a.status, a.err = "success", cmp.Or(h.failAction, a.fails)
-					if fields := strings.Fields(a.command); (a.err == "") && (h.failRestoreAction != "") && (fields[0] == "restore_remote") {
+					if fields := strings.Fields(a.command); (a.err == "") && (h.failRestoreAction != "") && ((fields[0] == "restore_remote") || (fields[0] == "restore")) {
 						completeStubOp(h, "restore_remote", fields[len(fields)-1])
 						a.err = h.failRestoreAction
 					}
@@ -466,6 +484,9 @@ func (s *sidecarStub) serveGet(w http.ResponseWriter, h *stubHost, call stubCall
 			return
 		}
 		s.serveBackupTables(w, h, call.query.Get("table"))
+	// The live tables a pattern matches, which takes a query of ClickHouse: the system ones are left out
+	case (segments[0] == "tables") && (len(segments) == 1):
+		writeRows[map[string]string](w, http.StatusOK)
 	case (segments[0] == "tables") && (len(segments) == 2) && (segments[1] == "all"):
 		w.WriteHeader(http.StatusOK)
 		rows := []tableRow{
@@ -518,9 +539,14 @@ func (s *sidecarStub) serveStatus(w http.ResponseWriter, h *stubHost, id string)
 		writeRows(w, http.StatusOK, row)
 		return
 	}
-	if failure, failed := h.failOp[op.kind]; failed {
+	if failure, failed := h.failOp[op.kind]; failed || (op.fails != "") {
+		if (op.kind == "create_remote") && h.leavesFailedUpload && !op.done {
+			op.done = true
+			h.local = append(h.local, local(op.name))
+			h.remote = append(h.remote, broken(op.name))
+		}
 		row["status"] = "error"
-		row["error"] = failure
+		row["error"] = cmp.Or(failure, op.fails)
 		writeRows(w, http.StatusOK, row)
 		return
 	}
@@ -611,8 +637,10 @@ func completeStubOp(h *stubHost, kind, name string, base ...string) {
 		}
 		h.remote = append(h.remote, backup)
 	case "download", "restore_remote":
-		if !h.noLocalOnDownload && (findStubBackup(h.local, name) < 0) {
-			h.local = append(h.local, stubBackup{Name: name, Location: "local", Desc: "regular"})
+		if i := findStubBackup(h.local, name); !h.noLocalOnDownload && (i >= 0) {
+			h.local[i] = local(name)
+		} else if !h.noLocalOnDownload {
+			h.local = append(h.local, local(name))
 		}
 	}
 }
@@ -667,9 +695,24 @@ func (h *stubHost) resumePending() {
 
 func (s *sidecarStub) servePost(w http.ResponseWriter, h *stubHost, call stubCall, segments []string) {
 	startOp := func(kind, name string, code int) {
+		if h.failSubmit != "" {
+			writeError(w, http.StatusInternalServerError, kind, h.failSubmit)
+			return
+		}
 		s.nextOp++
 		id := fmt.Sprintf("op-%d", s.nextOp)
-		s.ops[id] = &stubOp{host: call.host, kind: kind, name: name, params: call.query, polls: 1, epoch: h.epoch}
+		op := &stubOp{host: call.host, kind: kind, name: name, params: call.query, polls: 1, epoch: h.epoch}
+		// clickhouse-backup 2.8.1 downloads no backup it holds a copy of, and restores none it holds no copy of
+		switch {
+		// An incomplete copy, listed broken, is no copy: its download resumes
+		case (kind == "download") && (findStubBackup(h.local, name) >= 0) && !strings.HasPrefix(h.local[findStubBackup(h.local, name)].Desc, "broken"):
+			op.fails = fmt.Sprintf("'%s' already exists", name)
+		case (kind == "download") && (findStubBackup(h.remote, name) < 0):
+			op.fails = fmt.Sprintf("'%s' is not found on remote storage", name)
+		case (kind == "restore") && (findStubBackup(h.local, name) < 0):
+			op.fails = fmt.Sprintf("'%s' is not found on local storage", name)
+		}
+		s.ops[id] = op
 		if h.lostOps {
 			h.restart(kind, name, call.query)
 		}
@@ -679,7 +722,8 @@ func (s *sidecarStub) servePost(w http.ResponseWriter, h *stubHost, call stubCal
 	case segments[0] == "actions":
 		// clickhouse-backup 2.8.1 takes the flags of a command after its name alone
 		fields := strings.Fields(call.command)
-		if (len(fields) < 2) || ((fields[0] != "restore_remote") && (fields[0] != "download")) {
+		if (len(fields) < 2) || ((fields[0] != "restore_remote") && (fields[0] != "download") && (fields[0] != "restore") &&
+			(fields[0] != "create_remote")) {
 			writeError(w, http.StatusBadRequest, call.command, "unknown command")
 			return
 		}
@@ -694,6 +738,16 @@ func (s *sidecarStub) servePost(w http.ResponseWriter, h *stubHost, call stubCal
 		})
 		if h.loseActions {
 			h.epoch++
+			// A create_remote whose upload the sidecar resumes, without its --env flags
+			if fields[0] == "create_remote" {
+				params := url.Values{}
+				for _, field := range fields {
+					if base, found := strings.CutPrefix(field, "--diff-from-remote="); found {
+						params.Set("diff-from-remote", base)
+					}
+				}
+				h.restart("create_remote", fields[len(fields)-1], params)
+			}
 		}
 		writeRows(w, http.StatusOK, map[string]string{"status": "acknowledged", "operation": call.command})
 	case segments[0] == "create_remote":
@@ -702,6 +756,8 @@ func (s *sidecarStub) servePost(w http.ResponseWriter, h *stubHost, call stubCal
 		startOp("download", segments[1], http.StatusOK)
 	case (segments[0] == "restore_remote") && (len(segments) == 2):
 		startOp("restore_remote", segments[1], http.StatusOK)
+	case (segments[0] == "restore") && (len(segments) == 2):
+		startOp("restore", segments[1], http.StatusOK)
 	case (segments[0] == "delete") && (len(segments) == 3):
 		list := &h.remote
 		if segments[1] == "local" {
@@ -746,6 +802,14 @@ func (h *stubHost) readBackups(fields []string) []stubBackup {
 func (h *stubHost) actionFailure(fields []string) string {
 	name := fields[len(fields)-1]
 	switch {
+	case fields[0] == "create_remote":
+		return h.failOp["create_remote"]
+	case (fields[0] == "restore") && (findStubBackup(h.local, name) < 0):
+		return fmt.Sprintf("'%s' is not found on local storage", name)
+	case (fields[0] == "restore") && h.schemaCopies[name] && slices.Contains(fields, "--data"):
+		return fmt.Sprintf("the local copy of %s holds the schema alone: no data was restored", name)
+	case fields[0] == "restore":
+		return ""
 	case findStubBackup(h.readBackups(fields), name) < 0:
 		return fmt.Sprintf("'%s' is not found on remote storage", name)
 	case (fields[0] == "download") && (findStubBackup(h.local, name) >= 0):
@@ -761,6 +825,16 @@ func (h *stubHost) actionFailure(fields []string) string {
 // entities only when it downloaded them; a restore, the copy it downloaded
 func (h *stubHost) completeAction(fields []string) {
 	name := fields[len(fields)-1]
+	if fields[0] == "create_remote" {
+		base := ""
+		for _, field := range fields {
+			if value, found := strings.CutPrefix(field, "--diff-from-remote="); found {
+				base = value
+			}
+		}
+		completeStubOp(h, "create_remote", name, base)
+		return
+	}
 	if fields[0] != "download" {
 		completeStubOp(h, fields[0], name)
 		return
@@ -790,13 +864,13 @@ func findStubBackup(list []stubBackup, name string) int {
 	return -1
 }
 
-// run executes jobScript under bash with only the given environment on top of the API settings
+// run executes orchestratorScript under bash with only the given environment on top of the API settings
 func (s *sidecarStub) run(env map[string]string) (int, string) {
 	s.t.Helper()
-	return s.runScript(jobScript, env)
+	return s.runScript(orchestratorScript, env)
 }
 
-// runScript executes script, a variant of jobScript, as run does
+// runScript executes script, a variant of orchestratorScript, as run does
 func (s *sidecarStub) runScript(script string, env map[string]string) (int, string) {
 	s.t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -812,7 +886,9 @@ func (s *sidecarStub) runScript(script string, env map[string]string) (int, stri
 	for name, value := range env {
 		vars[name] = value
 	}
-	cmd := exec.CommandContext(ctx, "bash", "-c", script)
+	// The script runs from a file, as the Job runs it: as an argument it would exceed the length Linux allows one,
+	// MAX_ARG_STRLEN
+	cmd := scriptCommand(ctx, s.t, script)
 	for name, value := range vars {
 		cmd.Env = append(cmd.Env, name+"="+value)
 	}
@@ -899,29 +975,43 @@ func local(name string) stubBackup {
 }
 
 func TestJobScriptSyntax(t *testing.T) {
+	bashOnly(t)
 	if _, err := exec.LookPath("bash"); err != nil {
 		t.Skip("bash is not available")
 	}
 	cmd := exec.Command("bash", "-n")
-	cmd.Stdin = strings.NewReader(jobScript)
+	cmd.Stdin = strings.NewReader(orchestratorScript)
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
 }
 
+// declaredScriptEnv are the variables of the environment of a Job the orchestrator scripts read
+var declaredScriptEnv = []string{
+	envOperation, envAPIPort, envAPIUsername, envAPIPassword, envPollInterval, envTerminationMessagePath,
+	envCluster, envBackupName, envBackupNamePrefix, envBackupHosts, envRetentionHosts,
+	envSchemaOnly, envTables, envPartitions, envDiffFromRemote, envNoDataMessage,
+	envSchedules, envScheduleTimezone, envCronJobName, envJobName, envRestoreInProgress, envBackupTransport,
+	envBackupPodWaitSeconds, envEventObjectAPIVersion, envEventObjectKind, envEventObjectName, envEventObjectUID,
+	envPodNamespace, envPodName,
+	envVerifyHosts, envSchemaHosts, envDataHosts, envGuardHosts, envOverwrite, envValidateTopology,
+	envRestoreRBAC, envRBACNotRestoredMessage, envUnchangedExitCode, envReplicated, envMaxTableSizeToDrop,
+	envPathClusters, envPathSelf, envPathInstallation, envPathNamespace, envPathReplicaSelection,
+	envDefaultPath, envDefaultObjectDiskPath, envSourceInstallation, envSourceNamespace, envSkipTables, envSkipTableEngines,
+	envDatabaseMapping, envBackupFallbackHosts, envHostsUsedMessage, envBackupNaming, envShardNumbers, envNamingInstallation,
+	envNamingNamespace, envKeepBackups, envPreviousSchedules, envHeldBackupsMessage, envConfigOverrides,
+}
+
 func TestJobScriptReadsDeclaredEnv(t *testing.T) {
-	for _, name := range []string{
-		envOperation, envAPIPort, envAPIUsername, envAPIPassword, envPollInterval, envTerminationMessagePath,
-		envCluster, envBackupName, envBackupNamePrefix, envCronJobName, envJobName, envBackupHosts, envRetentionHosts,
-		envSchemaOnly, envTables, envPartitions, envDiffFromRemote, envKeepLast, envNoDataMessage,
-		envVerifyHosts, envSchemaHosts, envDataHosts, envGuardHosts, envOverwrite, envValidateTopology,
-		envRestoreRBAC, envRBACNotRestoredMessage, envUnchangedExitCode, envReplicated, envMaxTableSizeToDrop,
-		envPathClusters, envPathSelf, envPathInstallation, envPathNamespace, envPathReplicaSelection,
-		envDefaultPath, envDefaultObjectDiskPath, envSourceInstallation, envSourceNamespace,
-	} {
-		require.Regexp(t, regexp.MustCompile(`\$\{!?`+name+`\b|\b(parse_hosts|is_true|check_name|default_path "\$\{index\}") `+name+`\b`), jobScript, name)
+	bashOnly(t)
+	for _, name := range declaredScriptEnv {
+		require.Regexp(t, regexp.MustCompile(`\$\{!?`+name+`\b|\b(parse_hosts|is_true|check_name|default_path "\$\{index\}") `+name+`\b`), orchestratorScript, name)
 	}
 	for _, operation := range []string{operationBackup, operationVerify, operationRestore} {
-		require.Contains(t, jobScript, "\n"+operation+") do_"+operation+" ;;")
+		require.Contains(t, orchestratorScript, "\n\t"+operation+") do_"+operation+" ;;")
+	}
+	require.NotRegexp(t, `\bKEEP_LAST\b`, orchestratorScript, "KEEP_LAST is no longer read")
+	for _, transport := range []string{backupTransportSidecar, backupTransportPod} {
+		require.Regexp(t, `\s`+transport+`\) `, orchestratorScript)
 	}
 }
 
@@ -929,24 +1019,25 @@ func TestJobScriptReadsDeclaredEnv(t *testing.T) {
 // them, the operator's builder names them by: the script knows exactly the keys PathCheckKeys lists,
 // and the replica selections of the API.
 func TestJobScriptReadsThePathCheckEnv(t *testing.T) {
-	keys := regexp.MustCompile(`(?m)^PATH_CHECK_KEYS=\(([^)]*)\)$`).FindStringSubmatch(jobScript)
+	bashOnly(t)
+	keys := regexp.MustCompile(`(?m)^PATH_CHECK_KEYS=\(([^)]*)\)$`).FindStringSubmatch(orchestratorScript)
 	require.NotNil(t, keys, "the script lists its keys in PATH_CHECK_KEYS")
 	require.Equal(t, PathCheckKeys, strings.Fields(keys[1]))
 	require.Equal(t, "REMOTE_STORAGE", PathCheckKeys[0])
 	for _, prefix := range []string{"S3", "GCS", "AZBLOB", "COS", "FTP", "SFTP"} {
 		require.Contains(t, PathCheckKeys, prefix+"_PATH")
 		require.Contains(t, PathCheckKeys, prefix+"_OBJECT_DISK_PATH")
-		require.Contains(t, jobScript, ") REPLY="+prefix+" ;;")
+		require.Contains(t, orchestratorScript, ") REPLY="+prefix+" ;;")
 	}
 
 	require.Equal(t, "PATH_12_S3_PATH", pathClusterEnv(12, "S3_PATH"))
-	require.Contains(t, jobScript, `local name="`+pathEnvPrefix+`$1_$2"`)
-	require.Contains(t, jobScript, `local own="`+pathEnvPrefix+`$1_$2"`)
+	require.Contains(t, orchestratorScript, `local name="`+pathEnvPrefix+`$1_$2"`)
+	require.Contains(t, orchestratorScript, `local own="`+pathEnvPrefix+`$1_$2"`)
 	for _, name := range []string{pathEnvCluster, pathEnvShards, pathEnvUnverifiable} {
-		require.Contains(t, jobScript, `path_setting "${index}" `+name+"\n")
+		require.Contains(t, orchestratorScript, `path_setting "${index}" `+name+"\n")
 	}
-	require.Contains(t, jobScript, `"" | `+string(api.ReplicaSelectionFirstPerShard)+` | `+string(api.ReplicaSelectionAllReplicas)+`) ;;`)
-	require.Contains(t, jobScript, `${selection} == `+string(api.ReplicaSelectionAllReplicas)+` `)
+	require.Contains(t, orchestratorScript, `"" | `+string(api.ReplicaSelectionFirstPerShard)+` | `+string(api.ReplicaSelectionAllReplicas)+`) ;;`)
+	require.Contains(t, orchestratorScript, `${selection} == `+string(api.ReplicaSelectionAllReplicas)+` `)
 }
 
 func TestJobScriptBackup(t *testing.T) {
@@ -985,6 +1076,48 @@ func TestJobScriptBackup(t *testing.T) {
 	require.Equal(t, []string{"base", "bk-1"}, s.remoteNames("chi-a-1-0"))
 }
 
+// A backup of one replica per shard runs on the preferred replica of every shard, backup.preferredReplica, as the
+// Altinity Cloud Manager backs up its backupReplica: a preferred replica whose ClickHouse does not answer leaves the
+// backup of its shard to the first replica, whose storage path is the shard's too.
+func TestJobScriptBacksUpThePreferredReplica(t *testing.T) {
+	s := newSidecarStub(t, map[string]*stubHost{"a1": {}, "b1": {status: http.StatusInternalServerError}, "a0": {}, "b0": {}})
+	termination := filepath.Join(t.TempDir(), "termination-log")
+	code, out := s.run(map[string]string{envOperation: operationBackup, envBackupName: "bk-1",
+		envBackupHosts: "a1 b1", envBackupFallbackHosts: "a0 b0", envTerminationMessagePath: termination,
+		envHostsUsedMessage: HostsUsedMessage})
+	require.Zero(t, code, out)
+	require.Contains(t, out, "WARNING: b1: the preferred replica does not answer (curl exit 0, HTTP 500), backing up b0 instead")
+	// The operator records the replicas the backup was made on, as the termination message tells them
+	message, err := os.ReadFile(termination)
+	require.NoError(t, err)
+	pod := &core.Pod{Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{{Name: jobContainerName,
+		State: core.ContainerState{Terminated: &core.ContainerStateTerminated{Message: string(message)}}}}}}
+	require.Equal(t, []string{"a1", "b0"}, JobHostsUsed(pod), string(message))
+	require.False(t, JobBackupHoldsNoData(pod))
+	require.Equal(t, []string{"bk-1"}, s.remoteNames("a1"))
+	require.Equal(t, []string{"bk-1"}, s.remoteNames("b0"))
+	require.Empty(t, s.remoteNames("a0"))
+	for _, c := range s.matching(http.MethodGet, "/backup/tables") {
+		require.Equal(t, url.Values{"table": {"system.one"}}, c.query)
+	}
+
+	// Every preferred replica answers: the termination message tells nothing
+	s = newSidecarStub(t, map[string]*stubHost{"a1": {}, "b1": {}, "a0": {}, "b0": {}})
+	termination = filepath.Join(t.TempDir(), "termination-log")
+	code, out = s.run(map[string]string{envOperation: operationBackup, envBackupName: "bk-1",
+		envBackupHosts: "a1 b1", envBackupFallbackHosts: "a0 b0", envTerminationMessagePath: termination,
+		envHostsUsedMessage: HostsUsedMessage})
+	require.Zero(t, code, out)
+	require.NoFileExists(t, termination)
+
+	// Fallback hosts of another count are refused
+	s = newSidecarStub(t, map[string]*stubHost{"a1": {}})
+	code, out = s.run(map[string]string{envOperation: operationBackup, envBackupName: "bk-1",
+		envBackupHosts: "a1", envBackupFallbackHosts: "a0 b0", envUnchangedExitCode: "3"})
+	require.Equal(t, 3, code, out)
+	require.Contains(t, out, "BACKUP_FALLBACK_HOSTS must name a host for every host of BACKUP_HOSTS")
+}
+
 func TestJobScriptBackupWithoutOptions(t *testing.T) {
 	s := newSidecarStub(t, map[string]*stubHost{"chi-a-0-0": {}})
 	code, out := s.run(map[string]string{
@@ -1009,7 +1142,7 @@ func TestJobScriptBackupScheduleName(t *testing.T) {
 	require.Zero(t, code, out)
 	creates := s.matching(http.MethodPost, "/backup/create_remote")
 	require.Len(t, creates, 1)
-	require.Regexp(t, `^nightly\.db-[0-9]{8}-[0-9]{6}$`, creates[0].query.Get("name"))
+	require.Regexp(t, `^nightly\.db-[0-9]{14}$`, creates[0].query.Get("name"))
 }
 
 func TestJobScriptBackupRefusals(t *testing.T) {
@@ -1033,11 +1166,10 @@ func TestJobScriptBackupRefusals(t *testing.T) {
 			output: "base backup base is missing in the storage of h1",
 		},
 		{
-			name:    "hosts sharing one storage path",
-			hosts:   map[string]*stubHost{"h0": {}},
-			env:     map[string]string{envBackupName: "bk-1", envBackupHosts: "h0 h0"},
-			output:  "must not share a storage path",
-			creates: 1,
+			name:   "a host listed twice",
+			hosts:  map[string]*stubHost{"h0": {}},
+			env:    map[string]string{envBackupName: "bk-1", envBackupHosts: "h0 h0"},
+			output: "BACKUP_HOSTS lists h0 twice: hosts of one backup must not share a storage path",
 		},
 	}
 	for _, tt := range tests {
@@ -1080,7 +1212,12 @@ func TestJobScriptRejectsInvalidEnv(t *testing.T) {
 		"poll interval":         {envPollInterval: "1;x"},
 		"no password":           {envAPIPassword: ""},
 		"boolean":               {envSchemaOnly: "yes please"},
-		"keep last":             {envKeepLast: "-1"},
+		"schedules":             {envSchedules: "period=daily keep=1"},
+		"a schedule time":       {envSchedules: "period=daily time=5:00 keep=1"},
+		"restore in progress":   {envRestoreInProgress: "maybe"},
+		"a time zone":           {envBackupName: "", envBackupNamePrefix: "daily", envScheduleTimezone: "Mars/Olympus"},
+		"a transport":           {envBackupTransport: "carrier-pigeon"},
+		"a pod wait":            {envBackupTransport: backupTransportPod, envBackupPodWaitSeconds: "soon"},
 		"no backup name":        {envBackupName: ""},
 		"consecutive dots":      {envBackupName: "a..b"},
 		"name with a slash":     {envBackupName: "a/b"},
@@ -1157,11 +1294,11 @@ func scriptWithTimeout(t *testing.T, script, name string, seconds int) string {
 	return setting.ReplaceAllString(script, fmt.Sprintf("%s=%d", name, seconds))
 }
 
-// scriptGivingUpAfter returns jobScript with the time it waits for an unreachable sidecar before
+// scriptGivingUpAfter returns orchestratorScript with the time it waits for an unreachable sidecar before
 // anything has changed set to seconds
 func scriptGivingUpAfter(t *testing.T, seconds int) string {
 	t.Helper()
-	return scriptWithTimeout(t, jobScript, "UNREACHABLE_TIMEOUT", seconds)
+	return scriptWithTimeout(t, orchestratorScript, "UNREACHABLE_TIMEOUT", seconds)
 }
 
 // While nothing has changed, a sidecar that does not answer, such as one of a stopped host, fails
@@ -1207,20 +1344,25 @@ func TestJobScriptGivesUpOnASidecarGoneAfterAChange(t *testing.T) {
 	for name, tc := range map[string]struct {
 		env  map[string]string
 		gone string
+		// posts is the number of POSTs the host accepts before it is gone
+		posts int
 	}{
 		"backup": {
 			env:  map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0 h1"},
 			gone: "h1",
 		},
+		// The download of the backup changes nothing, the data restore after it does
 		"restore": {
-			env:  restoreEnv(nil),
-			gone: "d1",
+			env:   restoreEnv(nil),
+			gone:  "d1",
+			posts: 2,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			hosts := restoreHosts()
 			hosts["h0"], hosts["h1"] = &stubHost{}, &stubHost{}
 			hosts[tc.gone].unavailableAfterPost = -1
+			hosts[tc.gone].postsBeforePosted = tc.posts
 			s := newSidecarStub(t, hosts)
 			script := scriptWithTimeout(t, scriptGivingUpAfter(t, 0), "MUTATED_UNREACHABLE_TIMEOUT", 0)
 			code, out := s.runScript(script, tc.env)
@@ -1239,8 +1381,40 @@ func TestJobScriptOperationFailure(t *testing.T) {
 		})
 		code, out := s.run(map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0 h1"})
 		require.Equal(t, 1, code, out)
-		require.Contains(t, out, "can't upload: disk full")
-		require.Len(t, s.matching(http.MethodPost, "/backup/create_remote"), 1, "the next host is not attempted")
+		require.Contains(t, out, "ERROR: backup bk-1 failed on h0: h0: create_remote bk-1 ended with status 'error': can't upload: disk full")
+		// Every host makes its part at once: the others finish all the same
+		require.Len(t, s.matching(http.MethodPost, "/backup/create_remote"), 2)
+		require.Equal(t, []string{"bk-1"}, s.remoteNames("h1"))
+	})
+	t.Run("errors of several hosts", func(t *testing.T) {
+		s := newSidecarStub(t, map[string]*stubHost{
+			"h0": {failOp: map[string]string{"create_remote": "disk full"}},
+			"h1": {},
+			"h2": {failOp: map[string]string{"create_remote": "no access"}},
+		})
+		code, out := s.run(map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0 h1 h2"})
+		require.Equal(t, 1, code, out)
+		require.Contains(t, out, "ERROR: backup bk-1 failed on h0, h2: h0: create_remote bk-1 ended with status 'error': disk full; "+
+			"h2: create_remote bk-1 ended with status 'error': no access")
+		require.Equal(t, []string{"bk-1"}, s.remoteNames("h1"))
+	})
+	t.Run("a submission that fails", func(t *testing.T) {
+		s := newSidecarStub(t, map[string]*stubHost{"h0": {}, "h1": {}, "h2": {}})
+		s.hosts["h1"].failSubmit = "can't create: no such table"
+		code, out := s.run(map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0 h1 h2"})
+		require.Equal(t, 1, code, out)
+		require.Contains(t, out, "ERROR: backup bk-1 failed on h1: h1: create_remote rejected (HTTP 500): can't create: no such table")
+		// No host after it gets the backup submitted, those before it finish theirs; what the refused one may have
+		// left is deleted
+		require.Equal(t, []string{"h0 POST /backup/create_remote", "h1 POST /backup/create_remote",
+			"h1 POST /backup/delete/local/bk-1", "h1 POST /backup/delete/remote/bk-1"}, func() []string {
+			var calls []string
+			for _, c := range s.matching(http.MethodPost, "/") {
+				calls = append(calls, c.String())
+			}
+			return calls
+		}())
+		require.Equal(t, []string{"bk-1"}, s.remoteNames("h0"))
 	})
 	t.Run("user input echoed in the status command", func(t *testing.T) {
 		s := newSidecarStub(t, map[string]*stubHost{"h0": {failOp: map[string]string{"create_remote": "no tables for backup"}}})
@@ -1255,93 +1429,335 @@ func TestJobScriptOperationFailure(t *testing.T) {
 	})
 }
 
+// clickhouse-backup deletes the local backup of a create_remote whose create fails, but not that of one whose upload
+// fails, nor the part of the remote backup it uploaded, which lists as broken: the Job deletes both on the host it
+// failed on, a copy that is not there being no failure, and fails all the same.
+func TestJobScriptDeletesWhatAFailedBackupLeft(t *testing.T) {
+	s := newSidecarStub(t, map[string]*stubHost{
+		"h0": {failOp: map[string]string{"create_remote": "can't upload: connection reset"}, leavesFailedUpload: true},
+		"h1": {failOp: map[string]string{"create_remote": "can't create: no tables"}},
+		"h2": {},
+	})
+	code, out := s.run(map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0 h1 h2"})
+	require.Equal(t, 1, code, out)
+	require.Contains(t, out, "ERROR: backup bk-1 failed on h0, h1: ")
+	require.Contains(t, out, "h0: the local copy of the failed backup bk-1 deleted")
+	require.Contains(t, out, "h0: the remote copy of the failed backup bk-1 deleted")
+	require.Contains(t, out, "h1: no remote copy of the failed backup bk-1 to delete")
+	require.Empty(t, s.hosts["h0"].local)
+	require.Empty(t, s.remoteNames("h0"))
+	require.Equal(t, []string{"bk-1"}, s.remoteNames("h2"), "a host that made its part keeps it")
+	for _, c := range s.matching(http.MethodPost, "/backup/delete/") {
+		require.NotEqual(t, "h2", c.host)
+	}
+
+	// A copy that cannot be deleted is left with a warning
+	s = newSidecarStub(t, map[string]*stubHost{"h0": {failOp: map[string]string{"create_remote": "can't upload"}, leavesFailedUpload: true,
+		deleteFail: map[string]string{"bk-1": "access denied"}}})
+	code, out = s.run(map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0"})
+	require.Equal(t, 1, code, out)
+	require.Contains(t, out, "WARNING: h0: the remote copy of the failed backup bk-1 is left: ")
+	require.Contains(t, out, "ERROR: backup bk-1 failed on h0: h0: create_remote bk-1 ended with status 'error': can't upload")
+}
+
+// scheduledEnv returns the environment of a scheduled backup of the series "daily" on hosts, which are its retention
+// hosts too, of the slot due at the RFC 3339 time slot, with the schedule entries schedules
+func scheduledEnv(hosts, schedules, slot string) map[string]string {
+	return map[string]string{
+		envOperation:        operationBackup,
+		envBackupNamePrefix: "daily",
+		envBackupHosts:      hosts,
+		envRetentionHosts:   hosts,
+		envSchedules:        schedules,
+		envCronJobName:      testCronJobName,
+		envJobName:          slotJobName(slot),
+	}
+}
+
+// testCronJobName is the CronJob of the scheduled runs of the tests
+const testCronJobName = "daily-main-backup"
+
+// slotJobName returns the name the CronJob controller gives the Job of testCronJobName of the slot due at slot, unix
+// seconds or RFC 3339: "<CronJob>-<minutes since the epoch>"
+func slotJobName(slot string) string {
+	seconds, err := strconv.ParseInt(slot, 10, 64)
+	if err != nil {
+		due, err := time.Parse(time.RFC3339, slot)
+		if err != nil {
+			panic(err)
+		}
+		seconds = due.Unix()
+	}
+	return fmt.Sprintf("%s-%d", testCronJobName, seconds/60)
+}
+
+// dailyKeeping returns a schedule of one daily entry at midnight that keeps keep backups
+func dailyKeeping(keep int) string {
+	return "period=daily time=00:00 keep=" + strconv.Itoa(keep)
+}
+
+// Retention after a scheduled backup, as the cleanup of remote backups of the Altinity Cloud Manager: every entry of the
+// schedule keeps its newest backups of its slots, the newest backup and the one just made are kept in any case, a
+// backup made at once from the schedule is kept while it is no older than the oldest scheduled backup kept, and the rest
+// of them goes, newest first: an incremental before its base, which clickhouse-backup rebases its dependents on. A name
+// of another form is never touched, and a failure only warns.
 func TestJobScriptRetention(t *testing.T) {
 	backups := func() []stubBackup {
 		return []stubBackup{
+			remote("daily-20200101000000", ""),
+			remote("daily-20200102000000", ""),
+			remote("daily-20200103000000", "daily-20200101000000"),
+			remote("daily-20200103T120000", ""),
+			remote("daily-x-20200101000000", ""),
+			remote("dailyx-20200101000000", ""),
 			remote("daily-20200101-000000", ""),
-			remote("daily-20200102-000000", ""),
-			remote("daily-20200103-000000", "daily-20200101-000000"),
-			remote("daily-x-20200101-000000", ""),
-			remote("dailyx-20200101-000000", ""),
-			remote("manual-1", "daily-20200102-000000"),
-			remote("daily-20200104-000000", ""),
+			remote("manual-1", "daily-20200102000000"),
+			remote("daily-20200104000000", ""),
+			remote("daily-20200104T120000", "daily-20200104000000"),
 		}
 	}
 	s := newSidecarStub(t, map[string]*stubHost{
 		"h0": {remote: backups()},
-		"h1": {remote: backups(), deleteFail: map[string]string{"daily-20200101-000000": "access denied"}},
+		"h1": {remote: backups(), deleteFail: map[string]string{"daily-20200101000000": "access denied"}},
 	})
-	code, out := s.run(map[string]string{
-		envOperation:        operationBackup,
-		envBackupNamePrefix: "daily",
-		envBackupHosts:      "h0 h1",
-		envRetentionHosts:   "h0 h1 bad;host",
-		envKeepLast:         "2",
-	})
+	env := scheduledEnv("h0 h1", dailyKeeping(2), "2020-01-05T00:00:00Z")
+	env[envRetentionHosts] = "h0 h1 bad;host"
+	code, out := s.run(env)
 	require.Zero(t, code, "retention failures never fail the backup:\n%s", out)
 	creates := s.matching(http.MethodPost, "/backup/create_remote")
 	require.Len(t, creates, 2)
 	made := creates[0].query.Get("name")
+	require.Equal(t, "daily-20200105000000", made)
 	require.Contains(t, out, "access denied")
 	require.Contains(t, out, "retention skipped an invalid host name")
-	require.Contains(t, out, "h0: retention keeps daily-20200102-000000, manual-1 is based on it")
 
 	var deletes []string
 	for _, c := range s.matching(http.MethodPost, "/backup/delete/") {
 		deletes = append(deletes, c.host+" "+c.path)
 	}
+	obsolete := []string{"daily-20200103T120000", "daily-20200103000000", "daily-20200102000000", "daily-20200101000000"}
+	var want []string
+	for _, host := range []string{"h0", "h1"} {
+		for _, name := range obsolete {
+			want = append(want, host+" /backup/delete/remote/"+name)
+		}
+	}
+	require.Equal(t, want, deletes, "newest first, an incremental before its base, which is not protected")
 	require.Equal(t, []string{
-		"h0 /backup/delete/remote/daily-20200103-000000",
-		// Freed within the same pass once daily-20200103-000000 is gone
-		"h0 /backup/delete/remote/daily-20200101-000000",
-		"h1 /backup/delete/remote/daily-20200103-000000",
-		"h1 /backup/delete/remote/daily-20200101-000000",
-	}, deletes)
-	require.Equal(t, []string{
-		"daily-20200102-000000", "daily-x-20200101-000000", "dailyx-20200101-000000", "manual-1", "daily-20200104-000000", made,
+		"daily-x-20200101000000", "dailyx-20200101000000", "daily-20200101-000000", "manual-1", "daily-20200104000000",
+		"daily-20200104T120000", made,
 	}, s.remoteNames("h0"))
 	require.Equal(t, []string{
-		"daily-20200101-000000", "daily-20200102-000000", "daily-x-20200101-000000", "dailyx-20200101-000000", "manual-1",
-		"daily-20200104-000000", made,
+		"daily-20200101000000", "daily-x-20200101000000", "dailyx-20200101000000", "daily-20200101-000000", "manual-1",
+		"daily-20200104000000", "daily-20200104T120000", made,
 	}, s.remoteNames("h1"))
 }
 
-// The backup list comes from the storage, which anybody with access to it can fill: a row
-// without a name never fails the backup the run has made, and still keeps the base it depends on.
+// The backup list comes from the storage, which anybody with access to it can fill: a row without a name never fails the
+// backup the run has made, nor keeps anything.
 func TestJobScriptRetentionToleratesARowWithoutName(t *testing.T) {
 	s := newSidecarStub(t, map[string]*stubHost{"h0": {remote: []stubBackup{
-		remote("daily-20200101-000000", ""), remote("daily-20200102-000000", ""), remote("", "daily-20200101-000000"),
+		remote("daily-20200101000000", ""), remote("daily-20200102000000", ""), remote("", "daily-20200101000000"),
 	}}})
-	code, out := s.run(map[string]string{
-		envOperation:        operationBackup,
-		envBackupNamePrefix: "daily",
-		envBackupHosts:      "h0",
-		envRetentionHosts:   "h0",
-		envKeepLast:         "1",
-	})
+	code, out := s.run(scheduledEnv("h0", dailyKeeping(1), "2020-01-03T00:00:00Z"))
 	require.Zero(t, code, out)
 	made := s.matching(http.MethodPost, "/backup/create_remote")[0].query.Get("name")
-	require.Equal(t, []string{"daily-20200101-000000", "", made}, s.remoteNames("h0"), out)
+	require.Equal(t, []string{"", made}, s.remoteNames("h0"), out)
+}
+
+// emptyBackup returns a backup listed complete with a size of 0: failed, or in progress, or of nothing at all
+func emptyBackup(name string) stubBackup {
+	return stubBackup{Name: name, Location: "remote", Desc: "tar, regular"}
+}
+
+// A backup listed with a size of 0, or broken, is neither counted nor deleted: it is failed, or in progress, an upload
+// in progress listing as broken until it completes. A backup that holds no data still has a size, as does every backup
+// of a sidecar that lists no sizes.
+func TestJobScriptRetentionCountsOnlyBackupsOfASize(t *testing.T) {
+	huge := func(name string) stubBackup {
+		backup := remote(name, "")
+		backup.DataSize = 1 << 63
+		return backup
+	}
+	for name, tc := range map[string]struct {
+		host stubHost
+		left []string
+	}{
+		"backups without data": {
+			host: stubHost{emptyBackups: true, remote: []stubBackup{
+				withoutData(remote("daily-20200101000000", "")), withoutData(remote("daily-20200102000000", "")),
+				withoutData(remote("daily-20200103000000", "")),
+			}},
+			left: []string{"daily-20200103000000"},
+		},
+		"a backup of size 0": {
+			host: stubHost{remote: []stubBackup{
+				remote("daily-20200101000000", ""), remote("daily-20200102000000", ""), remote("daily-20200103000000", ""),
+				emptyBackup("daily-20200104000000"),
+			}},
+			left: []string{"daily-20200103000000", "daily-20200104000000"},
+		},
+		"the newest backup of size 0": {
+			host: stubHost{emptyBackups: true, remote: []stubBackup{
+				remote("daily-20200101000000", ""), remote("daily-20200102000000", ""), emptyBackup("daily-29990101000000"),
+			}},
+			left: []string{"daily-20200102000000", "daily-29990101000000"},
+		},
+		// A broken backup is an upload that failed, whatever its size: it goes once a complete one is newer
+		"broken backups": {
+			host: stubHost{remote: []stubBackup{
+				broken("daily-20200101000000"), remote("daily-20200102000000", ""), remote("daily-20200103000000", ""),
+				broken("daily-20200104000000"),
+			}},
+			left: []string{"daily-20200103000000"},
+		},
+		"data beyond what bash arithmetic holds": {
+			host: stubHost{remote: []stubBackup{remote("daily-20200101000000", ""), huge("daily-20200102000000"), remote("daily-20200103000000", "")}},
+			left: []string{"daily-20200103000000"},
+		},
+		"a sidecar that lists no sizes": {
+			host: stubHost{sizelessList: true, remote: []stubBackup{
+				emptyBackup("daily-20200101000000"), emptyBackup("daily-20200102000000"), emptyBackup("daily-20200103000000"),
+			}},
+			left: []string{"daily-20200103000000"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			host := tc.host
+			s := newSidecarStub(t, map[string]*stubHost{"h0": &host})
+			code, out := s.run(scheduledEnv("h0", dailyKeeping(2), "2020-01-05T00:00:00Z"))
+			require.Zero(t, code, out)
+			made := s.matching(http.MethodPost, "/backup/create_remote")[0].query.Get("name")
+			require.Equal(t, append(tc.left, made), s.remoteNames("h0"), out)
+		})
+	}
+}
+
+// A run that failed on one host leaves complete copies on the others, which cannot be restored on their own: a backup
+// counts, and goes, only when every host lists it complete and of a size.
+func TestJobScriptRetentionCountsOnlyBackupsCompleteEverywhere(t *testing.T) {
+	for name, tc := range map[string]struct {
+		h0, h1       []stubBackup
+		left0, left1 []string
+	}{
+		// An incomplete backup goes from the hosts that hold it once a complete one is newer, as the Altinity Cloud
+		// Manager deletes every backup of a size
+		"a leftover of a failed run": {
+			h0: []stubBackup{remote("daily-20200101000000", ""), remote("daily-20200103000000", "")},
+			h1: []stubBackup{remote("daily-20200101000000", "")},
+		},
+		"backups from before a host was added": {
+			h0: []stubBackup{remote("daily-20200101000000", ""), remote("daily-20200102000000", "")},
+		},
+		"a broken copy": {
+			h0: []stubBackup{remote("daily-20200101000000", ""), remote("daily-20200102000000", "")},
+			h1: []stubBackup{remote("daily-20200101000000", ""), broken("daily-20200102000000")},
+		},
+		"a backup of size 0 on one host, missing on the other": {
+			h0:    []stubBackup{emptyBackup("daily-20200103000000")},
+			left0: []string{"daily-20200103000000"},
+		},
+		"a broken leftover of size 0 on every host": {
+			h0: []stubBackup{broken("daily-20200103000000")},
+			h1: []stubBackup{broken("daily-20200103000000")},
+		},
+		"a copy of size 0 on one host": {
+			h0:    []stubBackup{emptyBackup("daily-20200101000000"), remote("daily-20200102000000", "")},
+			h1:    []stubBackup{remote("daily-20200101000000", ""), remote("daily-20200102000000", "")},
+			left0: []string{"daily-20200101000000"},
+			left1: []string{"daily-20200101000000"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newSidecarStub(t, map[string]*stubHost{"h0": {remote: tc.h0}, "h1": {remote: tc.h1}})
+			code, out := s.run(scheduledEnv("h0 h1", dailyKeeping(1), "2020-01-05T00:00:00Z"))
+			require.Zero(t, code, out)
+			made := s.matching(http.MethodPost, "/backup/create_remote")[0].query.Get("name")
+			require.Equal(t, append(tc.left0, made), s.remoteNames("h0"), out)
+			require.Equal(t, append(tc.left1, made), s.remoteNames("h1"), out)
+		})
+	}
+}
+
+// Every entry keeps the newest backups of its own slots: a daily one those at its time, a weekly one those of its day of
+// the week (0 is Sunday), a monthly one those of its day of the month, the 31st being the last day of a shorter month.
+// A backup of no slot, made with the prefix by hand, goes.
+func TestJobScriptRetentionKeepsTheBackupsOfEveryEntry(t *testing.T) {
+	var backups []stubBackup
+	for day := time.Date(2026, time.January, 20, 0, 0, 0, 0, time.UTC); day.Before(time.Date(2026, time.March, 3, 0, 0, 0, 0, time.UTC)); day = day.AddDate(0, 0, 1) {
+		backups = append(backups, remote("daily-"+day.Format("20060102150405"), ""))
+	}
+	backups = append(backups, remote("daily-20260215120000", ""))
+	for name, tc := range map[string]struct {
+		schedules string
+		slot      string
+		backups   []stubBackup
+		left      []string
+	}{
+		"daily, weekly and monthly": {
+			schedules: "period=daily time=00:00 keep=2;period=weekly day=0 time=00:00 keep=2;period=monthly day=31 time=00:00 keep=2",
+			slot:      "2026-03-03T00:00:00Z",
+			backups:   backups,
+			left: []string{"daily-20260131000000", "daily-20260222000000", "daily-20260228000000", "daily-20260301000000",
+				"daily-20260302000000", "daily-20260303000000"},
+		},
+		"hourly and every 6 hours": {
+			schedules: "period=hour time=00:30 keep=3; period=6hours time=02:00 keep=2 ;",
+			slot:      "1767313800",
+			backups: func() []stubBackup {
+				var hourly []stubBackup
+				for hour := 0; hour < 24; hour++ {
+					for _, minute := range []int{0, 30} {
+						hourly = append(hourly, remote(fmt.Sprintf("daily-20260101%02d%02d00", hour, minute), ""))
+					}
+				}
+				return hourly
+			}(),
+			left: []string{"daily-20260101140000", "daily-20260101200000", "daily-20260101223000", "daily-20260101233000",
+				"daily-20260102003000"},
+		},
+		"slots in the time zone of the schedule": {
+			schedules: "period=daily time=02:00 keep=2",
+			slot:      "2026-01-03T01:00:00Z",
+			backups:   []stubBackup{remote("daily-20260101020000", ""), remote("daily-20260102020000", ""), remote("daily-20260102010000", "")},
+			left:      []string{"daily-20260102020000", "daily-20260103020000"},
+		},
+		"a name of no valid time": {
+			schedules: dailyKeeping(1),
+			slot:      "2026-01-03T00:00:00Z",
+			backups:   []stubBackup{remote("daily-20261399000000", ""), remote("daily-20260101000000", "")},
+			left:      []string{"daily-20260103000000", "daily-20261399000000"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newSidecarStub(t, map[string]*stubHost{"h0": {remote: slices.Clone(tc.backups)}})
+			env := scheduledEnv("h0", tc.schedules, tc.slot)
+			if strings.Contains(name, "time zone") {
+				env[envScheduleTimezone] = "Europe/Berlin"
+			}
+			code, out := s.run(env)
+			require.Zero(t, code, out)
+			left := s.remoteNames("h0")
+			slices.Sort(left)
+			require.Equal(t, tc.left, left, out)
+		})
+	}
 }
 
 // Every host keeps and deletes the same backups, which takes knowing what each of them holds: a
 // retention host that does not answer skips retention on every host, and is not retried.
 func TestJobScriptRetentionWithAnUnreachableHost(t *testing.T) {
 	s := newSidecarStub(t, map[string]*stubHost{
-		"h0":   {remote: []stubBackup{remote("daily-20200101-000000", ""), remote("daily-20200102-000000", "")}},
+		"h0":   {remote: []stubBackup{remote("daily-20200101000000", ""), remote("daily-20200102000000", "")}},
 		"down": {unavailable: -1},
 	})
-	code, out := s.run(map[string]string{
-		envOperation:        operationBackup,
-		envBackupNamePrefix: "daily",
-		envBackupHosts:      "h0",
-		envRetentionHosts:   "h0 down",
-		envKeepLast:         "1",
-	})
+	env := scheduledEnv("h0", dailyKeeping(1), "2020-01-03T00:00:00Z")
+	env[envRetentionHosts] = "h0 down"
+	code, out := s.run(env)
 	require.Zero(t, code, "retention failures never fail the backup:\n%s", out)
 	made := s.matching(http.MethodPost, "/backup/create_remote")[0].query.Get("name")
 	require.Contains(t, out, "retention skipped: down cannot be listed")
-	require.Equal(t, []string{"daily-20200101-000000", "daily-20200102-000000", made}, s.remoteNames("h0"))
+	require.Equal(t, []string{"daily-20200101000000", "daily-20200102000000", made}, s.remoteNames("h0"))
 	require.Empty(t, s.matching(http.MethodPost, "/backup/delete/"))
 	downCalls := 0
 	for _, c := range s.matching(http.MethodGet, "/") {
@@ -1352,115 +1768,6 @@ func TestJobScriptRetentionWithAnUnreachableHost(t *testing.T) {
 	require.Equal(t, 1, downCalls, "an unreachable retention host is not retried")
 }
 
-// A backup without data - of tables a pattern no longer matches, or of an installation recreated
-// empty - succeeds, but never takes the place of one that holds data: retention keeps the newest
-// backups with data and, apart from them, the newest without, so neither crowds out the other - nor
-// do the backups of a schedule switched to schema only. Data on an object disk counts as data, and
-// so does every backup of a sidecar that does not list sizes.
-func TestJobScriptRetentionCountsOnlyBackupsWithData(t *testing.T) {
-	const keep = 2
-	empty := func(name string) stubBackup {
-		return withoutData(remote(name, ""))
-	}
-	huge := func(name string) stubBackup {
-		backup := remote(name, "")
-		backup.DataSize = 1 << 63
-		return backup
-	}
-	onObjectDisk := func(name string) stubBackup {
-		backup := empty(name)
-		backup.ObjectDiskSize = stubDataSize
-		return backup
-	}
-	for name, tc := range map[string]struct {
-		host       stubHost
-		schemaOnly string
-		left       []string
-		warned     bool
-	}{
-		"runs that made nothing never push out data": {
-			host: stubHost{remote: []stubBackup{
-				remote("daily-20200101-000000", ""), remote("daily-20200102-000000", ""),
-				empty("daily-20200103-000000"), empty("daily-20200104-000000"),
-			}},
-			left: []string{"daily-20200102-000000", "daily-20200103-000000", "daily-20200104-000000"},
-		},
-		"a run that made nothing": {
-			host:   stubHost{emptyBackups: true, remote: []stubBackup{remote("daily-20200101-000000", ""), remote("daily-20200102-000000", "")}},
-			left:   []string{"daily-20200101-000000", "daily-20200102-000000"},
-			warned: true,
-		},
-		"a host that never holds data": {
-			host: stubHost{emptyBackups: true, remote: []stubBackup{
-				empty("daily-20200101-000000"), empty("daily-20200102-000000"), empty("daily-20200103-000000"),
-			}},
-			left:   []string{"daily-20200103-000000"},
-			warned: true,
-		},
-		"broken backups of a host that never holds data": {
-			host: stubHost{emptyBackups: true, remote: []stubBackup{
-				broken("daily-20200101-000000"), empty("daily-20200102-000000"),
-				broken("daily-20200103-000000"), empty("daily-20200104-000000"),
-			}},
-			left:   []string{"daily-20200104-000000"},
-			warned: true,
-		},
-		"data beyond what bash arithmetic holds": {
-			host: stubHost{remote: []stubBackup{
-				remote("daily-20200101-000000", ""),
-				huge("daily-20200102-000000"),
-			}},
-			left: []string{"daily-20200102-000000"},
-		},
-		"data on an object disk": {
-			host: stubHost{objectDiskBackups: true, remote: []stubBackup{onObjectDisk("daily-20200101-000000"), onObjectDisk("daily-20200102-000000")}},
-			left: []string{"daily-20200102-000000"},
-		},
-		"a schedule switched to schema only": {
-			host:       stubHost{emptyBackups: true, remote: []stubBackup{remote("daily-20200101-000000", ""), remote("daily-20200102-000000", "")}},
-			schemaOnly: "true",
-			left:       []string{"daily-20200101-000000", "daily-20200102-000000"},
-		},
-		"schema-only schedule": {
-			host:       stubHost{emptyBackups: true, remote: []stubBackup{empty("daily-20200101-000000"), empty("daily-20200102-000000")}},
-			schemaOnly: "true",
-			left:       []string{"daily-20200102-000000"},
-		},
-		"sidecar that lists no sizes": {
-			host: stubHost{emptyBackups: true, sizelessList: true, remote: []stubBackup{empty("daily-20200101-000000"), empty("daily-20200102-000000")}},
-			left: []string{"daily-20200102-000000"},
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			host := tc.host
-			s := newSidecarStub(t, map[string]*stubHost{"h0": &host})
-			path := filepath.Join(t.TempDir(), "termination-log")
-			code, out := s.run(map[string]string{
-				envOperation:              operationBackup,
-				envBackupNamePrefix:       "daily",
-				envBackupHosts:            "h0",
-				envRetentionHosts:         "h0",
-				envKeepLast:               strconv.Itoa(keep),
-				envSchemaOnly:             cmp.Or(tc.schemaOnly, "false"),
-				envNoDataMessage:          NoDataMessage,
-				envTerminationMessagePath: path,
-			})
-			require.Zero(t, code, out)
-			made := s.matching(http.MethodPost, "/backup/create_remote")[0].query.Get("name")
-			require.Equal(t, append(tc.left, made), s.remoteNames("h0"), out)
-			message, err := os.ReadFile(path)
-			if tc.warned {
-				require.Contains(t, out, fmt.Sprintf("%s holds no data, so it does not count toward the %d backups with data that retention keeps", made, keep))
-				require.NoError(t, err, "the run tells that its backup holds no data:\n%s", out)
-				require.Equal(t, NoDataMessage+"\n", string(message))
-			} else {
-				require.NotContains(t, out, "holds no data")
-				require.True(t, os.IsNotExist(err), "the run tells nothing:\n%s", out)
-			}
-		})
-	}
-}
-
 // A backup that holds no data - of tables a pattern matches none of, or of an installation recreated
 // empty - succeeds, and tells so in the termination message its Job environment names, which the
 // pod keeps after the Job and its log are gone. The backup holds data when any host's copy does. A
@@ -1468,8 +1775,8 @@ func TestJobScriptRetentionCountsOnlyBackupsWithData(t *testing.T) {
 // size, leaves that unknown, and a schema-only backup never holds data: none of them tells anything.
 // The backup is made by then, so a host that does not answer is not waited for.
 func TestJobScriptTellsABackupWithoutData(t *testing.T) {
-	script := scriptWithTimeout(t, jobScript, "MUTATED_UNREACHABLE_TIMEOUT", 1)
-	job := BuildBackupJob(testBackup("b1"), testInstallation(), testTopology())
+	script := scriptWithTimeout(t, orchestratorScript, "MUTATED_UNREACHABLE_TIMEOUT", 1)
+	job := BuildBackupJob(testBackup("b1"), testInstallation(), testTopology(), testOrchestrator())
 	declared := scriptEnv(job)
 	require.Equal(t, NoDataMessage, declared[envNoDataMessage], "the Job environment names the message")
 	hosts := strings.Fields(declared[envBackupHosts])
@@ -1534,156 +1841,129 @@ func TestJobScriptTellsABackupWithoutData(t *testing.T) {
 	}
 }
 
-// A run that failed on one host leaves complete copies on the others, which cannot be restored on
-// their own: a backup counts as one retention keeps only where every host holds it complete, and
-// such leftovers go only once the backups that do count fill their window. A backup holds data when
-// any host's copy does, so a shard whose tables hold none keeps and deletes the same backups as the
-// others.
-func TestJobScriptRetentionCountsOnlyBackupsCompleteEverywhere(t *testing.T) {
-	for name, tc := range map[string]struct {
-		h0, h1     []stubBackup
-		empty      bool
-		emptyShard bool
-		schemaOnly bool
-		keep       string
-		left0      []string
-		left1      []string
-	}{
-		"a leftover of a failed schema-only run": {
-			h0:         []stubBackup{withoutData(remote("daily-20200101-000000", "")), withoutData(remote("daily-20200102-000000", ""))},
-			h1:         []stubBackup{withoutData(remote("daily-20200101-000000", ""))},
-			empty:      true,
-			schemaOnly: true,
-			keep:       "2",
-			left0:      []string{"daily-20200101-000000", "daily-20200102-000000"},
-			left1:      []string{"daily-20200101-000000"},
-		},
-		"leftovers of failed runs on an empty shard": {
-			h0: []stubBackup{
-				withoutData(remote("daily-20200101-000000", "")), withoutData(remote("daily-20200102-000000", "")),
-				withoutData(remote("daily-20200103-000000", "")), withoutData(remote("daily-20200104-000000", "")),
-			},
-			h1:         []stubBackup{remote("daily-20200101-000000", ""), remote("daily-20200103-000000", "")},
-			emptyShard: true,
-			keep:       "2",
-			left0:      []string{"daily-20200103-000000", "daily-20200104-000000"},
-			left1:      []string{"daily-20200103-000000"},
-		},
-		"backups with data from before a host was added": {
-			h0:    []stubBackup{remote("daily-20200101-000000", ""), remote("daily-20200102-000000", "")},
-			empty: true,
-			keep:  "1",
-			left0: []string{"daily-20200101-000000", "daily-20200102-000000"},
-		},
-		"a leftover of a failed run": {
-			h0:    []stubBackup{remote("daily-20200101-000000", ""), remote("daily-20200103-000000", "")},
-			h1:    []stubBackup{remote("daily-20200101-000000", "")},
-			empty: true,
-			keep:  "1",
-			left0: []string{"daily-20200101-000000", "daily-20200103-000000"},
-			left1: []string{"daily-20200101-000000"},
-		},
-		"the last backups with data of a shard whose data is gone, next to an empty shard": {
-			h0:    []stubBackup{remote("daily-20200101-000000", ""), remote("daily-20200102-000000", "")},
-			h1:    []stubBackup{withoutData(remote("daily-20200101-000000", "")), withoutData(remote("daily-20200102-000000", ""))},
-			empty: true,
-			keep:  "1",
-			left0: []string{"daily-20200102-000000"},
-			left1: []string{"daily-20200102-000000"},
-		},
-		"a leftover past the kept window": {
-			h0:    []stubBackup{remote("daily-20200101-000000", ""), remote("daily-20200103-000000", ""), remote("daily-20200105-000000", "")},
-			h1:    []stubBackup{remote("daily-20200101-000000", ""), remote("daily-20200105-000000", "")},
-			keep:  "2",
-			left0: []string{"daily-20200105-000000"},
-			left1: []string{"daily-20200105-000000"},
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			s := newSidecarStub(t, map[string]*stubHost{
-				"h0": {emptyBackups: tc.empty || tc.emptyShard, remote: tc.h0},
-				"h1": {emptyBackups: tc.empty, remote: tc.h1},
-			})
-			code, out := s.run(map[string]string{
-				envOperation:        operationBackup,
-				envBackupNamePrefix: "daily",
-				envBackupHosts:      "h0 h1",
-				envRetentionHosts:   "h0 h1",
-				envKeepLast:         tc.keep,
-				envSchemaOnly:       strconv.FormatBool(tc.schemaOnly),
-			})
-			require.Zero(t, code, out)
-			made := s.matching(http.MethodPost, "/backup/create_remote")[0].query.Get("name")
-			require.Equal(t, append(tc.left0, made), s.remoteNames("h0"), out)
-			require.Equal(t, append(tc.left1, made), s.remoteNames("h1"), out)
-		})
-	}
-}
-
-// A broken backup cannot be restored, so it never counts as one retention keeps. Inside the kept
-// window it is left alone, as an upload in progress lists as broken until it completes; past the
-// window it is pruned like any other.
-func TestJobScriptRetentionSkipsBrokenBackups(t *testing.T) {
-	s := newSidecarStub(t, map[string]*stubHost{"h0": {remote: []stubBackup{
-		broken("daily-20200101-000000"),
-		remote("daily-20200102-000000", ""),
-		remote("daily-20200103-000000", ""),
-		broken("daily-20200104-000000"),
-	}}})
-	code, out := s.run(map[string]string{
-		envOperation:        operationBackup,
-		envBackupNamePrefix: "daily",
-		envBackupHosts:      "h0",
-		envRetentionHosts:   "h0",
-		envKeepLast:         "2",
-	})
-	require.Zero(t, code, out)
-	made := s.matching(http.MethodPost, "/backup/create_remote")[0].query.Get("name")
-	var deletes []string
-	for _, c := range s.matching(http.MethodPost, "/backup/delete/") {
-		deletes = append(deletes, c.path)
-	}
-	require.Equal(t, []string{
-		"/backup/delete/remote/daily-20200102-000000",
-		"/backup/delete/remote/daily-20200101-000000",
-	}, deletes)
-	require.Equal(t, []string{"daily-20200103-000000", "daily-20200104-000000", made}, s.remoteNames("h0"),
-		"two restorable backups are kept")
-}
-
 func TestJobScriptRetentionKeepsNewBackup(t *testing.T) {
 	// Clock skew: a scheduled backup that looks newer than the one just made
 	s := newSidecarStub(t, map[string]*stubHost{
-		"h0": {remote: []stubBackup{remote("daily-29991231-235959", ""), remote("daily-20200101-000000", "")}},
+		"h0": {remote: []stubBackup{remote("daily-29991231235959", ""), remote("daily-20200101000000", "")}},
 	})
-	code, out := s.run(map[string]string{
-		envOperation:        operationBackup,
-		envBackupNamePrefix: "daily",
-		envBackupHosts:      "h0",
-		envRetentionHosts:   "h0",
-		envKeepLast:         "1",
-	})
+	code, out := s.run(scheduledEnv("h0", dailyKeeping(1), "2026-01-02T00:00:00Z"))
 	require.Zero(t, code, out)
 	made := s.matching(http.MethodPost, "/backup/create_remote")[0].query.Get("name")
-	require.Equal(t, []string{"daily-29991231-235959", made}, s.remoteNames("h0"))
+	require.Equal(t, []string{"daily-29991231235959", made}, s.remoteNames("h0"))
 }
 
+// Retention runs after a scheduled backup alone, and not while a restore of the cluster runs.
 func TestJobScriptRetentionDisabled(t *testing.T) {
-	for _, keep := range []string{"", "0", "00"} {
-		t.Run("keep "+keep, func(t *testing.T) {
-			s := newSidecarStub(t, map[string]*stubHost{"h0": {remote: []stubBackup{remote("daily-20200101-000000", "")}}})
-			code, out := s.run(map[string]string{
-				envOperation:        operationBackup,
-				envBackupNamePrefix: "daily",
-				envBackupHosts:      "h0",
-				envRetentionHosts:   "h0",
-				envKeepLast:         keep,
-			})
+	for name, override := range map[string]map[string]string{
+		"no schedule":           {envSchedules: ""},
+		"a restore in progress": {envRestoreInProgress: "true"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newSidecarStub(t, map[string]*stubHost{"h0": {remote: []stubBackup{remote("daily-20200101000000", "")}}})
+			code, out := s.run(withEnv(scheduledEnv("h0", dailyKeeping(1), "2020-01-03T00:00:00Z"), override))
 			require.Zero(t, code, out)
 			require.Empty(t, s.matching(http.MethodPost, "/backup/delete/"))
 			require.Len(t, s.remoteNames("h0"), 2)
+			if override[envRestoreInProgress] != "" {
+				require.Contains(t, out, "retention skipped: a restore of the cluster is in progress")
+			}
 		})
 	}
+}
+
+// The heaviest entry whose slot the run is decides whether its backup is incremental: from the newest backup of the
+// series every host holds complete, until the chain of incremental backups that ends with it is as long as the entry
+// keeps; then the backup is full again. A base the run names itself wins.
+func TestJobScriptMakesIncrementalBackups(t *testing.T) {
+	chain := func(days ...int) []stubBackup {
+		var backups []stubBackup
+		for i, day := range days {
+			required := ""
+			if i > 0 && days[i-1] > 0 {
+				required = fmt.Sprintf("daily-2020010%d000000", days[i-1])
+			}
+			if day > 0 {
+				backups = append(backups, remote(fmt.Sprintf("daily-2020010%d000000", day), required))
+			}
+		}
+		return backups
+	}
+	const incremental = "period=hour time=00:00 keep=24 incremental=true;period=daily time=00:00 keep=3 incremental=true"
+	for name, tc := range map[string]struct {
+		h0, h1    []stubBackup
+		schedules string
+		slot      string
+		env       map[string]string
+		base      string
+	}{
+		"after a full backup":                {h0: chain(1), h1: chain(1), base: "daily-20200101000000"},
+		"a chain shorter than keep":          {h0: chain(1, 2, 3), h1: chain(1, 2, 3), base: "daily-20200103000000"},
+		"a chain of keep":                    {h0: chain(1, 2, 3, 4), h1: chain(1, 2, 3, 4)},
+		"a newest backup one host lacks":     {h0: chain(1, 2, 3, 4), h1: chain(1, 2, 3), base: "daily-20200103000000"},
+		"a broken newest backup":             {h0: append(chain(1), broken("daily-20200102000000")), h1: chain(1, 2), base: "daily-20200101000000"},
+		"no backup of the series":            {h0: []stubBackup{remote("other-20200101000000", "")}},
+		"a slot of a lighter entry":          {h0: chain(1, 2, 3, 4), h1: chain(1, 2, 3, 4), slot: "2020-01-09T05:00:00Z", base: "daily-20200104000000"},
+		"a winner that is not incremental":   {h0: chain(1), h1: chain(1), schedules: "period=hour keep=24 incremental=true;period=daily time=00:00 keep=3"},
+		"a slot of no entry":                 {h0: chain(1), h1: chain(1), slot: "2020-01-09T05:30:00Z"},
+		"a base the run names":               {h0: chain(1, 2), h1: chain(1, 2), env: map[string]string{envDiffFromRemote: "daily-20200101000000"}, base: "daily-20200101000000"},
+		"the slot as unix seconds":           {h0: chain(1), h1: chain(1), slot: "1578528000", base: "daily-20200101000000"},
+		"the slot as RFC 3339 with a offset": {h0: chain(1), h1: chain(1), slot: "2020-01-09T01:00:00+01:00", base: "daily-20200101000000"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newSidecarStub(t, map[string]*stubHost{"h0": {remote: tc.h0}, "h1": {remote: tc.h1}})
+			env := withEnv(map[string]string{
+				envOperation:        operationBackup,
+				envBackupNamePrefix: "daily",
+				envBackupHosts:      "h0 h1",
+				envSchedules:        cmp.Or(tc.schedules, incremental),
+				envCronJobName:      testCronJobName,
+				envJobName:          slotJobName(cmp.Or(tc.slot, "2020-01-09T00:00:00Z")),
+			}, tc.env)
+			code, out := s.run(env)
+			require.Zero(t, code, out)
+			creates := s.matching(http.MethodPost, "/backup/create_remote")
+			require.Len(t, creates, 2)
+			for _, c := range creates {
+				require.Equal(t, tc.base, c.query.Get("diff-from-remote"), out)
+			}
+		})
+	}
+}
+
+// A backup that runs a schedule now has the entries of the schedule: it is incremental as the first incremental entry
+// says, as the Altinity Cloud Manager makes a backup by hand, from the newest backup of the series, and retention runs
+// after it, keeping it while it is recent.
+func TestJobScriptRunsAScheduleNow(t *testing.T) {
+	s := newSidecarStub(t, map[string]*stubHost{"h0": {remote: []stubBackup{
+		remote("daily-20200101000000", ""), remote("daily-20200102000000", "daily-20200101000000"), remote("daily-20200103000000", ""),
+	}}})
+	code, out := s.run(map[string]string{envOperation: operationBackup, envBackupName: "daily-20200103T120000",
+		envBackupNamePrefix: "daily", envBackupHosts: "h0", envRetentionHosts: "h0",
+		envSchedules: "period=weekly time=00:00 day=0 keep=1;period=daily time=00:00 keep=2 incremental=true"})
+	require.Zero(t, code, out)
+	require.Contains(t, out, "runs the schedule now, incremental as its daily entry")
+	creates := s.matching(http.MethodPost, "/backup/create_remote")
+	require.Len(t, creates, 1)
+	require.Equal(t, "daily-20200103000000", creates[0].query.Get("diff-from-remote"))
+	require.Equal(t, []string{"daily-20200102000000", "daily-20200103000000", "daily-20200103T120000"}, s.remoteNames("h0"),
+		"retention ran after it")
+
+	// The next scheduled backup is incremental from it, the newest backup, as the Altinity Cloud Manager makes a backup
+	// incremental from the newest backup of the cluster, whether made by hand or on schedule
+	code, out = s.run(scheduledEnv("h0", "period=weekly time=00:00 day=0 keep=1;period=daily time=00:00 keep=2 incremental=true",
+		"2020-01-04T00:00:00Z"))
+	require.Zero(t, code, out)
+	creates = s.matching(http.MethodPost, "/backup/create_remote")
+	require.Len(t, creates, 2)
+	require.Equal(t, "daily-20200104000000", creates[1].query.Get("name"))
+	require.Equal(t, "daily-20200103T120000", creates[1].query.Get("diff-from-remote"))
+
+	// Without an incremental entry it is full
+	s = newSidecarStub(t, map[string]*stubHost{"h0": {remote: []stubBackup{remote("daily-20200103000000", "")}}})
+	code, out = s.run(map[string]string{envOperation: operationBackup, envBackupName: "daily-20200103T120000",
+		envBackupNamePrefix: "daily", envBackupHosts: "h0", envRetentionHosts: "h0", envSchedules: "period=daily time=00:00 keep=2"})
+	require.Zero(t, code, out)
+	require.Empty(t, s.matching(http.MethodPost, "/backup/create_remote")[0].query.Get("diff-from-remote"))
 }
 
 func TestJobScriptVerify(t *testing.T) {
@@ -1717,7 +1997,7 @@ func TestJobScriptVerifyFailure(t *testing.T) {
 		require.Contains(t, out, "'bk-1' is not found on remote storage")
 	})
 	t.Run("no local copy after the download", func(t *testing.T) {
-		s := newSidecarStub(t, map[string]*stubHost{"h0": {noLocalOnDownload: true}})
+		s := newSidecarStub(t, map[string]*stubHost{"h0": {noLocalOnDownload: true, remote: []stubBackup{remote("bk-1", "")}}})
 		code, out := s.run(map[string]string{envOperation: operationVerify, envBackupName: "bk-1", envVerifyHosts: "h0"})
 		require.Equal(t, 1, code, out)
 		require.Contains(t, out, "bk-1 is not present locally after the download")
@@ -1792,10 +2072,12 @@ func TestJobScriptRestore(t *testing.T) {
 		// The engines and sizes of the tables of every replica
 		"a0 GET /backup/tables/all", "a1 GET /backup/tables/all", "b0 GET /backup/tables/all", "b1 GET /backup/tables/all",
 		"a0 GET /backup/list/local", "a1 GET /backup/list/local", "b0 GET /backup/list/local", "b1 GET /backup/list/local",
+		// Every host downloads the backup at once before anything is dropped, but a1, which holds a copy already
+		"a0 POST /backup/download/bk-1", "b0 POST /backup/download/bk-1", "b1 POST /backup/download/bk-1",
 		"a0 POST /backup/actions",
-		"a0 POST /backup/restore_remote/bk-1", "a1 POST /backup/restore_remote/bk-1",
-		"b0 POST /backup/restore_remote/bk-1", "b1 POST /backup/restore_remote/bk-1",
-		"a0 POST /backup/restore_remote/bk-1", "b0 POST /backup/restore_remote/bk-1",
+		"a0 POST /backup/restore/bk-1", "a1 POST /backup/restore/bk-1",
+		"b0 POST /backup/restore/bk-1", "b1 POST /backup/restore/bk-1",
+		"a0 POST /backup/restore/bk-1", "b0 POST /backup/restore/bk-1",
 		// Only the copies the restore downloaded are dropped, a1 had its own before
 		"a0 GET /backup/list/local", "a0 POST /backup/delete/local/bk-1",
 		"b0 GET /backup/list/local", "b0 POST /backup/delete/local/bk-1",
@@ -1807,10 +2089,13 @@ func TestJobScriptRestore(t *testing.T) {
 		}
 	}
 	actions := s.matching(http.MethodPost, "/backup/actions")
-	require.Equal(t, "restore_remote --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER="+restoreTestCluster+" bk-1", actions[0].command)
+	require.Equal(t, "restore --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER="+restoreTestCluster+" bk-1", actions[0].command)
 	require.Equal(t, []string{
+		// The data to the hosts that restore it, the schema alone to the others
+		"a0 download hardlink_exists_files=", "b0 download hardlink_exists_files=", "b1 download schema=",
+		"a0 restore --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=" + restoreTestCluster + " bk-1",
 		"a0 rm= schema=", "a1 rm= schema=", "b0 rm= schema=", "b1 rm= schema=", "a0 data=", "b0 data=",
-	}, s.restoreSteps()[1:])
+	}, s.restoreSteps())
 }
 
 // withReplicatedTable gives every host the live table db1.t1 of a Replicated engine, which the backup
@@ -1935,19 +2220,72 @@ func TestJobScriptDropsOnClusterOnlyWhatReplicates(t *testing.T) {
 			require.Equal(t, tc.unlisted, !slices.ContainsFunc(s.matching(http.MethodGet, "/backup/tables"), func(c stubCall) bool {
 				return c.path == "/backup/tables"
 			}))
-			steps := s.restoreSteps()
+			steps := slices.DeleteFunc(s.restoreSteps(), func(step string) bool { return strings.Contains(step, " download ") })
 			require.NotEmpty(t, steps)
 			if tc.onCluster {
-				require.True(t, strings.HasPrefix(steps[0], "a0 restore_remote --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main "), out)
+				require.True(t, strings.HasPrefix(steps[0], "a0 restore --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main "), out)
 				require.Len(t, s.matching(http.MethodPost, "/backup/actions"), 1)
 				return
 			}
 			require.Empty(t, s.matching(http.MethodPost, "/backup/actions"), out)
 			for _, step := range steps {
-				require.NotContains(t, step, "restore_remote --schema")
+				require.NotContains(t, step, "--schema")
 			}
 		})
 	}
+}
+
+// As the Altinity Cloud Manager restores, every host downloads the backup before anything is dropped, all at once: the
+// data to the hosts that restore it, every file already on their disks hard-linked, the schema alone to the others. A
+// host that cannot download it - short of disk space, say - fails the restore before it changes anything: the other
+// hosts finish their downloads, which are deleted again.
+func TestJobScriptRestoreDownloadsEverywhereFirst(t *testing.T) {
+	hosts := replicaRestoreHosts()
+	hosts["b0"].failOp = map[string]string{"download": "not enough space on disk default"}
+	s := newSidecarStub(t, hosts)
+	code, out := s.run(replicaRestoreEnv(map[string]string{envUnchangedExitCode: "3", envTables: "db1.*"}))
+	require.Equal(t, 3, code, out)
+	require.Contains(t, out, "ERROR: download of bk-1 failed on b0: b0: download bk-1 ended with status 'error': not enough space on disk default")
+	require.Equal(t, []string{
+		"a0 download hardlink_exists_files= table=db1.*", "a1 download schema= table=db1.*",
+		"b0 download hardlink_exists_files= table=db1.*", "b1 download schema= table=db1.*",
+	}, s.restoreSteps(), "nothing is restored")
+	for _, host := range []string{"a0", "a1", "b1"} {
+		require.Empty(t, hosts[host].local, "the copy %s downloaded is deleted:\n%s", host, out)
+	}
+}
+
+// A host that holds an incomplete local copy of the backup, as a download that failed or was stopped leaves it,
+// downloads it again, which clickhouse-backup resumes, rather than restoring from it; a restore whose download fails
+// leaves that copy for the next one to resume, and deletes only the copies it started itself.
+func TestJobScriptRestoreResumesAnIncompleteLocalCopy(t *testing.T) {
+	incomplete := stubBackup{Name: "bk-1", Location: "local", Desc: "broken (can't stat metadata.json)"}
+	t.Run("restored", func(t *testing.T) {
+		hosts := replicaRestoreHosts()
+		hosts["a0"].local = []stubBackup{incomplete}
+		s := newSidecarStub(t, hosts)
+		code, out := s.run(replicaRestoreEnv(nil))
+		require.Zero(t, code, out)
+		require.Contains(t, out, "a0: holds an incomplete local copy of bk-1, whose download the restore resumes")
+		require.Contains(t, s.restoreSteps(), "a0 download hardlink_exists_files=")
+		require.Empty(t, hosts["a0"].local, "the resumed copy is deleted after the restore, as any it downloaded")
+	})
+	t.Run("download failed", func(t *testing.T) {
+		hosts := replicaRestoreHosts()
+		hosts["a0"].local = []stubBackup{incomplete}
+		hosts["b0"].failOp = map[string]string{"download": "not enough space on disk default"}
+		hosts["a0"].failOp = map[string]string{"download": "connection reset"}
+		s := newSidecarStub(t, hosts)
+		code, out := s.run(replicaRestoreEnv(map[string]string{envUnchangedExitCode: "3"}))
+		require.Equal(t, 3, code, out)
+		require.Equal(t, []stubBackup{incomplete}, hosts["a0"].local, "the incomplete copy is kept to resume:\n%s", out)
+		for _, host := range []string{"a1", "b1"} {
+			require.Empty(t, hosts[host].local, "the copy %s downloaded is deleted:\n%s", host, out)
+		}
+		for _, request := range s.matching(http.MethodPost, "/backup/delete/local/bk-1") {
+			require.NotEqual(t, "a0", request.host)
+		}
+	})
 }
 
 // Without overwrite the guard has proven that nothing of the backup exists, so every schema host
@@ -1960,7 +2298,7 @@ func TestJobScriptRestoreWithoutOverwrite(t *testing.T) {
 	requirePreflightFirst(t, s)
 	require.Len(t, s.matching(http.MethodGet, "/backup/tables/all"), 2)
 	require.Empty(t, s.matching(http.MethodPost, "/backup/actions"))
-	restores := s.matching(http.MethodPost, "/backup/restore_remote/")
+	restores := s.matching(http.MethodPost, "/backup/restore/")
 	require.Len(t, restores, 3)
 	require.Equal(t, url.Values{"schema": {""}, "rm": {""}}, restores[0].query)
 }
@@ -1969,10 +2307,8 @@ func TestJobScriptRestoreSchemaOnly(t *testing.T) {
 	s := newSidecarStub(t, restoreHosts())
 	code, out := s.run(restoreEnv(map[string]string{envSchemaOnly: "true", envDataHosts: ""}))
 	require.Zero(t, code, out)
-	restores := s.matching(http.MethodPost, "/backup/restore_remote/")
-	require.Len(t, restores, 1)
-	require.Equal(t, "s0", restores[0].host)
-	require.Equal(t, url.Values{"schema": {""}, "rm": {""}}, restores[0].query)
+	// The schema alone is downloaded
+	require.Equal(t, []string{"s0 download schema=", "s0 rm= schema="}, s.restoreSteps())
 }
 
 func TestJobScriptRestorePreflightRefusals(t *testing.T) {
@@ -2039,7 +2375,7 @@ func TestJobScriptRestorePreflightRefusals(t *testing.T) {
 // a table refuses the restore.
 func TestJobScriptRestoreGuardsEveryReplica(t *testing.T) {
 	chr, topology := testRestore("r1"), testTopology()
-	job := BuildRestoreJob(chr, testInstallation(), topology)
+	job := BuildRestoreJob(chr, testInstallation(), topology, testOrchestrator())
 	hosts := map[string]*stubHost{}
 	for _, host := range topology.allReplicas() {
 		hosts[host] = &stubHost{remote: []stubBackup{remote(chr.Spec.BackupName, "")}}
@@ -2053,9 +2389,7 @@ func TestJobScriptRestoreGuardsEveryReplica(t *testing.T) {
 }
 
 func TestJobScriptRestoreWithoutTopologyValidation(t *testing.T) {
-	hosts := restoreHosts()
-	hosts["d1"].remote = nil
-	s := newSidecarStub(t, hosts)
+	s := newSidecarStub(t, restoreHosts())
 	code, out := s.run(restoreEnv(map[string]string{envValidateTopology: "false"}))
 	require.Zero(t, code, out)
 	require.Empty(t, s.matching(http.MethodGet, "/backup/list/remote"))
@@ -2176,7 +2510,7 @@ func TestJobScriptWritesWhyItFailed(t *testing.T) {
 // before any sidecar may have accepted a change exits with the code the Job environment names, a
 // restore that exits so leaves nothing behind that scheduled backups must be held for.
 func TestJobScriptTellsWhetherItChangedAnything(t *testing.T) {
-	declared := scriptEnv(BuildRestoreJob(testRestore("r1"), testInstallation(), testTopology()))[envUnchangedExitCode]
+	declared := scriptEnv(BuildRestoreJob(testRestore("r1"), testInstallation(), testTopology(), testOrchestrator()))[envUnchangedExitCode]
 	unchanged, err := strconv.Atoi(declared)
 	require.NoError(t, err, "the Job environment names the exit code")
 	for name, tc := range map[string]struct {
@@ -2200,15 +2534,24 @@ func TestJobScriptTellsWhetherItChangedAnything(t *testing.T) {
 			code:   unchanged,
 		},
 		"a restore that failed after it started": {
-			mutate: func(h map[string]*stubHost) { h["d1"].failOp = map[string]string{"restore_remote": "disk full"} },
+			mutate: func(h map[string]*stubHost) { h["d1"].failOp = map[string]string{"restore": "disk full"} },
 			code:   1,
 		},
-		"a request the sidecar may have accepted": {
+		// The download of the backup to every host comes first, and changes nothing
+		"a download that failed": {
+			mutate: func(h map[string]*stubHost) { h["d1"].failOp = map[string]string{"download": "not enough space"} },
+			code:   unchanged,
+		},
+		"a download the sidecar may have accepted": {
 			mutate: func(h map[string]*stubHost) { h["s0"].hangUpPosts = true },
+			code:   unchanged,
+		},
+		"a request the sidecar may have accepted": {
+			mutate: func(h map[string]*stubHost) { h["s0"].hangUpPosts, h["s0"].failPostsAfter = true, 1 },
 			code:   1,
 		},
 		"a request a proxy failed after passing it on": {
-			mutate: func(h map[string]*stubHost) { h["s0"].proxyFailsPosts = true },
+			mutate: func(h map[string]*stubHost) { h["s0"].proxyFailsPosts, h["s0"].failPostsAfter = true, 1 },
 			script: func(t *testing.T) string { return scriptGivingUpAfter(t, 0) },
 			code:   1,
 		},
@@ -2220,7 +2563,7 @@ func TestJobScriptTellsWhetherItChangedAnything(t *testing.T) {
 			}
 			env := restoreEnv(tc.env)
 			env[envUnchangedExitCode] = declared
-			script := jobScript
+			script := orchestratorScript
 			if tc.script != nil {
 				script = tc.script(t)
 			}
@@ -2235,26 +2578,28 @@ func TestJobScriptTellsWhetherItChangedAnything(t *testing.T) {
 // the restore, or make the backup, twice.
 func TestJobScriptNeverResubmitsAChangeAProxyFailed(t *testing.T) {
 	hosts := restoreHosts()
-	hosts["s0"].proxyFailsPosts = true
+	hosts["s0"].proxyFailsPosts, hosts["s0"].failPostsAfter = true, 1
 	s := newSidecarStub(t, hosts)
 	// Long enough for a retry to happen, if the script retried
 	code, out := s.runScript(scriptGivingUpAfter(t, 1), restoreEnv(nil))
 	require.Equal(t, 1, code, out)
-	require.Len(t, s.matching(http.MethodPost, "/"), 1, out)
+	// The downloads, and the schema restore the proxy failed
+	require.Len(t, s.matching(http.MethodPost, "/"), 3, out)
+	require.Len(t, s.matching(http.MethodPost, "/backup/restore/"), 1, out)
 }
 
 // scheduledRun returns a run of the schedule's CronJob as the CronJob controller creates it for the
 // slot due at the given time, with the Job name labels the API server gives its pods.
 func scheduledRun(chbs *api.ClickHouseBackupSchedule, due time.Time) *batch.Job {
-	cronJob := BuildBackupCronJob(chbs, testInstallation(), testTopology(), false)
+	cronJob := BuildBackupCronJob(chbs, testInstallation(), testTopology(), testOrchestrator(), false)
 	job := &batch.Job{Spec: cronJob.Spec.JobTemplate.Spec}
 	job.Name = fmt.Sprintf("%s-%d", cronJob.Name, due.Unix()/60)
 	job.Spec.Template.Labels = map[string]string{LegacyJobNameLabel: job.Name, batch.JobNameLabel: job.Name}
 	return job
 }
 
-// scriptEnv returns the environment the Job script of a Job sees: the plain values, and the Job name
-// the pod's label gives it. The poll interval and the termination message path are left to the test.
+// scriptEnv returns the environment the Job script of a Job sees: the plain values. The poll interval and the
+// termination message path are left to the test.
 func scriptEnv(job *batch.Job) map[string]string {
 	values := map[string]string{}
 	for _, e := range job.Spec.Template.Spec.Containers[0].Env {
@@ -2268,83 +2613,85 @@ func scriptEnv(job *batch.Job) map[string]string {
 	return values
 }
 
-// Every run of one schedule slot names its backup after the time the slot was due, so the operator
-// knows the name of the backup a run makes, and both derive the same one.
+// A scheduled backup is named after the wall time of its slot in the time zone of the schedule: the CronJob controller
+// names the Job of a run after the minute it was due, which the script reads from the Job name label of its pod, so
+// every run of one slot makes the same backup, and the operator derives its name the same way. A Job named otherwise
+// takes the current minute.
 func TestJobScriptNamesScheduledBackupsAfterTheirSlot(t *testing.T) {
-	slot := regexp.MustCompile(`(?m)^SLOT_RE='([^']*)'$`).FindStringSubmatch(jobScript)
-	require.NotNil(t, slot, "the script no longer defines SLOT_RE")
-	require.Equal(t, scheduleSlotRegexp.String(), slot[1], "the script reads the number of a scheduled Job's name as the builder does")
-
-	chbs := testSchedule("nightly")
-	run := scheduledRun(chbs, time.Date(2023, time.November, 14, 22, 14, 0, 0, time.UTC))
-	require.Equal(t, "ns-demo-nightly-20231114-221400", ScheduledBackupName(run))
-
+	due := time.Date(2023, time.November, 14, 22, 14, 0, 0, time.UTC)
 	for name, tc := range map[string]struct {
-		jobName string
+		zone    string
+		jobName func(cronJob string) string
 		backup  string
 	}{
-		"a run of the CronJob":                     {jobName: run.Name, backup: "ns-demo-nightly-20231114-221400"},
-		"a Job created by hand from the CronJob":   {jobName: "nightly-backup-manual"},
-		"a pod without the Job name label":         {jobName: ""},
-		"a slot past the four-digit years":         {jobName: "nightly-backup-9999999999"},
-		"a Job of another CronJob of that pattern": {jobName: "other-backup-28333334"},
+		"a run of the CronJob":                     {backup: "-20231114221400"},
+		"a run in the zone of the schedule":        {zone: "Europe/Berlin", backup: "-20231114231400"},
+		"a run in UTC by name":                     {zone: "UTC", backup: "-20231114221400"},
+		"a Job created by hand from the CronJob":   {jobName: func(string) string { return "nightly-backup-manual" }},
+		"a pod without the Job name label":         {jobName: func(string) string { return "" }},
+		"a slot past the ten digits":               {jobName: func(cronJob string) string { return cronJob + "-28333334000" }},
+		"a slot past the four-digit years":         {jobName: func(cronJob string) string { return cronJob + "-9999999999" }},
+		"a Job of another CronJob of that pattern": {jobName: func(string) string { return "other-backup-28333334" }},
 	} {
 		t.Run(name, func(t *testing.T) {
-			s := newSidecarStub(t, map[string]*stubHost{"chi-demo-main-0-0": {}, "chi-demo-main-1-0": {}})
+			chbs := testSchedule("nightly")
+			chbs.Spec.TimeZone = tc.zone
+			run := scheduledRun(chbs, due)
 			env := scriptEnv(run)
-			env[envJobName] = tc.jobName
+			env[envScheduleTimezone] = tc.zone
+			if tc.jobName != nil {
+				env[envJobName] = tc.jobName(env[envCronJobName])
+			}
+			s := newSidecarStub(t, map[string]*stubHost{"chi-demo-main-0-0": {}, "chi-demo-main-1-0": {}})
 			code, out := s.run(env)
 			require.Zero(t, code, out)
-			creates := s.matching(http.MethodPost, "/backup/create_remote")
-			require.Len(t, creates, 2)
-			made := creates[0].query.Get("name")
+			made := s.matching(http.MethodPost, "/backup/create_remote")[0].query.Get("name")
+			prefix := env[envBackupNamePrefix]
 			if tc.backup != "" {
-				require.Equal(t, tc.backup, made)
+				require.Equal(t, prefix+tc.backup, made)
+				if tc.zone == "" {
+					require.Equal(t, ScheduledBackupName(run), made, "the operator derives the same name")
+				}
 				return
 			}
-			require.Regexp(t, `^ns-demo-nightly-[0-9]{8}-[0-9]{6}$`, made, "a run named otherwise takes the time it runs")
-			require.NotEqual(t, "ns-demo-nightly-20231114-221400", made)
+			require.Regexp(t, `^`+regexp.QuoteMeta(prefix)+`-[0-9]{12}00$`, made, "a run named otherwise takes the current minute")
+			require.NotEqual(t, prefix+"-20231114221400", made)
 		})
 	}
 }
 
-// The Job script formats the suffix of a scheduled backup name with date, the operator with
-// scheduleTimestampLayout. Whichever time the script takes, the longest prefix the API admits gives a
-// name of the format the operator derives, within the backup name limit, which the script admits back
-// as the name of the backup to restore.
+// The longest prefix the API admits gives a name of the format the operator derives, within the backup name limit,
+// which the script admits back as the name of the backup to restore.
 func TestJobScriptScheduledBackupNameFitsTheBackupNameLimit(t *testing.T) {
-	chbs := testSchedule("nightly")
 	prefix := strings.Repeat("p", api.BackupNamePrefixMaxLength)
-	chbs.Spec.BackupNamePrefix = prefix
-	run := scheduledRun(chbs, time.Date(2026, time.January, 2, 3, 4, 0, 0, time.UTC))
+	s := newSidecarStub(t, map[string]*stubHost{"h0": {}})
+	code, out := s.run(map[string]string{
+		envOperation: operationBackup, envBackupNamePrefix: prefix, envBackupHosts: "h0",
+		envCronJobName: testCronJobName, envJobName: slotJobName("2026-01-02T03:04:00Z"),
+	})
+	require.Zero(t, code, out)
+	made := s.matching(http.MethodPost, "/backup/create_remote")[0].query.Get("name")
+	require.Len(t, made, api.BackupNamePrefixMaxLength+api.BackupNameScheduleSuffixLength)
+	require.LessOrEqual(t, len(made), api.BackupNameMaxLength)
+	timestamp, found := strings.CutPrefix(made, prefix+"-")
+	require.True(t, found, made)
+	_, err := time.Parse(scheduleTimestampLayout, timestamp)
+	require.NoError(t, err, made)
 
-	for name, jobName := range map[string]string{
-		"a run of the CronJob":                   run.Name,
-		"a Job created by hand from the CronJob": "nightly-backup-manual",
-	} {
-		t.Run(name, func(t *testing.T) {
-			s := newSidecarStub(t, map[string]*stubHost{"chi-demo-main-0-0": {}, "chi-demo-main-1-0": {}})
-			env := scriptEnv(run)
-			env[envJobName] = jobName
-			code, out := s.run(env)
-			require.Zero(t, code, out)
-			creates := s.matching(http.MethodPost, "/backup/create_remote")
-			require.NotEmpty(t, creates, out)
-			made := creates[0].query.Get("name")
-			require.Len(t, made, api.BackupNameMaxLength)
-			timestamp, found := strings.CutPrefix(made, prefix+"-")
-			require.True(t, found, made)
-			_, err := time.Parse(scheduleTimestampLayout, timestamp)
-			require.NoError(t, err, made)
+	s = newSidecarStub(t, map[string]*stubHost{"h0": {remote: []stubBackup{remote(made, "")}}})
+	code, out = s.run(map[string]string{
+		envOperation: operationRestore, envBackupName: made,
+		envSchemaHosts: "h0", envDataHosts: "h0", envGuardHosts: "h0",
+	})
+	require.Zero(t, code, out)
 
-			s = newSidecarStub(t, map[string]*stubHost{"h0": {remote: []stubBackup{remote(made, "")}}})
-			code, out = s.run(map[string]string{
-				envOperation: operationRestore, envBackupName: made,
-				envSchemaHosts: "h0", envDataHosts: "h0", envGuardHosts: "h0",
-			})
-			require.Zero(t, code, out)
-		})
-	}
+	s = newSidecarStub(t, map[string]*stubHost{"h0": {}})
+	code, out = s.run(map[string]string{
+		envOperation: operationBackup, envBackupNamePrefix: prefix + "pp", envBackupHosts: "h0",
+	})
+	require.Equal(t, 1, code, out)
+	require.Contains(t, out, "BACKUP_NAME_PREFIX is too long for a backup name")
+	require.Zero(t, s.countCalls())
 }
 
 func lostOpEnv(operation string) map[string]string {
@@ -2414,7 +2761,7 @@ func TestJobScriptFollowsAnOperationResumedAfterARestart(t *testing.T) {
 				host.remote = append(host.remote, remote("bk-1", ""))
 			}
 			s := newSidecarStub(t, map[string]*stubHost{"h0": &host})
-			code, out := s.runScript(scriptWithTimeout(t, jobScript, "RESUME_TIMEOUT", tc.resumeTimeout), lostOpEnv(tc.operation))
+			code, out := s.runScript(scriptWithTimeout(t, orchestratorScript, "RESUME_TIMEOUT", tc.resumeTimeout), lostOpEnv(tc.operation))
 			require.Equal(t, tc.code, code, out)
 			require.Contains(t, out, tc.output)
 			if (tc.code == 0) && (tc.operation == operationBackup) {
@@ -2430,7 +2777,7 @@ func TestJobScriptFollowsAnOperationResumedAfterARestart(t *testing.T) {
 		s := newSidecarStub(t, hosts)
 		code, out := s.run(restoreEnv(map[string]string{envOverwrite: "true"}))
 		require.Equal(t, 1, code, out)
-		require.Contains(t, out, "schema restore of bk-1 failed on s0: s0: the sidecar restarted during restore_remote schema bk-1, which it does not resume: the restore is partially applied")
+		require.Contains(t, out, "schema restore of bk-1 failed on s0: s0: the sidecar restarted during restore schema bk-1, which it does not resume: the restore is partially applied")
 	})
 }
 
@@ -2474,7 +2821,8 @@ func (s *sidecarStub) restoreSteps() []string {
 		switch {
 		case c.path == "/backup/actions":
 			steps = append(steps, c.host+" "+c.command)
-		case strings.HasPrefix(c.path, "/backup/restore_remote/"):
+		case strings.HasPrefix(c.path, "/backup/restore_remote/"), strings.HasPrefix(c.path, "/backup/restore/"),
+			strings.HasPrefix(c.path, "/backup/download/"):
 			var params []string
 			for key, values := range c.query {
 				for _, value := range values {
@@ -2482,6 +2830,9 @@ func (s *sidecarStub) restoreSteps() []string {
 				}
 			}
 			slices.Sort(params)
+			if strings.HasPrefix(c.path, "/backup/download/") {
+				params = append([]string{"download"}, params...)
+			}
 			steps = append(steps, c.host+" "+strings.Join(params, " "))
 		}
 	}
@@ -2496,6 +2847,7 @@ func TestJobScriptRestoresTheSchemaOnEveryReplica(t *testing.T) {
 	code, out := s.run(replicaRestoreEnv(nil))
 	require.Zero(t, code, out)
 	require.Equal(t, []string{
+		"a0 download hardlink_exists_files=", "a1 download schema=", "b0 download hardlink_exists_files=", "b1 download schema=",
 		"a0 rm= schema=", "a1 rm= schema=", "b0 rm= schema=", "b1 rm= schema=",
 		"a0 data=", "b0 data=",
 	}, s.restoreSteps())
@@ -2512,12 +2864,14 @@ func TestJobScriptOverwriteDropsTheBackupOnClusterFirst(t *testing.T) {
 	code, out := s.run(replicaRestoreEnv(map[string]string{envOverwrite: "true", envTables: "db1.*,db2.t?"}))
 	require.Zero(t, code, out)
 	require.Equal(t, []string{
-		"a0 restore_remote --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main --tables=db1.*,db2.t? bk-1",
+		"a0 download hardlink_exists_files= table=db1.*,db2.t?", "a1 download schema= table=db1.*,db2.t?",
+		"b0 download hardlink_exists_files= table=db1.*,db2.t?", "b1 download schema= table=db1.*,db2.t?",
+		"a0 restore --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main --tables=db1.*,db2.t? bk-1",
 		"a0 rm= schema= table=db1.*,db2.t?", "a1 rm= schema= table=db1.*,db2.t?",
 		"b0 rm= schema= table=db1.*,db2.t?", "b1 rm= schema= table=db1.*,db2.t?",
 		"a0 data= table=db1.*,db2.t?", "b0 data= table=db1.*,db2.t?",
 	}, s.restoreSteps())
-	require.Contains(t, out, "a0: restore_remote schema on cluster main bk-1 succeeded")
+	require.Contains(t, out, "a0: restore schema on cluster main bk-1 succeeded")
 }
 
 // The answer to a command of the actions endpoint names no operation: the script follows the row of
@@ -2534,7 +2888,7 @@ func TestJobScriptFollowsTheRowOfItsOwnAction(t *testing.T) {
 	code, out := s.run(replicaRestoreEnv(map[string]string{envOverwrite: "true"}))
 	require.Zero(t, code, out)
 	require.Len(t, s.matching(http.MethodPost, "/backup/actions"), 1)
-	require.Len(t, s.matching(http.MethodPost, "/backup/restore_remote/"), 6)
+	require.Len(t, s.matching(http.MethodPost, "/backup/restore/"), 6)
 }
 
 // A sidecar that runs another operation refuses a command of the actions endpoint with HTTP 500 and
@@ -2542,13 +2896,13 @@ func TestJobScriptFollowsTheRowOfItsOwnAction(t *testing.T) {
 // submitted again once the sidecar is idle.
 func TestJobScriptQueuesAnActionWhileTheSidecarIsLocked(t *testing.T) {
 	hosts := withReplicatedTable(replicaRestoreHosts())
-	hosts["a0"].lockedPosts = 2
+	hosts["a0"].lockedActions = 2
 	s := newSidecarStub(t, hosts)
 	code, out := s.run(replicaRestoreEnv(map[string]string{envOverwrite: "true"}))
 	require.Zero(t, code, out)
-	require.Contains(t, out, "a0: sidecar busy, queueing restore_remote schema on cluster main")
+	require.Contains(t, out, "a0: sidecar busy, queueing restore schema on cluster main")
 	require.Len(t, s.matching(http.MethodPost, "/backup/actions"), 3, "two refusals, then accepted")
-	require.Len(t, s.matching(http.MethodPost, "/backup/restore_remote/"), 6)
+	require.Len(t, s.matching(http.MethodPost, "/backup/restore/"), 6)
 }
 
 // The drop ON CLUSTER changes every replica: when it fails, or the sidecar restarts during it and
@@ -2560,11 +2914,11 @@ func TestJobScriptStopsWhenTheDropOnClusterFails(t *testing.T) {
 	}{
 		"the action fails": {
 			host:   stubHost{failAction: "code: 47, unknown identifier"},
-			output: "schema restore of bk-1 on cluster main failed on a0: a0: restore_remote schema on cluster main bk-1 ended with status 'error': code: 47, unknown identifier",
+			output: "schema restore of bk-1 on cluster main failed on a0: a0: restore schema on cluster main bk-1 ended with status 'error': code: 47, unknown identifier",
 		},
 		"the sidecar restarts during the action": {
 			host:   stubHost{loseActions: true},
-			output: "a0: the sidecar restarted during restore_remote schema on cluster main bk-1, which it does not resume: the restore is partially applied",
+			output: "a0: the sidecar restarted during restore schema on cluster main bk-1, which it does not resume: the restore is partially applied",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -2577,7 +2931,7 @@ func TestJobScriptStopsWhenTheDropOnClusterFails(t *testing.T) {
 			code, out := s.run(replicaRestoreEnv(map[string]string{envOverwrite: "true", envUnchangedExitCode: "3"}))
 			require.Equal(t, 1, code, out)
 			require.Contains(t, out, tc.output)
-			require.Empty(t, s.matching(http.MethodPost, "/backup/restore_remote/"))
+			require.Empty(t, s.matching(http.MethodPost, "/backup/restore/"))
 		})
 	}
 }
@@ -2942,7 +3296,7 @@ func TestJobScriptRefusesAnOverwriteThatStopsInADatabaseDroppedAsAWhole(t *testi
 					actions = 0
 				}
 				require.Len(t, s.matching(http.MethodPost, "/backup/actions"), actions, "the drop ON CLUSTER runs where it has to")
-				require.NotEmpty(t, s.matching(http.MethodPost, "/backup/restore_remote/"))
+				require.NotEmpty(t, s.matching(http.MethodPost, "/backup/restore/"))
 				return
 			}
 			require.Equal(t, 3, code, out)
@@ -2981,7 +3335,8 @@ func TestJobScriptRejectsAnInvalidOverwriteEnv(t *testing.T) {
 // The Job runs in an Alpine image, whose regex library refuses a repetition count above 255, the least
 // RE_DUP_MAX POSIX allows: a regex with a larger one fails every match, as if every value were invalid.
 func TestJobScriptRegexesArePortable(t *testing.T) {
-	for _, count := range regexp.MustCompile(`\{([0-9]*),?([0-9]*)\}`).FindAllStringSubmatch(jobScript, -1) {
+	bashOnly(t)
+	for _, count := range regexp.MustCompile(`\{([0-9]*),?([0-9]*)\}`).FindAllStringSubmatch(orchestratorScript, -1) {
 		for _, bound := range count[1:] {
 			if bound == "" {
 				continue
@@ -3010,6 +3365,20 @@ func TestJobScriptRefusesRestoreValuesThatAreNoToken(t *testing.T) {
 		"tables with a newline":    {envTables: "db1.*\n--rbac"},
 		"tables with a bracket":    {envTables: "db1.[a-z]"},
 		"tables too long":          {envTables: strings.Repeat("t", 1025)},
+		"partitions with a blank":  {envPartitions: "2026 --rbac"},
+		"partitions with a quote":  {envPartitions: "('a')"},
+		"an empty partition":       {envPartitions: "2026,,2027"},
+		"skipped tables of a flag": {envSkipTables: "-db.*"},
+		"skipped tables too long":  {envSkipTables: strings.Repeat("t", 1025)},
+		"an engine with a blank":   {envSkipTableEngines: "Kafka --rbac"},
+		"an engine with a digit":   {envSkipTableEngines: "1Kafka"},
+		"a mapping with a blank":   {envDatabaseMapping: "a:b --rbac"},
+		"a mapping without target": {envDatabaseMapping: "a:"},
+		"a mapping of a dot":       {envDatabaseMapping: "a.b:c"},
+		"a mapping to itself":      {envDatabaseMapping: "a:a"},
+		"a mapping of one twice":   {envDatabaseMapping: "a:b,a:c"},
+		"a mapping to one twice":   {envDatabaseMapping: "a:c,b:c"},
+		"a chain of mappings":      {envDatabaseMapping: "a:b,b:c"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			s := newSidecarStub(t, restoreHosts())
@@ -3018,6 +3387,111 @@ func TestJobScriptRefusesRestoreValuesThatAreNoToken(t *testing.T) {
 			require.Equal(t, 3, code, out)
 			require.Contains(t, out, "ERROR:")
 			require.Zero(t, s.countCalls())
+		})
+	}
+}
+
+// A restore narrowed as the Altinity Cloud Manager narrows one - partitions of the data, tables and table engines left
+// out - sets clickhouse-backup settings of its own, which a typed request takes none of: every step runs as a command of
+// the actions endpoint, the download and the data restore with the partitions, every command with the --env flags of
+// the tables and engines left out, on top of the system databases clickhouse-backup leaves out by default, and, as the
+// Altinity Cloud Manager restores partitions, without the check of the replicas before the parts are attached. A
+// database mapping restores the schema and the data into other databases.
+func TestJobScriptRestoresWithTheFiltersOfTheAltinityCloudManager(t *testing.T) {
+	hosts := restoreHosts()
+	// A restore of partitions attaches them into the tables as they are, which the guard of a restore with the schema
+	// would refuse
+	for _, host := range hosts {
+		host.tables = []string{"db2.t1"}
+		host.backupTables = []string{"db1.t1"}
+	}
+	s := newSidecarStub(t, hosts)
+	code, out := s.run(restoreEnv(map[string]string{
+		envTables: "db1.*", envPartitions: "202601,202602", envSkipTables: "db1.tmp*", envSkipTableEngines: "Kafka,RabbitMQ",
+		envDatabaseMapping: "db1:db2",
+	}))
+	require.Zero(t, code, out)
+	env := " --env=CLICKHOUSE_SKIP_TABLES=system.*,INFORMATION_SCHEMA.*,information_schema.*,_temporary_and_external_tables.*,db1.tmp*" +
+		" --env=CLICKHOUSE_SKIP_TABLE_ENGINES=Kafka,RabbitMQ --env=CLICKHOUSE_CHECK_REPLICAS_BEFORE_ATTACH=0 bk-1"
+	require.Equal(t, []string{
+		"s0 download --hardlink-exists-files --tables=db1.* --partitions=202601,202602" + env,
+		"d1 download --hardlink-exists-files --tables=db1.* --partitions=202601,202602" + env,
+		"s0 restore --data --tables=db1.* --partitions=202601,202602 --restore-database-mapping=db1:db2" + env,
+		"d1 restore --data --tables=db1.* --partitions=202601,202602 --restore-database-mapping=db1:db2" + env,
+	}, s.restoreSteps())
+	for _, host := range []string{"s0", "d1"} {
+		require.Empty(t, s.hosts[host].local, "the downloaded copies are dropped")
+	}
+	require.Contains(t, out, "restore bk-1: restores the partitions 202601,202602 into the tables as they are, without the schema")
+
+	// Without the schema step, a restore of partitions leaves the replicas that restore no data alone, and has no
+	// overwrite: nothing runs ON CLUSTER
+	replicas := withReplicatedTable(replicaRestoreHosts())
+	s = newSidecarStub(t, replicas)
+	code, out = s.run(replicaRestoreEnv(map[string]string{envPartitions: "202601", envOverwrite: "true"}))
+	require.Zero(t, code, out)
+	partitionEnv := " --env=CLICKHOUSE_CHECK_REPLICAS_BEFORE_ATTACH=0 bk-1"
+	require.Equal(t, []string{
+		"a0 download --hardlink-exists-files --partitions=202601" + partitionEnv,
+		"b0 download --hardlink-exists-files --partitions=202601" + partitionEnv,
+		"a0 restore --data --partitions=202601" + partitionEnv,
+		"b0 restore --data --partitions=202601" + partitionEnv,
+	}, s.restoreSteps())
+	for _, call := range s.calls {
+		require.NotContains(t, []string{"a1", "b1"}, call.host, "%s %s", call.method, call.path)
+	}
+
+	// Partitions take data, and no schema to restore the access entities with
+	for env, refused := range map[string]string{envSchemaOnly: "PARTITIONS restore data, which SCHEMA_ONLY leaves out",
+		envRestoreRBAC: "PARTITIONS restore no schema, which RESTORE_RBAC restores the access entities with"} {
+		s = newSidecarStub(t, restoreHosts())
+		code, out = s.run(restoreEnv(map[string]string{envPartitions: "202601", env: "true", envUnchangedExitCode: "3"}))
+		require.Equal(t, 3, code, out)
+		require.Contains(t, out, "ERROR: "+refused)
+	}
+
+	// A database mapping alone takes no setting: typed requests
+	s = newSidecarStub(t, restoreHosts())
+	code, out = s.run(restoreEnv(map[string]string{envDatabaseMapping: "db1:db2,db3:db4"}))
+	require.Zero(t, code, out)
+	require.Equal(t, []string{
+		"s0 download hardlink_exists_files=", "d1 download hardlink_exists_files=",
+		"s0 restore_database_mapping=db1:db2,db3:db4 rm= schema=",
+		"s0 data= restore_database_mapping=db1:db2,db3:db4", "d1 data= restore_database_mapping=db1:db2,db3:db4",
+	}, s.restoreSteps())
+}
+
+// The overwrite guard looks where a database mapping restores the tables: a table of the database the backup's is
+// restored into refuses the restore, one of the database of the backup, which the restore leaves alone, does not.
+func TestJobScriptRestoreGuardChecksTheMappedDatabases(t *testing.T) {
+	for name, tc := range map[string]struct {
+		tables  string
+		live    string
+		refused bool
+	}{
+		"a table of the database restored into":              {tables: "db1.t1", live: "db2.t1", refused: true},
+		"the table of the backup in its own database":        {tables: "db1.t1", live: "db1.t1"},
+		"any table of the database restored into as a whole": {tables: "db1.*", live: "db2.other", refused: true},
+		"a table of another database":                        {tables: "db1.*", live: "db3.t1"},
+		"any table without a pattern, but the mapped source": {live: "db1.t1"},
+		"any table without a pattern":                        {live: "db3.t1", refused: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			hosts := restoreHosts()
+			for _, host := range hosts {
+				host.backupTables = []string{"db1.t1"}
+			}
+			hosts["d1"].tables = []string{tc.live}
+			s := newSidecarStub(t, hosts)
+			code, out := s.run(restoreEnv(map[string]string{envTables: tc.tables, envDatabaseMapping: "db1:db2",
+				envUnchangedExitCode: "3"}))
+			if tc.refused {
+				require.Equal(t, 3, code, out)
+				require.Contains(t, out, "refusing to restore over existing tables (d1:"+tc.live+")")
+				require.Empty(t, s.matching(http.MethodPost, "/"))
+				return
+			}
+			require.Zero(t, code, out)
 		})
 	}
 }
@@ -3125,9 +3599,13 @@ func TestJobScriptRestoresAccessEntitiesOnEveryReplica(t *testing.T) {
 	}))
 	require.Zero(t, code, out)
 	require.Equal(t, []string{
-		"a0 rm= schema= table=db1.*", "a1 rm= schema= table=db1.*", "b0 rm= schema= table=db1.*", "b1 rm= schema= table=db1.*",
+		"a0 download hardlink_exists_files= table=db1.*", "a1 download schema= table=db1.*",
+		"b0 download hardlink_exists_files= table=db1.*", "b1 download schema= table=db1.*",
+		// The access entities come with the schema of every replica, before the data, as the Altinity Cloud Manager
+		// restores them
+		"a0 rbac= rm= schema= table=db1.*", "a1 rbac= rm= schema= table=db1.*", "b0 rbac= rm= schema= table=db1.*",
+		"b1 rbac= rm= schema= table=db1.*",
 		"a0 data= table=db1.*", "b0 data= table=db1.*",
-		"a0 rbac-only=", "a1 rbac-only=", "b0 rbac-only=", "b1 rbac-only=",
 	}, s.restoreSteps())
 	_, err := os.Stat(path)
 	require.True(t, os.IsNotExist(err), "a restore of the access entities tells nothing:\n%s", out)
@@ -3176,26 +3654,33 @@ func TestJobScriptTellsAccessEntitiesItDidNotRestore(t *testing.T) {
 // script asks its sidecar for the last step it ran there, and stops when the sidecar no longer knows
 // it: the restore is partially applied, never continued.
 func TestJobScriptStopsWhenASidecarRestartsBetweenSteps(t *testing.T) {
+	downloads := []string{
+		"a0 download hardlink_exists_files=", "a1 download schema=", "b0 download hardlink_exists_files=", "b1 download schema=",
+	}
 	for name, tc := range map[string]struct {
-		host  string
-		env   map[string]string
-		steps []string
+		host string
+		// after is the number of steps the host runs before its sidecar restarts, 1 when unset
+		after     int
+		unchanged bool
+		env       map[string]string
+		steps     []string
 	}{
+		// The downloads change nothing
+		"after its download": {
+			host:      "a0",
+			steps:     downloads,
+			unchanged: true,
+		},
 		"after its schema restore": {
 			host:  "a0",
-			steps: []string{"a0 rm= schema=", "a1 rm= schema=", "b0 rm= schema=", "b1 rm= schema="},
+			after: 2,
+			steps: append(slices.Clone(downloads), "a0 rm= schema=", "a1 rm= schema=", "b0 rm= schema=", "b1 rm= schema="),
 		},
 		"after the drop on cluster": {
 			host:  "a0",
+			after: 2,
 			env:   map[string]string{envOverwrite: "true"},
-			steps: []string{"a0 restore_remote --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main bk-1"},
-		},
-		"before the restore of access entities": {
-			host: "a1",
-			env:  map[string]string{envRestoreRBAC: "true"},
-			steps: []string{
-				"a0 rm= schema=", "a1 rm= schema=", "b0 rm= schema=", "b1 rm= schema=", "a0 data=", "b0 data=", "a0 rbac-only=",
-			},
+			steps: append(slices.Clone(downloads), "a0 restore --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main bk-1"),
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -3203,11 +3688,16 @@ func TestJobScriptStopsWhenASidecarRestartsBetweenSteps(t *testing.T) {
 			if tc.env[envOverwrite] == "true" {
 				withReplicatedTable(hosts)
 			}
-			hosts[tc.host].restartAfter = 1
+			hosts[tc.host].restartAfter = max(tc.after, 1)
 			s := newSidecarStub(t, hosts)
 			code, out := s.run(replicaRestoreEnv(withEnv(map[string]string{envUnchangedExitCode: "3"}, tc.env)))
-			require.Equal(t, 1, code, out)
-			require.Contains(t, out, tc.host+": the sidecar restarted after the last step of this restore on it, which it no longer knows: the restore is partially applied")
+			if tc.unchanged {
+				require.Equal(t, 3, code, out)
+				require.Contains(t, out, tc.host+": the sidecar restarted after the last step of this restore on it, which it no longer knows; nothing was changed")
+			} else {
+				require.Equal(t, 1, code, out)
+				require.Contains(t, out, tc.host+": the sidecar restarted after the last step of this restore on it, which it no longer knows: the restore is partially applied")
+			}
 			require.Equal(t, tc.steps, s.restoreSteps())
 		})
 	}
@@ -3563,7 +4053,11 @@ func TestJobScriptTellsNoStorageByItsRegion(t *testing.T) {
 			{Name: config.ClickHouseContainerName, Image: "clickhouse/clickhouse-server"},
 			{Name: config.ClickHouseBackupContainerName, Env: env},
 		}}})
-		cluster := layoutCluster(name, 1, 1, &api.ClusterBackup{Enabled: types.NewStringBool(true), PodTemplate: types.NewString(template)})
+		cluster := layoutCluster(name, 1, 1, &api.ClusterBackup{
+			Enabled:         types.NewStringBool(true),
+			PodTemplate:     types.NewString(template),
+			ConfigSecretRef: &core.LocalObjectReference{Name: "backup-config"},
+		})
 		cluster.Templates = &api.TemplatesList{PodTemplate: template}
 		return cluster
 	}
@@ -3579,7 +4073,7 @@ func TestJobScriptTellsNoStorageByItsRegion(t *testing.T) {
 			require.NoError(t, err)
 			target, err := topology.ForCluster("a")
 			require.NoError(t, err)
-			env := scriptEnv(BuildBackupJob(testBackup("b1"), stored, target))
+			env := scriptEnv(BuildBackupJob(testBackup("b1"), stored, target, testOrchestrator()))
 			hosts := map[string]*stubHost{}
 			for _, host := range strings.Fields(env[envBackupHosts]) {
 				hosts[host] = &stubHost{}
@@ -3706,9 +4200,9 @@ func TestJobScriptRestoresFromTheStoragePathsOfAnotherInstallation(t *testing.T)
 			env:  map[string]string{envTables: "db1.*", envRestoreRBAC: "true"},
 			path: testSourcePath, objectDiskPath: testSourceObjectDiskPath,
 			steps: []string{
-				"s0 restore_remote --schema --rm --tables=db1.*",
-				"s0 restore_remote --data --tables=db1.*", "d1 restore_remote --data --tables=db1.*",
-				"s0 restore_remote --rbac-only",
+				"s0 download --hardlink-exists-files --tables=db1.*", "d1 download --hardlink-exists-files --tables=db1.*",
+				"s0 restore --schema --rm --rbac --tables=db1.*",
+				"s0 restore --data --tables=db1.*", "d1 restore --data --tables=db1.*",
 			},
 		},
 	} {
@@ -3731,7 +4225,9 @@ func TestJobScriptRestoresFromTheStoragePathsOfAnotherInstallation(t *testing.T)
 			steps := tc.steps
 			if steps == nil {
 				steps = []string{
-					"s0 restore_remote --schema --rm --tables=db1.t1", "s0 restore_remote --data --tables=db1.t1", "d1 restore_remote --data --tables=db1.t1",
+					// Every host downloads the backup first, with its data
+					"s0 download --hardlink-exists-files --tables=db1.t1", "d1 download --hardlink-exists-files --tables=db1.t1",
+					"s0 restore --schema --rm --tables=db1.t1", "s0 restore --data --tables=db1.t1", "d1 restore --data --tables=db1.t1",
 				}
 			}
 			calls := []string{
@@ -3806,10 +4302,12 @@ func TestJobScriptDropsOnClusterFromTheStoragePathsOfAnotherInstallation(t *test
 	require.Equal(t, []string{
 		"a0 download --schema --rbac" + flags + " bk-1", "a1 download --schema --rbac" + flags + " bk-1",
 		"b0 download --schema --rbac" + flags + " bk-1", "b1 download --schema --rbac" + flags + " bk-1",
-		"a0 restore_remote --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main" + flags + " bk-1",
-		"a0 restore_remote --schema --rm" + flags + " bk-1", "a1 restore_remote --schema --rm" + flags + " bk-1",
-		"b0 restore_remote --schema --rm" + flags + " bk-1", "b1 restore_remote --schema --rm" + flags + " bk-1",
-		"a0 restore_remote --data" + flags + " bk-1", "b0 restore_remote --data" + flags + " bk-1",
+		"a0 download --hardlink-exists-files" + flags + " bk-1", "a1 download --schema" + flags + " bk-1",
+		"b0 download --hardlink-exists-files" + flags + " bk-1", "b1 download --schema" + flags + " bk-1",
+		"a0 restore --schema --rm --env=RESTORE_SCHEMA_ON_CLUSTER=main" + flags + " bk-1",
+		"a0 restore --schema --rm" + flags + " bk-1", "a1 restore --schema --rm" + flags + " bk-1",
+		"b0 restore --schema --rm" + flags + " bk-1", "b1 restore --schema --rm" + flags + " bk-1",
+		"a0 restore --data" + flags + " bk-1", "b0 restore --data" + flags + " bk-1",
 	}, s.restoreSteps())
 	var listed []string
 	for _, c := range s.matching(http.MethodGet, "/backup/tables") {
@@ -3832,7 +4330,7 @@ func TestJobScriptDropsOnClusterFromTheStoragePathsOfAnotherInstallation(t *test
 		"a0 POST /backup/delete/local/bk-1", "a1 POST /backup/delete/local/bk-1",
 		"b0 POST /backup/delete/local/bk-1", "b1 POST /backup/delete/local/bk-1",
 	}, deleted, "every downloaded copy is gone before the drop ON CLUSTER")
-	require.Empty(t, s.matching(http.MethodPost, "/backup/restore_remote/"))
+	require.Empty(t, s.matching(http.MethodPost, "/backup/restore/"))
 }
 
 // A restore from another installation fails before it changes anything, with the exit code that tells
@@ -4059,7 +4557,8 @@ func TestJobScriptRestoresFromItsOwnPathsWhenTheyTellNoOtherInstallation(t *test
 			}
 			require.Contains(t, out, tc.warned)
 			require.Empty(t, s.matching(http.MethodPost, "/backup/actions"))
-			require.Equal(t, []string{"s0 rm= schema=", "s0 data=", "d1 data="}, s.restoreSteps())
+			require.Equal(t, []string{"s0 download hardlink_exists_files=", "d1 download hardlink_exists_files=", "s0 rm= schema=", "s0 data=", "d1 data="},
+				s.restoreSteps())
 			require.Len(t, s.matching(http.MethodGet, "/backup/list/remote"), 2)
 		})
 	}
@@ -4133,7 +4632,7 @@ func TestJobScriptRestoresFromAnotherInstallationWithoutTopologyValidation(t *te
 				"s0 GET /backup/version", "d1 GET /backup/version",
 				"s0 GET /backup/list/local", "s0 GET /backup/list/remote", "d1 GET /backup/list/local", "d1 GET /backup/list/remote",
 				"s0 GET /backup/tables/all", "d1 GET /backup/tables/all",
-				"s0 POST /backup/actions", "s0 POST /backup/actions", "d1 POST /backup/actions",
+				"s0 POST /backup/actions", "d1 POST /backup/actions", "s0 POST /backup/actions", "s0 POST /backup/actions", "d1 POST /backup/actions",
 				"s0 GET /backup/list/local", "s0 POST /backup/delete/local/bk-1",
 				"d1 GET /backup/list/local", "d1 POST /backup/delete/local/bk-1",
 			},
@@ -4144,7 +4643,7 @@ func TestJobScriptRestoresFromAnotherInstallationWithoutTopologyValidation(t *te
 				"s0 GET /backup/version", "d1 GET /backup/version",
 				"s0 GET /backup/list/local", "s0 GET /backup/list/remote", "d1 GET /backup/list/local", "d1 GET /backup/list/remote",
 				"s0 GET /backup/tables/all", "d1 GET /backup/tables/all",
-				"s0 POST /backup/actions", "s0 POST /backup/actions", "d1 POST /backup/actions",
+				"s0 POST /backup/actions", "d1 POST /backup/actions", "s0 POST /backup/actions", "s0 POST /backup/actions", "d1 POST /backup/actions",
 				"s0 GET /backup/list/local", "s0 POST /backup/delete/local/bk-1",
 				"d1 GET /backup/list/local", "d1 POST /backup/delete/local/bk-1",
 			},
@@ -4158,7 +4657,7 @@ func TestJobScriptRestoresFromAnotherInstallationWithoutTopologyValidation(t *te
 				"s0 GET /backup/tables/all", "d1 GET /backup/tables/all",
 				"s0 POST /backup/actions", "s0 GET /backup/tables", "d1 POST /backup/actions", "d1 GET /backup/tables",
 				"s0 POST /backup/delete/local/bk-1", "d1 POST /backup/delete/local/bk-1",
-				"s0 POST /backup/actions", "s0 POST /backup/actions", "d1 POST /backup/actions",
+				"s0 POST /backup/actions", "d1 POST /backup/actions", "s0 POST /backup/actions", "s0 POST /backup/actions", "d1 POST /backup/actions",
 				"s0 GET /backup/list/local", "s0 POST /backup/delete/local/bk-1",
 				"d1 GET /backup/list/local", "d1 POST /backup/delete/local/bk-1",
 			},
@@ -4183,5 +4682,931 @@ func TestJobScriptRestoresFromAnotherInstallationWithoutTopologyValidation(t *te
 				require.True(t, strings.HasSuffix(step, flags+" bk-1"), step)
 			}
 		})
+	}
+}
+
+// orchestratorScriptDir returns the directory of the orchestrator script in the repository: the backup folder of the
+// operator configuration, generated from deploy/builder/templates-config/backup
+func orchestratorScriptDir() string {
+	_, file, _, _ := runtime.Caller(0)
+	return filepath.Join(filepath.Dir(file), "..", "..", "..", "config", "backup")
+}
+
+// orchestratorScript is the orchestrator script of the repository, which the tests run
+var orchestratorScript string
+
+func init() {
+	script, err := ReadOrchestratorScript(orchestratorScriptDir())
+	if testedOrchestrator == orchestratorPython {
+		script, err = readScript(filepath.Join(pythonOrchestratorScriptDir(), OrchestratorPythonScriptFile))
+	}
+	if err != nil {
+		panic(err)
+	}
+	orchestratorScript = script
+}
+
+func TestReadOrchestratorScript(t *testing.T) {
+	bashOnly(t)
+	script, err := ReadOrchestratorScript(orchestratorScriptDir())
+	require.NoError(t, err)
+	require.True(t, strings.HasPrefix(script, "# backup-orchestrator.sh "))
+	_, err = ReadOrchestratorScript(t.TempDir())
+	require.Error(t, err)
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, OrchestratorScriptFile), []byte(" \n"), 0o600))
+	_, err = ReadOrchestratorScript(dir)
+	require.Error(t, err)
+}
+
+// The Job runs the script as a file: its main runs then, as under bash -c.
+func TestJobScriptRunsAsAFile(t *testing.T) {
+	requireOrchestrator(t)
+	path := filepath.Join(orchestratorScriptDir(), OrchestratorScriptFile)
+	termination := filepath.Join(t.TempDir(), "termination-log")
+	cmd := exec.Command("bash", path)
+	if testedOrchestrator == orchestratorPython {
+		cmd = exec.Command("python3", filepath.Join(pythonOrchestratorScriptDir(), OrchestratorPythonScriptFile))
+	}
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), envOperation + "=drop", envAPIPort + "=7171", envAPIUsername + "=u",
+		envAPIPassword + "=p", envTerminationMessagePath + "=" + termination, envUnchangedExitCode + "=3"}
+	out, err := cmd.CombinedOutput()
+	var exitErr *exec.ExitError
+	require.ErrorAs(t, err, &exitErr, string(out))
+	require.Equal(t, 3, exitErr.ExitCode(), string(out))
+	message, err := os.ReadFile(termination)
+	require.NoError(t, err)
+	require.Equal(t, "OPERATION must be one of backup, verify, restore\n", string(message))
+}
+
+// sourced runs snippet in bash after sourcing the script, which runs nothing then but leaves its functions, with only
+// the given environment on top of PATH, and returns its exit code and output.
+func sourced(t *testing.T, env map[string]string, snippet string) (int, string) {
+	t.Helper()
+	bashOnly(t)
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash is not available")
+	}
+	path := filepath.Join(t.TempDir(), "backup-orchestrator.sh")
+	require.NoError(t, os.WriteFile(path, []byte(orchestratorScript), 0o600))
+	cmd := exec.Command("bash", "-c", "source \"$1\"\nshift\n"+snippet, "bash", path)
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH")}
+	for name, value := range env {
+		cmd.Env = append(cmd.Env, name+"="+value)
+	}
+	out, err := cmd.CombinedOutput()
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr.ExitCode(), string(out)
+	}
+	require.NoError(t, err)
+	return 0, string(out)
+}
+
+// sourcedOutput runs snippet as sourced does and requires it to succeed, returning its output
+func sourcedOutput(t *testing.T, env map[string]string, snippet string) string {
+	t.Helper()
+	code, out := sourced(t, env, snippet)
+	require.Zero(t, code, out)
+	return out
+}
+
+// Sourced, the script runs nothing: no request, no output, no exit.
+func TestJobScriptSourcedRunsNothing(t *testing.T) {
+	require.Equal(t, "sourced\n", snippetOutput(t, map[string]string{envOperation: "drop"}, "echo sourced", "print('sourced')"))
+}
+
+// The slot rules of the script are those of the scheduler: an hour entry matches the minute of its time, a 6hours
+// entry that minute every 6 hours from its hour, a daily entry its time, a weekly entry its day of the week too, 0
+// being Sunday, a monthly entry its day of the month too, clamped to the last day of a shorter month.
+func TestJobScriptSlotMatches(t *testing.T) {
+	for _, tc := range []struct {
+		entry string
+		tag   string
+		match bool
+	}{
+		{"period=minute keep=1", "20260101031759", true},
+		{"period=minute time=07:15 keep=1", "20261231235900", true},
+		{"period=hour time=07:15 keep=1", "20260101031500", true},
+		{"period=hour time=07:15 keep=1", "20260101031600", false},
+		{"period=hour keep=1", "20260101090059", true},
+		{"period=6hours time=08:30 keep=1", "20260101023000", true},
+		{"period=6hours time=08:30 keep=1", "20260101203000", true},
+		{"period=6hours time=08:30 keep=1", "20260101033000", false},
+		{"period=6hours time=08:30 keep=1", "20260101080000", false},
+		{"period=daily time=23:45 keep=1", "20260505234500", true},
+		{"period=daily time=23:45 keep=1", "20260505224500", false},
+		// 2026-11-15 is a Sunday
+		{"period=weekly day=0 time=01:00 keep=1", "20261115010000", true},
+		{"period=weekly day=0 time=01:00 keep=1", "20261116010000", false},
+		{"period=weekly day=6 time=01:00 keep=1", "20261114010000", true},
+		{"period=weekly day=4 time=00:00 keep=1", "19700101000000", true},
+		{"period=weekly day=1 time=00:00 keep=1", "20000228000000", true},
+		{"period=monthly day=31 time=00:00 keep=1", "20260131000000", true},
+		{"period=monthly day=31 time=00:00 keep=1", "20260228000000", true},
+		{"period=monthly day=31 time=00:00 keep=1", "20280229000000", true},
+		{"period=monthly day=31 time=00:00 keep=1", "20280228000000", false},
+		{"period=monthly day=31 time=00:00 keep=1", "20260430000000", true},
+		{"period=monthly day=31 time=00:00 keep=1", "20260429000000", false},
+		{"period=monthly day=29 time=00:00 keep=1", "21000228000000", true},
+		{"period=monthly day=15 time=00:00 keep=1", "20260215000000", true},
+		{"period=monthly day=15 time=00:00 keep=1", "20260228000000", false},
+	} {
+		out := snippetOutput(t, map[string]string{envSchedules: tc.entry, "TAG": tc.tag},
+			`parse_schedules; if slot_matches 0 "${TAG}"; then echo yes; else echo no; fi`, pySlotMatches)
+		require.Equal(t, map[bool]string{true: "yes\n", false: "no\n"}[tc.match], out, "%s at %s", tc.entry, tc.tag)
+	}
+}
+
+// int32Ref returns a reference to value
+func int32Ref(value int32) *int32 {
+	return &value
+}
+
+// The script and the operator agree on the entries a slot is one of, and on the one it is above all: the script
+// decides from it whether the backup is incremental, the operator records it on the schedule.
+func TestJobScriptMatchesTheEntriesAsTheOperator(t *testing.T) {
+	schedules := [][]api.BackupScheduleEntry{
+		{
+			{Period: api.BackupPeriodMinute, Keep: 60},
+			{Period: api.BackupPeriodHour, Time: "05:30", Keep: 24},
+			{Period: api.BackupPeriodDaily, Time: "05:30", Keep: 7},
+		},
+		{
+			{Period: api.BackupPeriodHour, Time: "05:30", Keep: 24},
+			{Period: api.BackupPeriod6Hours, Time: "05:30", Keep: 4},
+			{Period: api.BackupPeriodDaily, Time: "05:30", Keep: 7},
+			{Period: api.BackupPeriodWeekly, Time: "05:30", Day: int32Ref(0), Keep: 4},
+			{Period: api.BackupPeriodMonthly, Time: "05:30", Day: int32Ref(31), Keep: 12},
+		},
+		{
+			{Period: api.BackupPeriodDaily, Time: "23:00", Keep: 7},
+			{Period: api.BackupPeriodMonthly, Time: "23:00", Day: int32Ref(30), Keep: 3},
+		},
+	}
+	for i, entries := range schedules {
+		env := EntriesEnv(entries)
+		var tags []string
+		var want []string
+		for at := time.Date(2028, time.February, 25, 0, 30, 0, 0, time.UTC); at.Before(time.Date(2028, time.March, 2, 0, 0, 0, 0, time.UTC)); at = at.Add(30 * time.Minute) {
+			tags = append(tags, at.Format(scheduleTimestampLayout))
+			winner := ""
+			if w := Winner(MatchingEntries(entries, at)); w != nil {
+				winner = string(w.Period)
+			}
+			want = append(want, winner)
+		}
+		out := snippetOutput(t, map[string]string{envSchedules: env, "TAGS": strings.Join(tags, " ")}, `
+			parse_schedules
+			for tag in ${TAGS}; do
+				winner_entry "${tag}"
+				printf '%s\n' "${WINNER:+${SCHED_PERIOD[WINNER]}}"
+			done`, `
+S.sched = parse_schedules(env('SCHEDULES'))
+for tag in env('TAGS').split():
+    winner_entry(tag)
+    print(S.sched[S.winner]['period'] if S.winner is not None else '')`)
+		require.Equal(t, want, strings.Split(strings.TrimSuffix(out, "\n"), "\n"), "schedule %d: %s", i, env)
+	}
+}
+
+// The heaviest entry of a slot wins: minute < hour < 6hours < daily < weekly < monthly.
+func TestJobScriptPicksTheHeaviestEntry(t *testing.T) {
+	const schedules = "period=minute keep=60;period=hour time=00:30 keep=24;period=6hours time=00:30 keep=4;" +
+		"period=daily time=06:30 keep=7;period=weekly day=0 time=06:30 keep=4;period=monthly day=15 time=06:30 keep=12"
+	for tag, want := range map[string]string{
+		"20261112071700": "minute 0", "20261112073000": "hour 0 1", "20261112003000": "6hours 0 1 2",
+		"20261112063000": "daily 0 1 2 3", "20261122063000": "weekly 0 1 2 3 4", "20261215063000": "monthly 0 1 2 3 5",
+	} {
+		out := snippetOutput(t, map[string]string{envSchedules: schedules, "TAG": tag},
+			`parse_schedules; winner_entry "${TAG}"; echo "${SCHED_PERIOD[WINNER]} ${MATCHED[*]}"`, `
+S.sched = parse_schedules(env('SCHEDULES'))
+winner_entry(env('TAG'))
+print(S.sched[S.winner]['period'], *S.matched)`)
+		require.Equal(t, want+"\n", out, tag)
+	}
+}
+
+func TestJobScriptParsesSchedules(t *testing.T) {
+	out := snippetOutput(t, map[string]string{
+		envSchedules: " period=daily time=05:00 keep=7;period=weekly day=0 time=05:07 keep=4; ;period=hour keep=24 incremental=true;period=6hours time=13:15 keep=2;period=monthly day=31 time=05:00 keep=12 incremental=false;period=minute time=07:07 keep=5",
+	}, `parse_schedules
+		for i in "${!SCHED_PERIOD[@]}"; do
+			echo "${SCHED_PERIOD[i]} ${SCHED_HOUR[i]} ${SCHED_MINUTE[i]} ${SCHED_DAY[i]:--} ${SCHED_KEEP[i]} ${SCHED_INCREMENTAL[i]}"
+		done`, `
+for e in parse_schedules(env('SCHEDULES')):
+    print(e['period'], e['hour'], e['minute'], '-' if e['day'] is None else e['day'], e['keep'], str(e['incremental']).lower())`)
+	require.Equal(t, "daily 5 0 - 7 false\nweekly 5 7 0 4 false\nhour 0 0 - 24 true\n6hours 13 15 - 2 false\nmonthly 5 0 31 12 false\nminute 0 0 - 5 false\n", out)
+	for _, invalid := range []string{
+		"period=yearly keep=1",
+		"period=minute keep=1 day=1",
+		"period=minute time=7:07 keep=1",
+		"period=daily time=00:00",
+		"period=daily time=00:00 keep=0",
+		"period=daily keep=1",
+		"period=daily time=24:00 keep=1",
+		"period=daily time=1:00 keep=1",
+		"period=daily time=01:00 day=1 keep=1",
+		"period=weekly time=01:00 keep=1",
+		"period=weekly time=01:00 day=7 keep=1",
+		"period=monthly time=01:00 day=0 keep=1",
+		"period=monthly time=01:00 day=32 keep=1",
+		"period=daily time=01:00 keep=1 incremental=yes",
+		"period=daily time=01:00 keep=1 colour=red",
+		"period=daily time=01:00 keep",
+		"period=daily time=01:00 keep=1;period=daily time=01:00 keep=2",
+		"period=daily time=01:00 keep=1\nperiod=hour keep=1",
+	} {
+		code, out := snippet(t, map[string]string{envSchedules: invalid}, "parse_schedules", "parse_schedules(env('SCHEDULES'))")
+		require.Equal(t, 1, code, "%q: %s", invalid, out)
+		require.Contains(t, out, "ERROR: SCHEDULES", invalid)
+	}
+}
+
+// The slot of a run is the minute its Job name ends with, after the name of its CronJob, in the time zone of the
+// schedule; a Job named otherwise, or a slot past the four-digit years, takes the current minute.
+func TestJobScriptReadsTheSlotTime(t *testing.T) {
+	for _, tc := range []struct {
+		cronJob, job, zone, want string
+	}{
+		{"nightly", "nightly-0", "", "19700101000000"},
+		{"nightly", "nightly-28333334", "", "20231114221400"},
+		{"nightly", "nightly-0028333334", "", "20231114221400"},
+		{"nightly", "nightly-28333334", "UTC", "20231114221400"},
+		{"nightly", "nightly-28333334", "America/New_York", "20231114171400"},
+		{"nightly", "nightly-28333334", "Asia/Kolkata", "20231115034400"},
+		{"nightly", "nightly-x28333334", "", ""},
+		{"nightly", "nightly-283333340000", "", ""},
+		{"nightly", "nightly-9999999999", "", ""},
+		{"nightly", "other-28333334", "", ""},
+		{"nightly", "", "", ""},
+		{"", "nightly-28333334", "", ""},
+	} {
+		out := snippetOutput(t, map[string]string{envCronJobName: tc.cronJob, envJobName: tc.job, envScheduleTimezone: tc.zone},
+			`check_timezone; schedule_slot; echo "${SLOT_TAG}"`, "check_timezone(env('SCHEDULE_TIMEZONE')); schedule_slot(); print(S.slot_tag)")
+		if tc.want == "" {
+			require.Regexp(t, `^[0-9]{12}00\n$`, out, "%+v", tc)
+			require.NotEqual(t, "20231114221400\n", out)
+			continue
+		}
+		require.Equal(t, tc.want+"\n", out, "%+v", tc)
+	}
+	for _, zone := range []string{"Mars/Olympus", "../etc/passwd", "Europe/../UTC", "a b"} {
+		code, out := snippet(t, map[string]string{envScheduleTimezone: zone}, "check_timezone", "check_timezone(env('SCHEDULE_TIMEZONE'))")
+		require.Equal(t, 1, code, "%q: %s", zone, out)
+		require.Contains(t, out, "ERROR: SCHEDULE_TIMEZONE is not a time zone of the tzdata of the image")
+	}
+}
+
+func TestJobScriptTellsValidTags(t *testing.T) {
+	for tag, valid := range map[string]bool{
+		"20260101000000": true, "20240229235959": true, "20230229000000": false, "20261301000000": false,
+		"20260100000000": false, "20260101240000": false, "20260101006000": false, "2026010100000": false,
+		"202601010000000": false, "2026010100000x": false, "": false,
+	} {
+		out := snippetOutput(t, map[string]string{"TAG": tag}, `if tag_valid "${TAG}"; then echo yes; else echo no; fi`,
+			"print('yes' if tag_valid(env('TAG')) else 'no')")
+		require.Equal(t, map[bool]string{true: "yes\n", false: "no\n"}[valid], out, tag)
+	}
+}
+
+// retention_plan decides as the cleanup of remote backups of the Altinity Cloud Manager: what it keeps, and what it
+// deletes, newest first.
+func TestJobScriptRetentionPlan(t *testing.T) {
+	all := func(names ...string) []string { return names }
+	for name, tc := range map[string]struct {
+		schedules string
+		names     []string
+		// incomplete and empty name the backups not every host lists complete, and those listed of size 0;
+		// sizeless those no host lists a size above 0 of, broken those a host lists broken
+		incomplete, empty, sizeless, broken []string
+		made                                string
+		keep, obsolete                      []string
+	}{
+		"the newest of a daily entry": {
+			schedules: "period=daily time=00:00 keep=2",
+			names:     all("d-20200101000000", "d-20200104000000", "d-20200102000000", "d-20200103000000"),
+			made:      "d-20200104000000",
+			keep:      all("d-20200103000000", "d-20200104000000"),
+			obsolete:  all("d-20200102000000", "d-20200101000000"),
+		},
+		"a backup kept by several entries": {
+			schedules: "period=weekly day=0 time=00:00 keep=2;period=daily time=00:00 keep=2",
+			// 2020-01-05 and 2020-01-12 are Sundays
+			names:    all("d-20200105000000", "d-20200111000000", "d-20200112000000", "d-20200113000000", "d-20200110000000"),
+			keep:     all("d-20200105000000", "d-20200112000000", "d-20200113000000"),
+			obsolete: all("d-20200111000000", "d-20200110000000"),
+		},
+		"backups made at once from the schedule": {
+			schedules: "period=daily time=00:00 keep=2",
+			names:     all("d-20200101000000", "d-20200102000000", "d-20200103000000", "d-20200101T120000", "d-20200102T120000", "d-20200103T120000"),
+			keep:      all("d-20200102000000", "d-20200102T120000", "d-20200103000000", "d-20200103T120000"),
+			obsolete:  all("d-20200101T120000", "d-20200101000000"),
+		},
+		"the newest backup made at once": {
+			schedules: "period=daily time=00:00 keep=1",
+			names:     all("d-20200101000000", "d-20200102000000", "d-20200102T120000"),
+			keep:      all("d-20200102000000", "d-20200102T120000"),
+			obsolete:  all("d-20200101000000"),
+		},
+		"backups made at once without a scheduled one": {
+			schedules: "period=daily time=00:00 keep=1",
+			names:     all("d-20200101T120000", "d-20200102T120000"),
+			keep:      all("d-20200101T120000", "d-20200102T120000"),
+		},
+		"backups of no slot": {
+			schedules: "period=daily time=00:00 keep=5",
+			names:     all("d-20200101000000", "d-20200101060000", "d-20200102000000"),
+			keep:      all("d-20200101000000", "d-20200102000000"),
+			obsolete:  all("d-20200101060000"),
+		},
+		"incomplete, empty and invalid backups": {
+			schedules:  "period=daily time=00:00 keep=1",
+			names:      all("d-20200101000000", "d-20200102000000", "d-20200103000000", "d-20200104000000", "d-20201399000000"),
+			incomplete: all("d-20200104000000"),
+			empty:      all("d-20200101000000"),
+			sizeless:   all("d-20200101000000"),
+			keep:       all("d-20200103000000"),
+			obsolete:   all("d-20200102000000"),
+		},
+		// An incomplete backup never counts, and goes once a complete one is newer, newest first among the others
+		"incomplete backups older than the newest complete one": {
+			schedules:  "period=daily time=00:00 keep=2",
+			names:      all("d-20200101000000", "d-20200102000000", "d-20200103000000", "d-20200104000000", "d-20200102T120000"),
+			incomplete: all("d-20200102000000", "d-20200102T120000"),
+			keep:       all("d-20200103000000", "d-20200104000000"),
+			obsolete:   all("d-20200102T120000", "d-20200102000000", "d-20200101000000"),
+		},
+		"incomplete backups the newest complete one keeps for the count": {
+			schedules:  "period=daily time=00:00 keep=3",
+			names:      all("d-20200101000000", "d-20200102000000", "d-20200103000000", "d-20200104000000"),
+			incomplete: all("d-20200103000000"),
+			keep:       all("d-20200101000000", "d-20200102000000", "d-20200104000000"),
+			obsolete:   all("d-20200103000000"),
+		},
+		"an incomplete backup of size 0": {
+			schedules:  "period=daily time=00:00 keep=1",
+			names:      all("d-20200101000000", "d-20200102000000"),
+			incomplete: all("d-20200101000000"),
+			sizeless:   all("d-20200101000000"),
+			keep:       all("d-20200102000000"),
+		},
+		"a broken backup of size 0": {
+			schedules:  "period=daily time=00:00 keep=1",
+			names:      all("d-20200101000000", "d-20200102000000", "d-20200103000000"),
+			incomplete: all("d-20200101000000", "d-20200103000000"),
+			sizeless:   all("d-20200101000000", "d-20200103000000"),
+			broken:     all("d-20200101000000", "d-20200103000000"),
+			keep:       all("d-20200102000000"),
+			obsolete:   all("d-20200101000000"),
+		},
+		"an incomplete backup newer than every complete one": {
+			schedules:  "period=daily time=00:00 keep=1",
+			names:      all("d-20200101000000", "d-20200102000000", "d-20200102T120000"),
+			incomplete: all("d-20200102000000", "d-20200102T120000"),
+			keep:       all("d-20200101000000"),
+			obsolete:   all(),
+		},
+		"incomplete backups alone": {
+			schedules:  "period=daily time=00:00 keep=1",
+			names:      all("d-20200101000000", "d-20200102000000"),
+			incomplete: all("d-20200101000000", "d-20200102000000"),
+		},
+		"the run just made, incomplete": {
+			schedules:  "period=daily time=00:00 keep=1",
+			names:      all("d-20200101000000", "d-20200102000000", "d-29990101000000"),
+			incomplete: all("d-20200101000000"),
+			made:       "d-20200101000000",
+			keep:       all("d-29990101000000"),
+			obsolete:   all("d-20200102000000"),
+		},
+		"the run just made, past newer ones": {
+			schedules: "period=daily time=00:00 keep=1",
+			names:     all("d-20200101000000", "d-20200102000000", "d-29990101000000"),
+			made:      "d-20200101000000",
+			keep:      all("d-20200101000000", "d-29990101000000"),
+			obsolete:  all("d-20200102000000"),
+		},
+		"no backups": {schedules: "period=daily time=00:00 keep=1"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out := snippetOutput(t, map[string]string{
+				envSchedules: tc.schedules, envBackupNamePrefix: "d", envBackupName: tc.made,
+				"ALL": strings.Join(tc.names, " "), "INCOMPLETE": strings.Join(tc.incomplete, " "), "EMPTIES": strings.Join(tc.empty, " "),
+				"SIZELESS": strings.Join(tc.sizeless, " "), "BROKENS": strings.Join(tc.broken, " "),
+			}, `
+				parse_schedules
+				read -r -a NAMES <<<"${ALL}"
+				declare -A COMPLETE=() EMPTY=() SIZED=()
+				for name in "${NAMES[@]}"; do COMPLETE[${name}]=1; SIZED[${name}]=1; done
+				for name in ${INCOMPLETE}; do unset "COMPLETE[${name}]"; done
+				for name in ${EMPTIES}; do EMPTY[${name}]=1; done
+				for name in ${SIZELESS}; do unset "SIZED[${name}]"; done
+				for name in ${BROKENS}; do BROKEN[${name}]=1; done
+				retention_plan
+				echo "keep: $(for name in "${!KEEP[@]}"; do echo "${name}"; done | sort | tr '\n' ' ')"
+				echo "obsolete: ${OBSOLETE[*]}"`, pyRetention+`
+obsolete, _, keep = plan()
+print('keep: ' + ''.join(name + ' ' for name in sorted(keep)))
+print('obsolete: ' + ' '.join(obsolete))`)
+			keep := slices.Clone(tc.keep)
+			if tc.made != "" && !slices.Contains(keep, tc.made) && !slices.Contains(tc.incomplete, tc.made) {
+				keep = append(keep, tc.made)
+			}
+			slices.Sort(keep)
+			want := "keep: " + strings.Join(keep, " ")
+			if len(keep) > 0 {
+				want += " "
+			}
+			require.Equal(t, want+"\nobsolete: "+strings.Join(tc.obsolete, " ")+"\n", out)
+		})
+	}
+}
+
+// The day by day simulations of Altinity/acm#814, a backup at midnight every day and one made at once at noon every 10
+// days, retention after every scheduled backup, leave what the pull request shows: every entry's backups, and the
+// backups made at once in its window. Which backups are incremental does not change what retention keeps.
+func TestJobScriptRetentionSimulation(t *testing.T) {
+	for name, tc := range map[string]struct {
+		schedules string
+		days      int
+		left      []string
+	}{
+		"4 weekly + 7 daily incremental, after 90 days": {
+			schedules: "period=weekly day=0 time=00:00 keep=4;period=daily time=00:00 keep=7 incremental=true",
+			days:      90,
+			left: []string{
+				"20260308000000", "20260315000000", "20260317T120000", "20260322000000", "20260325000000", "20260326000000",
+				"20260327000000", "20260327T120000", "20260328000000", "20260329000000", "20260330000000", "20260331000000",
+			},
+		},
+		"1 monthly + 2 weekly + 3 daily incremental, after 120 days": {
+			schedules: "period=monthly day=1 time=00:00 keep=1;period=weekly day=0 time=00:00 keep=2;period=daily time=00:00 keep=3 incremental=true",
+			days:      120,
+			left: []string{
+				"20260401000000", "20260406T120000", "20260416T120000", "20260419000000", "20260426000000", "20260426T120000",
+				"20260428000000", "20260429000000", "20260430000000",
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC).Unix()
+			out := snippetOutput(t, map[string]string{
+				envSchedules: tc.schedules, envBackupNamePrefix: "d", "DAYS": strconv.Itoa(tc.days), "START": strconv.FormatInt(start, 10),
+			}, `
+				parse_schedules
+				declare -A HELD=() COMPLETE=() EMPTY=()
+				for ((day = 0; day < DAYS; day++)); do
+					TZ=UTC0 printf -v date '%(%Y%m%d)T' "$((START + day * 86400))"
+					BACKUP_NAME=d-${date}000000
+					HELD[${BACKUP_NAME}]=1
+					NAMES=("${!HELD[@]}")
+					COMPLETE=()
+					for name in "${NAMES[@]}"; do COMPLETE[${name}]=1; done
+					retention_plan
+					for name in "${OBSOLETE[@]}"; do unset "HELD[${name}]"; done
+					# A backup made at once, at noon, after the scheduled one
+					if ((day % 10 == 5)); then HELD[d-${date}T120000]=1; fi
+				done
+				printf '%s\n' "${!HELD[@]}" | sed 's/^d-//' | sort`, `
+S.sched = parse_schedules(env('SCHEDULES'))
+held = set()
+for day in range(int(env('DAYS'))):
+    date = datetime.fromtimestamp(int(env('START')) + day * 86400, timezone.utc).strftime('%Y%m%d')
+    S.env['BACKUP_NAME'] = 'd-' + date + '000000'
+    held.add(S.env['BACKUP_NAME'])
+    obsolete, _, _ = retention_plan(sorted(held), {'complete': set(held), 'empty': set(), 'sized': set(), 'broken': set()})
+    held -= set(obsolete)
+    if day % 10 == 5:
+        held.add('d-' + date + 'T120000')
+print('\n'.join(sorted(name[2:] for name in held)))`)
+			require.Equal(t, strings.Join(tc.left, "\n")+"\n", out)
+		})
+	}
+}
+
+// incremental_base makes a backup incremental from the newest backup of the series every host holds, until the chain
+// of incremental backups that ends with it is as long as the entry keeps. A backup made at once from the schedule is
+// a base as a scheduled one, ordered by the time it is named after, as the Altinity Cloud Manager makes a backup
+// incremental from the newest backup of the cluster.
+func TestJobScriptIncrementalBase(t *testing.T) {
+	const (
+		d1 = "d-20260101000000"
+		d2 = "d-20260102000000"
+		d3 = "d-20260103000000"
+		// Made at once from the schedule, at noon of the first day: after d1, before d2
+		r1 = "d-20260101T120000"
+	)
+	for name, tc := range map[string]struct {
+		series string
+		keep   string
+		base   string
+		chain  string
+	}{
+		"no backup":                  {series: "", keep: "3", base: "", chain: "0"},
+		"after a full backup":        {series: "h0 " + d1 + "=;h1 " + d1 + "=", keep: "3", base: d1, chain: "0"},
+		"a chain shorter than keep":  {series: "h0 " + d1 + "=;h0 " + d2 + "=" + d1 + ";h1 " + d1 + "=;h1 " + d2 + "=" + d1, keep: "2", base: d2, chain: "1"},
+		"a chain of keep":            {series: "h0 " + d1 + "=;h0 " + d2 + "=" + d1 + ";h0 " + d3 + "=" + d2 + ";h1 " + d1 + "=;h1 " + d2 + "=" + d1 + ";h1 " + d3 + "=" + d2, keep: "2", base: "", chain: "2"},
+		"a newest backup one lacks":  {series: "h0 " + d1 + "=;h0 " + d2 + "=" + d1 + ";h0 " + d3 + "=" + d2 + ";h1 " + d1 + "=;h1 " + d2 + "=" + d1, keep: "2", base: d2, chain: "1"},
+		"the longest chain of hosts": {series: "h0 " + d1 + "=;h0 " + d2 + "=;h1 " + d1 + "=;h1 " + d2 + "=" + d1, keep: "1", base: "", chain: "1"},
+		"another host's backups":     {series: "h0 " + d1 + "=;h1 " + d1 + "=;h9 " + d2 + "=" + d1, keep: "1", base: d1, chain: "0"},
+		"a host without the series":  {series: "h0 " + d1 + "=;h9 " + d1 + "=", keep: "1", base: "", chain: "0"},
+		"a backup made at once, newest": {series: "h0 " + d1 + "=;h0 " + r1 + "=" + d1 + ";h1 " + d1 + "=;h1 " + r1 + "=" + d1,
+			keep: "3", base: r1, chain: "1"},
+		"a backup made at once, older than a scheduled one": {series: "h0 " + d1 + "=;h0 " + r1 + "=" + d1 + ";h0 " + d2 + "=" + r1 +
+			";h1 " + d1 + "=;h1 " + r1 + "=" + d1 + ";h1 " + d2 + "=" + r1, keep: "3", base: d2, chain: "2"},
+		"a backup made at once in a chain of keep": {series: "h0 " + d1 + "=;h0 " + r1 + "=" + d1 + ";h0 " + d2 + "=" + r1 +
+			";h1 " + d1 + "=;h1 " + r1 + "=" + d1 + ";h1 " + d2 + "=" + r1, keep: "2", base: "", chain: "2"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out := snippetOutput(t, map[string]string{"SERIES": tc.series, "KEEP": tc.keep, envBackupNamePrefix: "d"}, `
+				declare -A SERIES_REQUIRED=()
+				IFS=';' read -r -a entries <<<"${SERIES}"
+				for entry in "${entries[@]}"; do
+					SERIES_REQUIRED["${entry%%=*}"]=${entry#*=}
+				done
+				incremental_base "${KEEP}" h0 h1
+				echo "${REPLY} ${CHAIN}"`, `
+for entry in filter(None, env('SERIES').split(';')):
+    key, required = entry.split('=', 1)
+    S.series_required[tuple(key.split(' ', 1))] = required
+print(*incremental_base(int(env('KEEP')), ['h0', 'h1']))`)
+			require.Equal(t, tc.base+" "+tc.chain+"\n", out)
+		})
+	}
+}
+
+// Only a request whose connection was never established is safe to submit again: it cannot have reached the API.
+func TestJobScriptRetriesWhatNeverConnected(t *testing.T) {
+	for _, tc := range []struct {
+		method, exit, connected, code string
+		retry                         bool
+	}{
+		{"POST", "7", "", "000", true},
+		{"POST", "6", "", "000", true},
+		{"POST", "28", "", "000", true},
+		{"POST", "28", "1", "000", false},
+		{"POST", "52", "1", "000", false},
+		{"POST", "0", "1", "503", false},
+		{"GET", "28", "1", "000", true},
+		{"GET", "0", "1", "502", true},
+		{"GET", "0", "1", "500", false},
+	} {
+		out := snippetOutput(t, map[string]string{"METHOD": tc.method, "EXIT": tc.exit, "CONNECTED": tc.connected, "CODE": tc.code}, `
+			CURL_EXIT=${EXIT} CURL_CONNECTED=${CONNECTED} HTTP_CODE=${CODE}
+			if unreachable "${METHOD}"; then echo retry; else echo no; fi`, `
+S.curl_exit, S.curl_connected, S.http_code = int(env('EXIT')), bool(env('CONNECTED')), env('CODE')
+print('retry' if unreachable(env('METHOD')) else 'no')`)
+		require.Equal(t, map[bool]string{true: "retry\n", false: "no\n"}[tc.retry], out, "%+v", tc)
+	}
+}
+
+// json_escape escapes as encoding/json reads it back, whatever the message holds.
+func TestJobScriptEscapesJSON(t *testing.T) {
+	for _, value := range []string{
+		"", "plain", `quote " and backslash \`, "new\nline\r\ttab", "bell\a esc\x1b del\x7f", "ünïcødé ✓", `A`, "{}[],:",
+	} {
+		out := sourcedOutput(t, map[string]string{"VALUE": value}, `json_escape "${VALUE}"; printf '"%s"' "${REPLY}"`)
+		var decoded string
+		require.NoError(t, json.Unmarshal([]byte(out), &decoded), "%q: %s", value, out)
+		require.Equal(t, value, decoded)
+	}
+}
+
+// eventTestEnv is the environment of the object the script posts Events on
+func eventTestEnv() map[string]string {
+	return map[string]string{
+		envEventObjectAPIVersion: "clickhouse.altinity.com/v1",
+		envEventObjectKind:       "ClickHouseBackup",
+		envEventObjectName:       "b1",
+		envEventObjectUID:        "0d9c7e4c-1b5e-4f4e-9d1e-6f2c1b9a7e11",
+		envPodNamespace:          "ns",
+		envPodName:               "b1-main-backup-x",
+	}
+}
+
+func TestJobScriptBuildsEvents(t *testing.T) {
+	message := "h0: create_remote \"bk-1\" failed:\n\tdisk full " + strings.Repeat("x", 2000)
+	out := snippetOutput(t, withEnv(eventTestEnv(), map[string]string{"MESSAGE": message}),
+		`event_body Warning OrchestratorHostFailed "${MESSAGE}" 2026-01-02T03:04:05Z; printf '%s' "${REPLY}"`,
+		`print(event_body('Warning', 'OrchestratorHostFailed', env('MESSAGE'), '2026-01-02T03:04:05Z'), end='')`)
+	var event map[string]any
+	require.NoError(t, json.Unmarshal([]byte(out), &event), out)
+	require.Equal(t, map[string]any{
+		"apiVersion": "v1",
+		"kind":       "Event",
+		"metadata":   map[string]any{"generateName": "b1.", "namespace": "ns"},
+		"involvedObject": map[string]any{
+			"apiVersion": "clickhouse.altinity.com/v1", "kind": "ClickHouseBackup", "name": "b1", "namespace": "ns",
+			"uid": "0d9c7e4c-1b5e-4f4e-9d1e-6f2c1b9a7e11",
+		},
+		"reason":             "OrchestratorHostFailed",
+		"message":            message[:1024],
+		"type":               "Warning",
+		"source":             map[string]any{"component": "clickhouse-backup-orchestrator"},
+		"firstTimestamp":     "2026-01-02T03:04:05Z",
+		"lastTimestamp":      "2026-01-02T03:04:05Z",
+		"count":              float64(1),
+		"reportingComponent": "clickhouse-backup-orchestrator",
+		"reportingInstance":  "b1-main-backup-x",
+	}, event)
+}
+
+// scriptWith returns script with the setting name, a line of its own, set to value
+func scriptWith(t *testing.T, script, name, value string) string {
+	t.Helper()
+	setting := regexp.MustCompile(`(?m)^` + name + `=.*$`)
+	require.Len(t, setting.FindAllString(script, -1), 1, name)
+	if testedOrchestrator == orchestratorPython {
+		value = strconv.Quote(value)
+	}
+	return setting.ReplaceAllLiteralString(script, name+"="+value)
+}
+
+// kubeStub emulates the events endpoint of the Kubernetes API over TLS, and the service account of the pod
+type kubeStub struct {
+	mu     sync.Mutex
+	events []map[string]any
+	posts  int
+	status int
+	// script is orchestratorScript reading the service account at dir
+	script string
+	env    map[string]string
+}
+
+const kubeStubToken = "orchestrator-token"
+
+func newKubeStub(t *testing.T, status int) *kubeStub {
+	t.Helper()
+	k := &kubeStub{status: status}
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		k.mu.Lock()
+		defer k.mu.Unlock()
+		if (r.Method != http.MethodPost) || (r.URL.Path != "/api/v1/namespaces/ns/events") ||
+			(r.Header.Get("Authorization") != "Bearer "+kubeStubToken) || (r.Header.Get("Content-Type") != "application/json") {
+			t.Errorf("unexpected request %s %s", r.Method, r.URL)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		k.posts++
+		var event map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
+			t.Errorf("an event that is no JSON: %v", err)
+		}
+		if k.status < 300 {
+			k.events = append(k.events, event)
+		}
+		w.WriteHeader(k.status)
+	}))
+	t.Cleanup(server.Close)
+	dir := t.TempDir()
+	cert := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "ca.crt"), cert, 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "token"), []byte(kubeStubToken), 0o600))
+	host, port, err := net.SplitHostPort(strings.TrimPrefix(server.URL, "https://"))
+	require.NoError(t, err)
+	k.script = scriptWith(t, orchestratorScript, "SERVICE_ACCOUNT_DIR", dir)
+	k.env = withEnv(eventTestEnv(), map[string]string{"KUBERNETES_SERVICE_HOST": host, "KUBERNETES_SERVICE_PORT": port})
+	return k
+}
+
+func (k *kubeStub) reasons() []string {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	var reasons []string
+	for _, event := range k.events {
+		reasons = append(reasons, event["reason"].(string))
+	}
+	return reasons
+}
+
+// The run posts an Event on the object it works for at every step, with the token of its service account.
+func TestJobScriptPostsEvents(t *testing.T) {
+	k := newKubeStub(t, http.StatusCreated)
+	s := newSidecarStub(t, map[string]*stubHost{"h0": {}, "h1": {}})
+	code, out := s.runScript(k.script, withEnv(k.env, map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0 h1"}))
+	require.Zero(t, code, out)
+	require.Equal(t, []string{"OrchestratorBackupStarted", "OrchestratorCommand", "OrchestratorCommand",
+		"OrchestratorCommandFinished", "OrchestratorHostStepSucceeded", "OrchestratorCommandFinished", "OrchestratorHostStepSucceeded",
+		"OrchestratorBackupCompleted"}, k.reasons(), out)
+	require.Equal(t, "Normal", k.events[0]["type"])
+	require.Equal(t, "b1", k.events[0]["involvedObject"].(map[string]any)["name"])
+
+	k = newKubeStub(t, http.StatusCreated)
+	s = newSidecarStub(t, map[string]*stubHost{"h0": {failOp: map[string]string{"create_remote": "disk full"}}})
+	code, out = s.runScript(k.script, withEnv(k.env, map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0"}))
+	require.Equal(t, 1, code, out)
+	require.Equal(t, []string{"OrchestratorBackupStarted", "OrchestratorCommand", "OrchestratorCommandFinished",
+		"OrchestratorHostFailed", "OrchestratorBackupFailed"}, k.reasons(), out)
+	require.Equal(t, "Warning", k.events[4]["type"])
+	require.Contains(t, k.events[4]["message"], "disk full")
+
+	k = newKubeStub(t, http.StatusCreated)
+	s = newSidecarStub(t, map[string]*stubHost{"h0": {remote: []stubBackup{remote("daily-20200101000000", ""), remote("daily-20200102000000", "")}}})
+	code, out = s.runScript(k.script, withEnv(k.env, scheduledEnv("h0", dailyKeeping(1), "2020-01-03T00:00:00Z")))
+	require.Zero(t, code, out)
+	require.Equal(t, 4, slices.Index(k.reasons(), "OrchestratorBackupCompleted"))
+	require.Equal(t, []string{"OrchestratorCommand", "OrchestratorRetentionDeleted", "OrchestratorCommand", "OrchestratorRetentionDeleted"},
+		k.reasons()[5:], out)
+	require.Equal(t, []string{
+		"h0: create_remote: POST h0:7171/backup/create_remote?name=daily-20200103000000",
+		"h0: delete remote daily-20200102000000: POST h0:7171/backup/delete/remote/daily-20200102000000",
+		"h0: delete remote daily-20200101000000: POST h0:7171/backup/delete/remote/daily-20200101000000",
+	}, k.messages("OrchestratorCommand"), out)
+}
+
+func (k *kubeStub) messages(reason string) []string {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	var messages []string
+	for _, event := range k.events {
+		if event["reason"] == reason {
+			messages = append(messages, event["message"].(string))
+		}
+	}
+	return messages
+}
+
+// Every request that starts or changes something shows in an Event as it is sent: the method, the host and port, the
+// path and the query string as curl encodes it, the command of the actions endpoint; and once the operation ends, the
+// command the sidecar tells it ran. No Event shows the credentials of the API.
+func TestJobScriptPostsTheCommandsItRuns(t *testing.T) {
+	k := newKubeStub(t, http.StatusCreated)
+	s := newSidecarStub(t, map[string]*stubHost{"h0": {remote: []stubBackup{remote("base", "")}}})
+	code, out := s.runScript(k.script, withEnv(k.env, map[string]string{envOperation: operationBackup, envBackupName: "bk-1",
+		envBackupHosts: "h0", envTables: "db.t*,x?y", envPartitions: "('a b'),2026", envDiffFromRemote: "base"}))
+	require.Zero(t, code, out)
+	// The query string is as curl encodes it, which tells the values apart however its version spells the escapes
+	commands := k.messages("OrchestratorCommand")
+	require.Len(t, commands, 1, out)
+	sent, found := strings.CutPrefix(commands[0], "h0: create_remote: POST ")
+	require.True(t, found, commands[0])
+	request, err := url.Parse("http://" + sent)
+	require.NoError(t, err)
+	require.Equal(t, "h0:7171", request.Host)
+	require.Equal(t, "/backup/create_remote", request.Path)
+	require.Equal(t, "name=bk-1&table=db.t*,x?y&partitions=('a b'),2026&diff-from-remote=base", func() string {
+		var pairs []string
+		for _, pair := range strings.Split(request.RawQuery, "&") {
+			key, value, _ := strings.Cut(pair, "=")
+			value, err := url.QueryUnescape(value)
+			require.NoError(t, err)
+			pairs = append(pairs, key+"="+value)
+		}
+		return strings.Join(pairs, "&")
+	}())
+	require.Equal(t, []string{
+		`h0: create_remote bk-1 (operation op-1) ended with status success: create_remote --tables="db.t*,x?y" bk-1`,
+	}, k.messages("OrchestratorCommandFinished"), out)
+
+	k = newKubeStub(t, http.StatusCreated)
+	s = newSidecarStub(t, map[string]*stubHost{"s0": {remote: []stubBackup{remote("bk-1", "")}}, "d1": {remote: []stubBackup{remote("bk-1", "")}}})
+	code, out = s.runScript(k.script, withEnv(k.env, restoreEnv(map[string]string{envTables: "db.*"})))
+	require.Zero(t, code, out)
+	require.NotEmpty(t, k.messages("OrchestratorCommand"), out)
+	require.NotEmpty(t, k.messages("OrchestratorCommandFinished"), out)
+	for _, event := range k.events {
+		message := event["message"].(string)
+		require.NotContains(t, message, scriptTestPassword)
+		require.NotContains(t, message, "Authorization")
+		require.NotContains(t, message, "Basic ")
+	}
+
+	// A command of the actions endpoint shows with its body
+	s = newSidecarStub(t, map[string]*stubHost{"h0": {remote: []stubBackup{remote("bk-1", "")}}})
+	out = snippetOutput(t, map[string]string{"http_proxy": s.server.URL, envAPIPort: scriptTestAPIPort,
+		envAPIUsername: scriptTestUser, envAPIPassword: scriptTestPassword, envPollInterval: "0.01"}, `
+		event() { printf 'EVENT %s %s\n' "$2" "$3"; }
+		log() { :; }
+		API_PORT=${API_PORT} POLL_INTERVAL=${POLL_INTERVAL}
+		AUTH=$(printf '%s:%s' "${API_USERNAME}" "${API_PASSWORD}" | base64 | tr -d '\n')
+		submit h0 download /backup/actions --data-binary '{"command":"download --schema bk-1"}'`, `
+def event(type_, reason, message): print('EVENT', reason, message)
+def log(message, stream=None): pass
+S.auth = base64.b64encode((env('API_USERNAME') + ':' + env('API_PASSWORD')).encode()).decode()
+submit('h0', 'download', '/backup/actions', body='{"command":"download --schema bk-1"}')`)
+	require.Equal(t, `EVENT OrchestratorCommand h0: download: POST h0:7171/backup/actions {"command":"download --schema bk-1"}`+"\n", out)
+}
+
+// An Event message is cut to the bytes the Kubernetes API takes, never inside a character.
+func TestJobScriptCutsEventMessages(t *testing.T) {
+	for _, tc := range []struct {
+		value string
+		max   int
+		want  string
+	}{
+		{"abc", 3, "abc"},
+		{"abcd", 3, "abc"},
+		{"aü", 2, "a"},
+		{"aü", 3, "aü"},
+		{"a✓", 3, "a"},
+		{"ab✓", 3, "ab"},
+		{"a😀", 4, "a"},
+		{"a😀", 5, "a😀"},
+		{"üü", 3, "ü"},
+	} {
+		out := snippetOutput(t, map[string]string{"VALUE": tc.value, "MAX": strconv.Itoa(tc.max), "LANG": "C.UTF-8"},
+			`truncate_bytes "${VALUE}" "${MAX}"; printf '%s' "${REPLY}"`, "print(truncate_bytes(env('VALUE'), int(env('MAX'))), end='')")
+		require.Equal(t, tc.want, out, "%q %d", tc.value, tc.max)
+	}
+	out := snippetOutput(t, withEnv(eventTestEnv(), map[string]string{"MESSAGE": strings.Repeat("ü", 600), "LANG": "C.UTF-8"}),
+		`event_body Normal OrchestratorCommand "${MESSAGE}" 2026-01-02T03:04:05Z; printf '%s' "${REPLY}"`,
+		`print(event_body('Normal', 'OrchestratorCommand', env('MESSAGE'), '2026-01-02T03:04:05Z'), end='')`)
+	var event map[string]any
+	require.NoError(t, json.Unmarshal([]byte(out), &event), out)
+	require.Equal(t, strings.Repeat("ü", 512), event["message"])
+}
+
+// An Event that cannot be posted never fails the run, nor holds it: after a few failures in a row none is tried; and a
+// run without the object or the token of an Event posts none.
+func TestJobScriptRunsWithoutEvents(t *testing.T) {
+	k := newKubeStub(t, http.StatusInternalServerError)
+	s := newSidecarStub(t, map[string]*stubHost{"h0": {}, "h1": {}})
+	code, out := s.runScript(k.script, withEnv(k.env, map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0 h1"}))
+	require.Zero(t, code, out)
+	require.Equal(t, 3, k.posts)
+	require.Contains(t, out, "WARNING: cannot post the event OrchestratorBackupStarted: 500")
+	require.Equal(t, []string{"bk-1"}, s.remoteNames("h1"))
+
+	for name, override := range map[string]map[string]string{
+		"no object":    {envEventObjectUID: ""},
+		"no namespace": {envPodNamespace: ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			k := newKubeStub(t, http.StatusCreated)
+			s := newSidecarStub(t, map[string]*stubHost{"h0": {}})
+			code, out := s.runScript(k.script, withEnv(withEnv(k.env, override), map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0"}))
+			require.Zero(t, code, out)
+			require.Zero(t, k.posts)
+		})
+	}
+	k = newKubeStub(t, http.StatusCreated)
+	s = newSidecarStub(t, map[string]*stubHost{"h0": {}})
+	code, out = s.runScript(scriptWith(t, orchestratorScript, "SERVICE_ACCOUNT_DIR", t.TempDir()),
+		withEnv(k.env, map[string]string{envOperation: operationBackup, envBackupName: "bk-1", envBackupHosts: "h0"}))
+	require.Zero(t, code, out)
+	require.Zero(t, k.posts, "no token, no events")
+}
+
+// With the pod transport the host lists name the backup Pods of the shards, which start with the operation: the run
+// waits until each answers, and fails, changing nothing, when one does not in time.
+func TestJobScriptWaitsForTheBackupPods(t *testing.T) {
+	s := newSidecarStub(t, map[string]*stubHost{"bk-0": {unavailable: 3}, "bk-1": {}})
+	code, out := s.run(map[string]string{envOperation: operationBackup, envBackupName: "b", envBackupHosts: "bk-0 bk-1",
+		envBackupTransport: backupTransportPod})
+	require.Zero(t, code, out)
+	require.Contains(t, out, "bk-0: waiting for the backup Pod to answer")
+	require.Equal(t, []string{"b"}, s.remoteNames("bk-1"))
+
+	for name, env := range map[string]map[string]string{
+		"backup":  {envOperation: operationBackup, envBackupName: "b", envBackupHosts: "bk-0 bk-1"},
+		"verify":  {envOperation: operationVerify, envBackupName: "b", envVerifyHosts: "bk-1"},
+		"restore": restoreEnv(map[string]string{envSchemaHosts: "bk-0", envDataHosts: "bk-0 bk-1"}),
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newSidecarStub(t, map[string]*stubHost{"bk-0": {}, "bk-1": {unavailable: -1}})
+			code, out := s.run(withEnv(env, map[string]string{envBackupTransport: backupTransportPod, envBackupPodWaitSeconds: "0",
+				envUnchangedExitCode: "3"}))
+			require.Equal(t, 3, code, out)
+			require.Contains(t, out, "ERROR: the backup Pod bk-1 does not answer after ")
+			require.Empty(t, s.matching(http.MethodPost, "/"))
+		})
+	}
+}
+
+// orchestratorScriptMaxBytes bounds each orchestrator script, the bash one and the Python one, each the data of a
+// ConfigMap of its own. dev/generate_helm_chart.sh passes the data of a ConfigMap, the script indented as YAML, to yq in
+// a single environment variable, and Linux refuses any single argument or environment string longer than
+// MAX_ARG_STRLEN, 128 KiB: the chart then fails to build, on Linux alone. The bound leaves room for the indentation and
+// a margin; macOS has no such limit, so this test catches it there.
+const orchestratorScriptMaxBytes = 110000
+
+func TestJobScriptFitsTheLinuxArgumentLimit(t *testing.T) {
+	for _, path := range []string{
+		filepath.Join(orchestratorScriptDir(), OrchestratorScriptFile),
+		filepath.Join(pythonOrchestratorScriptDir(), OrchestratorPythonScriptFile),
+	} {
+		script, err := readScript(path)
+		require.NoError(t, err)
+		require.LessOrEqual(t, len(script), orchestratorScriptMaxBytes,
+			"%s must stay within %d bytes, as Linux passes the ConfigMap data that holds it in one environment string of "+
+				"at most 128 KiB: condense it", path, orchestratorScriptMaxBytes)
+		lines := strings.Count(script, "\n") + 1
+		require.Less(t, len(script)+2*lines, 120000, "%s as the data of its ConfigMap, indented by YAML", path)
+	}
+}
+
+// The Helm chart renders the data of every ConfigMap of the operator through tpl, which reads "{{" as the start of a
+// template action: an orchestrator script holding it breaks the chart
+func TestJobScriptHoldsNoHelmTemplateAction(t *testing.T) {
+	for _, path := range []string{
+		filepath.Join(orchestratorScriptDir(), OrchestratorScriptFile),
+		filepath.Join(pythonOrchestratorScriptDir(), OrchestratorPythonScriptFile),
+	} {
+		script, err := readScript(path)
+		require.NoError(t, err)
+		for i, line := range strings.Split(script, "\n") {
+			require.NotContains(t, line, "{{", "%s:%d holds {{, which tpl of the Helm chart reads as a template action", path, i+1)
+		}
 	}
 }

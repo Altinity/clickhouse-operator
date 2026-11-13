@@ -305,7 +305,9 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.S
 		// Without operator-managed backup, or without both credentials in the backup Secret, no user is, and a user
 		// of the name is the installation's own.
 		ips = slices.Clone(config.ClickHouseBackupUserNetworksIP)
-		hostRegexp = ""
+		// Clusters in backup.mode pod run clickhouse-backup in backup Pods next to the hosts, which connect over the
+		// network: from those Pods alone, by their DNS names.
+		hostRegexp = backupPodHostRegexp(n.req.GetTarget())
 	}
 
 	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
@@ -315,6 +317,22 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.S
 		ips:        ips,
 		hostRegexp: hostRegexp,
 	})
+}
+
+// backupPodHostRegexp returns the host_regexp the backup user connects from when a backup-enabled cluster of the
+// installation is in backup.mode pod, "" otherwise: the DNS names of the backup Pods of its shards,
+// chi-<chi>-<cluster>-<shard>-bk.<chi>-<cluster>-backup.<namespace>.svc..., which ClickHouse finds by the reverse DNS
+// of the address a Pod connects from, as its headless Service gives the Pod that name. A name past 63 characters is
+// shortened with a hash after its first characters, which keep the installation name unless it is very long.
+func backupPodHostRegexp(cr *api.ClickHouseInstallation) string {
+	for _, cluster := range cr.GetSpecT().GetConfiguration().GetClusters() {
+		backup := cluster.GetBackup().DeepCopy().MergeFrom(cr.GetSpecT().GetBackup(), api.MergeTypeFillEmptyValues)
+		if backup.IsEnabled() && backup.IsPodMode() {
+			chi := regexp.QuoteMeta(cr.GetName())
+			return fmt.Sprintf(`^chi-%s-[^.]+-bk\.%s-[^.]+-backup\.%s\.svc\.`, chi, chi, regexp.QuoteMeta(cr.GetNamespace()))
+		}
+	}
+	return ""
 }
 
 type userFields struct {

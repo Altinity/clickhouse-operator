@@ -15,14 +15,20 @@
 package chbackup
 
 import (
-	_ "embed"
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 )
 
-// Environment of the backup Job container. jobScript reads every input from these variables,
-// so no user-provided value is ever part of the script text.
+// Environment of the backup Job container. backup-orchestrator.sh, the OrchestratorScriptFile, reads every input
+// from these variables, so no user-provided value is ever part of the script text.
 const (
 	// envOperation selects what the Job does: operationBackup, operationVerify or operationRestore
 	envOperation = "OPERATION"
@@ -33,10 +39,11 @@ const (
 	envAPIPassword = config.ClickHouseBackupSecretKeyAPIPassword
 	// envPollInterval is the number of seconds between status polls, 5 when empty
 	envPollInterval = "POLL_INTERVAL"
-	// envTerminationMessagePath is the file the script writes why it failed to, or envNoDataMessage
-	// when it succeeded with a backup that holds no data, or envRBACNotRestoredMessage when it succeeded
-	// with a restore that left out the access entities of its backup: the termination message path of
-	// its container
+	// envTerminationMessagePath is the file the script writes why it failed to, or, when it succeeded, a
+	// line of each thing it tells of what it did: envNoDataMessage for a backup that holds no data,
+	// envHostsUsedMessage and the hosts a backup was made on when they are not those the Job names,
+	// envRBACNotRestoredMessage for a restore that left out the access entities of its backup: the
+	// termination message path of its container
 	envTerminationMessagePath = "TERMINATION_MESSAGE_PATH"
 	// envUnchangedExitCode is the exit code the script fails with when it has changed nothing
 	envUnchangedExitCode = "UNCHANGED_EXIT_CODE"
@@ -46,32 +53,84 @@ const (
 	envCluster = "CLUSTER"
 	// envBackupName is the backup to create, verify or restore
 	envBackupName = "BACKUP_NAME"
-	// envBackupNamePrefix names a scheduled backup "<prefix>-<UTC timestamp>" when envBackupName is empty,
-	// and scopes retention to the backups named that way
+	// envBackupNamePrefix names a scheduled backup "<prefix>-<YYYYMMDDHHMMSS>", the wall time of its slot in
+	// envScheduleTimezone, when envBackupName is empty, and scopes retention to the backups named that way; with
+	// envBackupNaming it is the value of {prefix}
 	envBackupNamePrefix = "BACKUP_NAME_PREFIX"
+	// envBackupNaming is the naming template of the backups of the cluster, backup.naming, see
+	// api.RenderBackupName: it names the backup of every shard apart, which the shards may then keep at one
+	// storage path, as the Altinity Cloud Manager does, and gives the slots of a schedule a tolerance of 30
+	// minutes. Unset or empty, a backup has one name on every host. envBackupName then is the name of the backup
+	// of any shard, the operator giving that of the first one, or for a restore or the base of a backup the
+	// time it is named after alone, YYYYMMDDHHMMSS - YYYYMMDDTHHMMSS for a backup made at once - unless the
+	// template holds {prefix}
+	envBackupNaming = "BACKUP_NAMING"
+	// envShardNumbers lists the number of the shard, from 1, of every host of the cluster a Job may reach - every
+	// replica, or the backup Pod of every shard -, as space-separated "host=number" pairs, with envBackupNaming
+	envShardNumbers = "SHARD_NUMBERS"
+	// envNamingInstallation and envNamingNamespace are the values of {chi} and {namespace} in the names of the
+	// backups of the cluster, with envBackupNaming; a restore of the backup of another installation takes those
+	// of envSourceInstallation and envSourceNamespace in their place
+	envNamingInstallation = "NAMING_INSTALLATION"
+	envNamingNamespace    = "NAMING_NAMESPACE"
+	// envSchedules (schedule.go) are the entries of the schedule of a scheduled backup, as EntriesEnv formats
+	// them: the heaviest entry whose slot the run is decides whether the backup is incremental; after the
+	// backup, every entry keeps its newest keep backups of its slots, and retention deletes the rest of the
+	// series. envScheduleTimezone (schedule.go) is the zone of the slots.
+	// envKeepBackups lists, space-separated, the backups retention never deletes, spec.retention.keepBackups of the
+	// schedule: names, or with envBackupNaming the name of the backup of any shard or the time alone.
+	envKeepBackups = "KEEP_BACKUPS"
+	// envPreviousSchedules (schedule.go, PreviousSchedulesEnv) are the entries and the time zone the schedule had
+	// before each change whose backups retention holds: it keeps every backup they kept of those made before the
+	// change, and tells those of them the entries as they are would delete in the line of the termination message
+	// envHeldBackupsMessage starts
+	envPreviousSchedules = "PREVIOUS_SCHEDULES"
+	// envHeldBackupsMessage starts the line of the termination message the script adds, followed by the
+	// space-separated names, when retention holds backups for a change of the schedule that the entries as they are
+	// would delete; a last "+N" counts those left out
+	envHeldBackupsMessage = "HELD_BACKUPS_MESSAGE"
+	// envRestoreInProgress skips retention, "true" or "false": a restore of the cluster runs
+	envRestoreInProgress = "RESTORE_IN_PROGRESS"
 	// envCronJobName is the name of the CronJob of a scheduled backup, which the names of its Jobs start with
 	envCronJobName = "CRON_JOB_NAME"
-	// envJobName is the name of the Job, from the Job name label of its pod: a scheduled run takes the
-	// timestamp of its backup name from it
+	// envJobName is the name of the Job, from the Job name label of its pod: the CronJob controller names the Job
+	// of a scheduled run "<CronJob>-<minutes since the epoch of its slot>", the slot the script names the backup
+	// after, in envScheduleTimezone, and matches the entries of envSchedules with; a Job named otherwise takes the
+	// current minute
 	envJobName = "JOB_NAME"
 	// envBackupHosts lists the space-separated hosts create_remote runs on
 	envBackupHosts = "BACKUP_HOSTS"
+	// envBackupFallbackHosts lists, as envBackupHosts, the host of every shard create_remote runs on when the one
+	// envBackupHosts names, the preferred replica of the shard, does not answer; empty when they are the same
+	envBackupFallbackHosts = "BACKUP_FALLBACK_HOSTS"
 	// envRetentionHosts lists the space-separated hosts whose backups retention prunes
 	envRetentionHosts = "RETENTION_HOSTS"
 	// envSchemaOnly restricts a backup or a restore to the schema, "true" or "false"
 	envSchemaOnly = "SCHEMA_ONLY"
 	// envTables is the clickhouse-backup table pattern of a backup or a restore
 	envTables = "TABLES"
-	// envPartitions is the comma-separated list of partitions of a backup
+	// envPartitions is the comma-separated list of partitions of a backup, or of the data of a restore
 	envPartitions = "PARTITIONS"
+	// envSkipTables is the clickhouse-backup table pattern of the tables a restore leaves out
+	envSkipTables = "SKIP_TABLES"
+	// envSkipTableEngines is the comma-separated list of the table engines a restore leaves out
+	envSkipTableEngines = "SKIP_TABLE_ENGINES"
+	// envDatabaseMapping maps the databases of the backup to those a restore restores into, as clickhouse-backup
+	// takes it: "source:target" pairs separated by commas
+	envDatabaseMapping = "DATABASE_MAPPING"
+	// envConfigOverrides lists, space-separated, the config overrides of a one-off backup, KEY=VALUE each: the backup
+	// is made through the actions endpoint with an --env flag of each, see api.ConfigOverrides. Those of a scheduled
+	// backup are the env fields of the entries of envSchedules
+	envConfigOverrides = "CONFIG_OVERRIDES"
 	// envDiffFromRemote names the remote base backup of an incremental backup
 	envDiffFromRemote = "DIFF_FROM_REMOTE"
-	// envKeepLast is how many of the most recent scheduled backups retention keeps of
-	// those that hold data, and apart from them of those that hold none; 0 keeps all
-	envKeepLast = "KEEP_LAST"
 	// envNoDataMessage is the termination message the script leaves when the backup it made holds no
 	// data on any host
 	envNoDataMessage = "NO_DATA_MESSAGE"
+	// envHostsUsedMessage starts the line of the termination message the script adds, followed by the
+	// space-separated hosts, when it made the backup on other hosts than envBackupHosts names: a preferred replica
+	// that did not answer left the backup of its shard to the host envBackupFallbackHosts names
+	envHostsUsedMessage = "HOSTS_USED_MESSAGE"
 
 	// envVerifyHosts lists the space-separated hosts a backup is downloaded to for verification
 	envVerifyHosts = "VERIFY_HOSTS"
@@ -97,8 +156,8 @@ const (
 	envMaxTableSizeToDrop = "MAX_TABLE_SIZE_TO_DROP"
 	// envValidateTopology requires the backup in the storage of every restored host, "true" or "false"
 	envValidateTopology = "VALIDATE_TOPOLOGY"
-	// envRestoreRBAC restores the access entities of the backup on every schema host once its schema and
-	// data are restored, "true" or "false"
+	// envRestoreRBAC restores the access entities of the backup on every schema host with its schema, before the
+	// data, "true" or "false"
 	envRestoreRBAC = "RESTORE_RBAC"
 	// envRBACNotRestoredMessage is the termination message the script leaves when the restore it made
 	// succeeded and did not restore the access entities the backup holds on any host
@@ -108,6 +167,23 @@ const (
 	// Unset or empty, the restore reads the paths of its own installation for either
 	envSourceInstallation = "SOURCE_INSTALLATION"
 	envSourceNamespace    = "SOURCE_NAMESPACE"
+
+	// envBackupTransport is how the script reaches the clickhouse-backup API: "sidecar", the default, through the
+	// sidecar of every host, or "pod", through the backup Pod of every shard, which the host lists then name by
+	// DNS and which the script waits for to answer
+	envBackupTransport = "BACKUP_TRANSPORT"
+	// envBackupPodWaitSeconds is how long the script waits for the backup Pods of the pod transport, 600 when empty
+	envBackupPodWaitSeconds = "BACKUP_POD_WAIT_SECONDS"
+
+	// The object the script posts Kubernetes Events on, all of them needed for any: the ClickHouseBackup,
+	// ClickHouseRestore or ClickHouseBackupSchedule the run works for, in envPodNamespace, the namespace of the
+	// Job, with the token of the service account of the pod; envPodName names the Job pod as the reporting instance
+	envEventObjectAPIVersion = "EVENT_OBJECT_API_VERSION"
+	envEventObjectKind       = "EVENT_OBJECT_KIND"
+	envEventObjectName       = "EVENT_OBJECT_NAME"
+	envEventObjectUID        = "EVENT_OBJECT_UID"
+	envPodNamespace          = "POD_NAMESPACE"
+	envPodName               = "POD_NAME"
 )
 
 // Environment of the storage path check, which the script runs before a backup or a restore changes
@@ -184,6 +260,15 @@ const UnchangedExitCode = 3
 // succeeded and made a backup that holds no data on any host.
 const NoDataMessage = "the backup holds no data"
 
+// HostsUsedMessage is the value of envHostsUsedMessage: it starts the line of the termination message of a Job
+// container that succeeded making a backup on other hosts than the Job names, followed by those hosts.
+const HostsUsedMessage = "backup made on hosts:"
+
+// HeldBackupsMessage is the value of envHeldBackupsMessage: it starts the line of the termination message of a Job
+// container that succeeded with a retention that held backups for a change of the schedule, which the entries as they
+// are would delete, followed by their names.
+const HeldBackupsMessage = "retention holds:"
+
 // RBACNotRestoredMessage is the value of envRBACNotRestoredMessage: the termination message of a Job
 // container that succeeded and restored a backup without the access entities - users, roles, grants -
 // it holds.
@@ -196,8 +281,62 @@ const (
 	operationRestore = "restore"
 )
 
-// jobScript is the bash script a backup Job runs as ["bash", "-c", jobScript]. It drives the
-// clickhouse-backup sidecar REST API of the target hosts and fails the Job on any error.
-//
-//go:embed scripts/job.sh
-var jobScript string
+// Values of envBackupTransport
+const (
+	backupTransportSidecar = "sidecar"
+	backupTransportPod     = "pod"
+)
+
+// OrchestratorScriptFile is the file name of the orchestrator script, backup-orchestrator.sh, which a backup Job runs
+// as "bash <file>". It is an operator configuration file, in the folder backup.path of the operator configuration
+// (config/backup in the repository, generated from deploy/builder/templates-config/backup), shipped with the operator
+// in the ConfigMap etc-clickhouse-operator-backup-files and replaceable without a release. It drives
+// the clickhouse-backup REST API of the target hosts and fails the Job on any error; sourced, it runs nothing and
+// leaves its functions to the caller.
+const OrchestratorScriptFile = "backup-orchestrator.sh"
+
+// OrchestratorPythonScriptFile is the file name of the Python orchestrator script, backup-orchestrator.py, the twin of
+// OrchestratorScriptFile, which a backup Job of a cluster whose backup.orchestrator is python runs as "python3 <file>".
+// It is an operator configuration file next to it, in the folder backup.path (config/backup in the repository,
+// generated from deploy/builder/templates-config/backup), shipped in the ConfigMap
+// etc-clickhouse-operator-backup-python-files, which the install manifests mount in the subfolder
+// OrchestratorPythonSubfolder of that folder: a ConfigMap of each script, as one of both would not fit the single
+// argument dev/generate_helm_chart.sh passes the data of a ConfigMap in.
+const OrchestratorPythonScriptFile = "backup-orchestrator.py"
+
+// OrchestratorPythonSubfolder is the subfolder of the folder of the orchestrator scripts a script not found in the
+// folder itself is read from: the install manifests mount the ConfigMap of the Python script there.
+const OrchestratorPythonSubfolder = "python"
+
+// ReadOrchestratorScript returns the orchestrator script, the OrchestratorScriptFile of dir.
+func ReadOrchestratorScript(dir string) (string, error) {
+	return ReadOrchestratorScriptOf(dir, api.BackupOrchestratorBash)
+}
+
+// OrchestratorScriptFileOf returns the file name of the script of the orchestrator, api.BackupOrchestratorBash or
+// api.BackupOrchestratorPython.
+func OrchestratorScriptFileOf(orchestrator string) string {
+	if orchestrator == api.BackupOrchestratorPython {
+		return OrchestratorPythonScriptFile
+	}
+	return OrchestratorScriptFile
+}
+
+// ReadOrchestratorScriptOf returns the script of the orchestrator, its OrchestratorScriptFileOf in dir, or, when dir
+// has no such file, in its subfolder OrchestratorPythonSubfolder.
+func ReadOrchestratorScriptOf(dir, orchestrator string) (string, error) {
+	path := filepath.Join(dir, OrchestratorScriptFileOf(orchestrator))
+	raw, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		if mounted, err2 := os.ReadFile(filepath.Join(dir, OrchestratorPythonSubfolder, OrchestratorScriptFileOf(orchestrator))); err2 == nil {
+			raw, err, path = mounted, nil, filepath.Join(dir, OrchestratorPythonSubfolder, OrchestratorScriptFileOf(orchestrator))
+		}
+	}
+	if err != nil {
+		return "", fmt.Errorf("cannot read the backup orchestrator script: %w", err)
+	}
+	if strings.TrimSpace(string(raw)) == "" {
+		return "", fmt.Errorf("the backup orchestrator script %s is empty", path)
+	}
+	return string(raw), nil
+}

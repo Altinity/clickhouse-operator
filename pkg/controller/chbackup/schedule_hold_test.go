@@ -36,7 +36,7 @@ import (
 // they all made, so there is none until it catches up.
 func TestScheduleLastBackupNameIsOneEveryClusterHolds(t *testing.T) {
 	name := func(due time.Time) string {
-		return "ns-demo-s1-" + due.UTC().Format("20060102-150405")
+		return "ns-demo-s1-" + due.UTC().Format("20060102150405")
 	}
 	slot := func(n int) time.Time {
 		return firstRunDue.Add(time.Duration(n) * time.Hour)
@@ -101,7 +101,7 @@ func TestScheduleLastBackupNameIsOneEveryClusterHolds(t *testing.T) {
 // installation is held, whatever cluster it backs up, those the recovery leaves out included, and from
 // the moment the recovery is asked for until the prefix is set.
 func TestScheduleHoldsEveryDefaultPrefixOfARecoveredInstallation(t *testing.T) {
-	const source = "ns-demo-nightly-20261004-020000"
+	const source = "ns-demo-nightly-20261004020000"
 	requireHeld := func(t *testing.T, f *scheduleFixture, schedule, cronJob string) {
 		t.Helper()
 		require.True(t, ptr.Deref(f.cronJob(cronJob).Spec.Suspend, false))
@@ -236,9 +236,9 @@ func TestScheduleHeldWhileReconcilingCountsAClusterItCannotRun(t *testing.T) {
 func TestScheduleHeldWhileReconcilingLeavesOutAClusterThatLeft(t *testing.T) {
 	left := meta.NewTime(firstRunDue.Add(-24 * time.Hour))
 	chbs := newScheduleCR("s1")
-	chbs.Spec.Retention.KeepLast = ptr.To(int32(3))
+	chbs.Spec.Schedules[0].Keep = 3
 	chbs.Status.Clusters = []api.ScheduleClusterStatus{{
-		Name: "gone", CronJobName: "s1-gone-backup", LastSuccessfulTime: &left, LastBackupName: "ns-demo-s1-20260101-030000",
+		Name: "gone", CronJobName: "s1-gone-backup", LastSuccessfulTime: &left, LastBackupName: "ns-demo-s1-20260101030000",
 		UnprunedHosts: []string{"chi-demo-gone-0-0"},
 	}}
 	cr := newFakeCR(twoClusters(t, api.StatusCompleted))
@@ -255,7 +255,7 @@ func TestScheduleHeldWhileReconcilingLeavesOutAClusterThatLeft(t *testing.T) {
 	require.Equal(t, pendingRequeueInterval, f.reconcile("s1").RequeueAfter, "the schedule waits for the installation")
 	got = f.schedule("s1")
 	require.True(t, succeeded.Equal(got.Status.LastSuccessfulTime), "the cluster that left does not count")
-	require.Equal(t, "ns-demo-s1-20260102-030000", got.Status.LastBackupName)
+	require.Equal(t, "ns-demo-s1-20260102030000", got.Status.LastBackupName)
 }
 
 // Through a reconcile a schedule tells a hold of its own cause first: the guard of a shared prefix and a hold that

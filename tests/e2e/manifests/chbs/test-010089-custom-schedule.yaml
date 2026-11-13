@@ -1,0 +1,18 @@
+# test_010089
+# A schedule of cluster custom, due once a month so it does not run during the scenario: aborted while the
+# orchestrator ConfigMap it names holds no script, active once it does.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackupSchedule"
+metadata:
+  name: custom-089
+spec:
+  clickHouseInstallation: test-089
+  cluster: custom
+  schedules:
+    - period: monthly
+      time: "00:00"
+      day: 1
+      keep: 1
+  backupNamePrefix: e2e-089-custom
+  orchestratorConfigMapRef:
+    name: test-089-custom-orchestrator

@@ -18,6 +18,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -78,6 +79,7 @@ func (c *BackupController) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	c.announcePhase(next, cur.Status.Phase, next.Status.Phase, next.Status.Conditions, &out)
 	return c.commitStatus(ctx, next, !apiEquality.Semantic.DeepEqual(cur.Status, next.Status), result, out)
 }
 
@@ -179,12 +181,42 @@ func (c *BackupController) validate(ctx context.Context, chb *api.ClickHouseBack
 		op.wait(api.BackupConditionValidated, wait.reason, wait.message)
 		return ctrl.Result{RequeueAfter: untilStartingDeadline(chb, now, wait.requeue)}, false, nil
 	}
+	// A naming template names the backup by its time, which the name of the backup of the first shard tells
+	name, err := templateBackupName(chb, target.topology)
+	if err != nil {
+		op.wait(api.BackupConditionValidated, api.BackupReasonInvalidSpec, err.Error())
+		return ctrl.Result{RequeueAfter: untilStartingDeadline(chb, now, 0)}, false, nil
+	}
+	if (chb.Status.BackupName == "") && (name != "") {
+		chb.Status.BackupName = name
+	}
 	op.pin(target.topology.ClusterNames())
 	retainRequestedClusters(chb.GetNamespace(), chb.TargetInstallation(), target.chi)
 	if leftOut := leftOutWithoutStorage(target, chb.TargetCluster()); leftOut != "" {
 		out.add(c.warning(chb, a.EventActionReconcile, api.BackupReasonNoBackupStorage, "backup %s", leftOut))
 	}
 	return ctrl.Result{}, true, nil
+}
+
+// templateBackupName returns the name of a backup of clusters with a naming template, "" for clusters without one: the
+// name the template gives the backup of the first shard, which tells the backup of every shard. One backup of several
+// clusters has one name, so their template has to be one, and to name the backups of every cluster alike, without
+// {cluster}.
+func templateBackupName(chb *api.ClickHouseBackup, topology *model.Topology) (string, error) {
+	namings := topology.ClusterNamings()
+	templates := map[string]bool{}
+	for _, template := range namings {
+		templates[template] = true
+	}
+	naming := topology.BackupNaming()
+	if (len(templates) == 1) && templates[""] {
+		return "", nil
+	}
+	if (len(templates) > 1) || ((len(namings) > 1) && api.BackupNamingHolds(naming.Template, api.BackupNamingCluster)) {
+		return "", fmt.Errorf("the clusters %s name their backups by naming templates that differ between them, or hold {cluster}: "+
+			"back up each of them in a ClickHouseBackup of its own (spec.cluster)", strings.Join(topology.ClusterNames(), ", "))
+	}
+	return model.ResolveTemplateBackupName(chb, naming)
 }
 
 // recordSchedule records what a backup that runs a schedule takes from it, the schedule as it is now: until the
@@ -222,12 +254,17 @@ func (c *BackupController) recordSchedule(ctx context.Context, chb *api.ClickHou
 		}, nil
 	}
 	chb.Status.Schedule = &api.BackupScheduleRecord{
-		Name:                   name,
-		Generation:             chbs.GetGeneration(),
-		ClickHouseInstallation: chbs.Spec.ClickHouseInstallation,
-		Cluster:                cluster,
-		BackupNamePrefix:       model.BackupNamePrefix(chbs),
-		BackupOptions:          *chbs.Spec.BackupOptions.DeepCopy(),
+		Name:                     name,
+		Generation:               chbs.GetGeneration(),
+		ClickHouseInstallation:   chbs.Spec.ClickHouseInstallation,
+		Cluster:                  cluster,
+		BackupNamePrefix:         model.BackupNamePrefix(chbs),
+		OrchestratorConfigMapRef: chbs.Spec.OrchestratorConfigMapRef.DeepCopy(),
+		Schedules:                chbs.Spec.DeepCopy().Schedules,
+		TimeZone:                 chbs.Spec.TimeZone,
+		KeepBackups:              slices.Clone(chbs.Spec.Retention.GetKeepBackups()),
+		PreviousSchedules:        chbs.Status.Retention.DeepCopy().GetPrevious(),
+		BackupOptions:            *chbs.Spec.BackupOptions.DeepCopy(),
 	}
 	return nil, nil
 }
@@ -342,7 +379,28 @@ func (c *BackupController) start(
 	}
 
 	retainRequestedClusters(chb.GetNamespace(), chb.TargetInstallation(), target.chi)
-	job := model.BuildBackupJob(chb, target.chi, target.topology)
+	orchestrator, missing, err := c.orchestrator(ctx, target.chi, cluster.Name, chb.OrchestratorConfigMap())
+	switch {
+	case err != nil:
+		return ctrl.Result{}, err
+	case missing != nil:
+		failOn(cluster, missing.reason, missing.message)
+		out.add(c.failed(chb, cluster))
+		return ctrl.Result{}, nil
+	}
+	if chb.Spec.ScheduleRef != nil {
+		// A backup that runs a schedule now prunes after it as a run of the schedule, which no restore may hold
+		schedules := &ScheduleController{c.reconciler}
+		holder := &api.ClickHouseBackupSchedule{}
+		holder.Namespace = chb.GetNamespace()
+		holder.Spec.ClickHouseInstallation = chb.TargetInstallation()
+		holds, err := schedules.restoreHolds(ctx, c.Client, holder, target.chi, []string{cluster.Name})
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		orchestrator.RestoreInProgress = holds[cluster.Name] != nil
+	}
+	job := model.BuildBackupJob(chb, target.chi, target.topology, orchestrator)
 	gate := c.accessRestoreGate(chb.GetNamespace(), chb.TargetInstallation())
 	result, err := c.startJob(ctx, chb, chb.TargetInstallation(), cluster.Name, job, gate, func(reason, message string) {
 		waitOn(cluster, reason, message)
@@ -366,9 +424,9 @@ func (c *BackupController) run(chb *api.ClickHouseBackup, cluster *api.Operation
 	out.add(func() { metrics.BackupStarted(context.Background(), namespace, chiName, clusterName) })
 }
 
-// complete records the completion of the backup Job of a cluster, announcing it once. A backup that
-// holds no data there, as its Job tells, completed all the same, which is warned about: it restores no
-// data on the cluster.
+// complete records the completion of the backup Job of a cluster, announcing it once, with the hosts the backup was
+// made on when its Job tells others than it names. A backup that holds no data there, as its Job tells, completed all
+// the same, which is warned about: it restores no data on the cluster.
 func (c *BackupController) complete(
 	ctx context.Context,
 	chb *api.ClickHouseBackup,
@@ -377,9 +435,20 @@ func (c *BackupController) complete(
 	out *announcements,
 ) error {
 	withoutData, err := c.backupHoldsNoData(ctx, job)
-	switch {
-	case err != nil:
+	if err != nil {
 		return err
+	}
+	// A preferred replica that did not answer left the backup of its shard to another one, which the status records
+	if cluster.CompletionTime == nil {
+		hosts, err := c.backupHostsUsed(ctx, job)
+		if err != nil {
+			return err
+		}
+		if len(hosts) > 0 {
+			cluster.Hosts = hosts
+		}
+	}
+	switch {
 	case withoutData:
 		noData := noDataCause(job)
 		if completeOn(cluster, job, api.BackupReasonCompletedWithoutData,
@@ -534,7 +603,15 @@ func (c *BackupController) startVerify(
 		return ctrl.Result{RequeueAfter: wait.requeue}, nil
 	}
 
-	job := model.BuildVerifyJob(chb, target.chi, target.topology)
+	orchestrator, missing, err := c.orchestrator(ctx, target.chi, cluster.Name, chb.OrchestratorConfigMap())
+	switch {
+	case err != nil:
+		return ctrl.Result{}, err
+	case missing != nil:
+		c.concludeVerifyOn(chb, cluster, missing.reason, missing.message, out)
+		return ctrl.Result{}, nil
+	}
+	job := model.BuildVerifyJob(chb, target.chi, target.topology, orchestrator)
 	gate := c.accessRestoreGate(chb.GetNamespace(), chb.TargetInstallation())
 	return c.startJob(ctx, chb, chb.TargetInstallation(), cluster.Name, job, gate, func(reason, message string) {
 		cluster.Reason, cluster.Message = reason, message

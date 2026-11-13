@@ -417,7 +417,6 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.C
 }
 
 func (w *worker) reconcileCRAuxObjectsPreliminaryDomain(ctx context.Context, cr *api.ClickHouseInstallation) error {
-	w.warnBackupWithoutStorage(cr)
 	w.warnUnpublishedBackupAPI(cr)
 	if err := w.reconcileBackupSecret(ctx, cr); err != nil {
 		return err

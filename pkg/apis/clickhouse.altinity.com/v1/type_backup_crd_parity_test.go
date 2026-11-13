@@ -34,9 +34,10 @@ const backupCRDTemplatePath = "../../../../deploy/builder/templates-install-bund
 // chiCRDTemplatePath is the source of the ClickHouseInstallation and ClickHouseInstallationTemplate CRDs.
 const chiCRDTemplatePath = "../../../../deploy/builder/templates-install-bundle/clickhouse-operator-install-yaml-template-01-section-crd-01-chi-chit.yaml"
 
-// jobScriptPath is the script of the backup and restore Jobs, which checks a tables pattern again before it
-// passes the pattern to clickhouse-backup.
-const jobScriptPath = "../../../model/chbackup/scripts/job.sh"
+// jobScriptPath is the script of the backup and restore Jobs, backup-orchestrator.sh, an operator configuration
+// file in the backup folder of the operator configuration, which checks a tables pattern again before it passes the
+// pattern to clickhouse-backup.
+const jobScriptPath = "../../../../config/backup/backup-orchestrator.sh"
 
 // backupTargetImmutableRule keeps the target of a backup, a schedule and a restore what it was created
 // with: holds, locks and records follow the target, and a retargeted restore would release the
@@ -61,6 +62,8 @@ var backupRules = map[string]string{
 		"replicaSelection, tables, partitions and activeDeadlineSeconds are not set with scheduleRef",
 	"!has(self.scheduleRef) || (has(self.backupName) ? self.backupName : '') == ''": "a backup that runs a schedule is " +
 		"named with the schedule's backupNamePrefix: backupName is not set with scheduleRef",
+	"!has(self.scheduleRef) || !has(self.configOverrides)": "a backup that runs a schedule takes no configOverrides: " +
+		"they are not set with scheduleRef",
 	"!has(self.backupName) || !self.backupName.matches('" + scheduledBackupNameRegexp.String() + "')": "backupName must not " +
 		"end like the backups of a schedule, " + BackupNameScheduleSuffix + ", which the retention of a schedule of that prefix would prune",
 }
@@ -431,9 +434,9 @@ func TestBackupCRDBoundsTheStartingDeadline(t *testing.T) {
 func TestJobScriptSeriesMatchesTheTypes(t *testing.T) {
 	raw, err := os.ReadFile(jobScriptPath)
 	require.NoError(t, err)
-	series := regexp.MustCompile(`(?m)^\s*pattern="\^\$\{BACKUP_NAME_PREFIX//\./\[\.\]\}(.*)"$`).FindStringSubmatch(string(raw))
-	require.NotNil(t, series, "the script no longer prunes the series of a prefix")
-	require.Equal(t, scheduledBackupNameRegexp.String(), series[1])
+	tag := regexp.MustCompile(`(?m)^TAG_RE='\^([^']*)'$`).FindStringSubmatch(string(raw))
+	require.NotNil(t, tag, "the script no longer defines TAG_RE, the time a backup of the series ends with")
+	require.Equal(t, scheduledBackupNameRegexp.String(), "-"+tag[1])
 }
 
 // The Job script accepts exactly the source installations and namespaces the spec validation does.
@@ -451,5 +454,44 @@ func TestJobScriptSourcePatternMatchesTheTypes(t *testing.T) {
 		maxLength := regexp.MustCompile(`(?m)^` + name + `=([0-9]+)$`).FindStringSubmatch(script)
 		require.NotNil(t, maxLength, "the script no longer defines %s", name)
 		require.Equal(t, strconv.Itoa(want), maxLength[1], name)
+	}
+}
+
+// The naming template of a cluster is bounded alike by the CRD schema, the spec validation and the Job script, which
+// reads it again, and a name given by its time alone alike by the operator and the script.
+func TestNamingTemplateMatchesTheTypes(t *testing.T) {
+	schema := loadCRDSchema(t, chiCRDTemplatePath, "${PLURAL}.clickhouse.altinity.com")
+	for _, path := range []string{"spec.backup.naming", "spec.configuration.clusters.backup.naming"} {
+		naming := schemaProperty(schema, path)
+		require.NotNil(t, naming, path)
+		require.Equal(t, backupNamingRegexp.String(), naming["pattern"], path)
+		require.Equal(t, backupNamingMaxLength, naming["maxLength"], path)
+	}
+	raw, err := os.ReadFile(jobScriptPath)
+	require.NoError(t, err)
+	script := string(raw)
+	for name, want := range map[string]string{
+		"NAMING_RE":         backupNamingRegexp.String(),
+		"NAMING_TAG_RE":     BackupTagRegexp.String(),
+		"NAMING_MAX_LENGTH": strconv.Itoa(backupNamingMaxLength),
+	} {
+		value := regexp.MustCompile(`(?m)^` + name + `='?([^'\n]*)'?$`).FindStringSubmatch(script)
+		require.NotNil(t, value, "the script no longer defines %s", name)
+		require.Equal(t, want, value[1], name)
+	}
+}
+
+// A config override is bounded alike by the CRD schema and the spec validation, which take the --env= flag in front of
+// it, on a one-off backup and on every entry of a schedule.
+func TestBackupCRDBoundsTheConfigOverrides(t *testing.T) {
+	for name, path := range map[string]string{
+		"clickhousebackups.clickhouse.altinity.com":         "spec.configOverrides",
+		"clickhousebackupschedules.clickhouse.altinity.com": "spec.schedules.configOverrides",
+	} {
+		overrides := schemaProperty(loadCRDSchema(t, backupCRDTemplatePath, name), path)
+		require.NotNil(t, overrides, path)
+		require.Equal(t, BackupConfigOverridesMaxItems, overrides["maxItems"], path)
+		items := overrides["items"].(map[string]any)
+		require.Equal(t, "^(--env=)?"+strings.TrimPrefix(backupConfigOverrideRegexp.String(), "^"), items["pattern"], path)
 	}
 }

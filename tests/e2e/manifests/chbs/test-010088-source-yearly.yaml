@@ -1,5 +1,5 @@
 # test_010088
-# A schedule of the source, due once a year, so it never runs during the scenario. The scenario creates it
+# A schedule of the source, due once a month, so it does not run during the scenario. The scenario creates it
 # with its backupNamePrefix, which cannot change once set, replaced by the default prefix of schedule nightly
 # of test-088-dr, <namespace>-test-088-dr-nightly, and runs it once, now, for the backup the new
 # installation is recovered from: the recovery reads that backup from the storage paths of test-088-src, so
@@ -11,6 +11,11 @@ metadata:
   name: source-yearly
 spec:
   clickHouseInstallation: test-088-src
-  schedule: "0 0 1 1 *"
+  # Due once a month, on the 1st at 00:00, so it does not run during the scenario.
+  schedules:
+    - period: monthly
+      time: "00:00"
+      day: 1
+      keep: 1
   concurrencyPolicy: Forbid
   backupNamePrefix: set-by-the-scenario

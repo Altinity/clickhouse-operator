@@ -24,8 +24,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
-// Backup turned on is on only where the spec names where the storage settings of the sidecar come from:
-// without them the sidecar could never upload or download a backup, so backup stays off there instead.
+// Backup turned on is on only where the spec names the Secret of the clickhouse-backup configuration, the only source
+// of the storage settings and of the REST API credentials: a pod template alone only overrides the container.
 func TestClusterBackupNeedsStorage(t *testing.T) {
 	const secret = "s3-credentials"
 	for name, tc := range map[string]struct {
@@ -46,6 +46,11 @@ func TestClusterBackupNeedsStorage(t *testing.T) {
 		"with a pod template": {
 			backup:    &ClusterBackup{Enabled: types.NewStringBool(true), PodTemplate: types.NewString("backup")},
 			requested: true,
+		},
+		"with a pod template and a Secret": {
+			backup: &ClusterBackup{Enabled: types.NewStringBool(true), PodTemplate: types.NewString("backup"),
+				ConfigSecretRef: secretRef(secret)},
+			requested: true,
 			enabled:   true,
 		},
 		"with a Secret of no name": {
@@ -63,6 +68,36 @@ func TestClusterBackupNeedsStorage(t *testing.T) {
 			require.Equal(t, tc.requested && !tc.enabled, tc.backup.LacksStorage(), "lacks storage")
 		})
 	}
+}
+
+// The mode of a cluster is sidecar unless it says pod, it is inherited like every other field, and Validate refuses any
+// other value.
+func TestClusterBackupMode(t *testing.T) {
+	require.Equal(t, BackupModeSidecar, (*ClusterBackup)(nil).GetMode())
+	require.Equal(t, BackupModeSidecar, (&ClusterBackup{}).GetMode())
+	require.Equal(t, BackupModeSidecar, (&ClusterBackup{Mode: types.NewString("")}).GetMode())
+	require.Equal(t, BackupModePod, (&ClusterBackup{Mode: types.NewString(BackupModePod)}).GetMode())
+	require.True(t, (&ClusterBackup{Mode: types.NewString(BackupModePod)}).IsPodMode())
+	require.False(t, (&ClusterBackup{}).IsPodMode())
+
+	for mode, valid := range map[string]bool{"": true, BackupModeSidecar: true, BackupModePod: true, "Pod": false, "job": false} {
+		err := (&ClusterBackup{Mode: types.NewString(mode)}).Validate()
+		if valid {
+			require.NoError(t, err, mode)
+		} else {
+			require.ErrorIs(t, err, ErrInvalidBackupSpec, mode)
+		}
+	}
+	require.NoError(t, (*ClusterBackup)(nil).Validate())
+	require.ErrorIs(t, (&ClusterBackup{Enabled: ptr.To(types.StringBool("maybe"))}).Validate(), ErrInvalidBackupSpec)
+
+	installation := &ClusterBackup{Mode: types.NewString(BackupModePod)}
+	require.Equal(t, BackupModePod, (&ClusterBackup{}).MergeFrom(installation, MergeTypeFillEmptyValues).GetMode(),
+		"a cluster inherits the mode")
+	own := &ClusterBackup{Mode: types.NewString(BackupModeSidecar)}
+	require.Equal(t, BackupModeSidecar, own.DeepCopy().MergeFrom(installation, MergeTypeFillEmptyValues).GetMode(),
+		"a cluster keeps a mode of its own")
+	require.Equal(t, BackupModePod, own.DeepCopy().MergeFrom(installation, MergeTypeOverrideByNonEmptyValues).GetMode())
 }
 
 // secretRef references the named Secret
@@ -113,4 +148,63 @@ func TestClusterBackupMergeConfigSecretLeavesTheSourceAlone(t *testing.T) {
 	got := (&ClusterBackup{}).MergeFrom(from, MergeTypeFillEmptyValues)
 	got.ConfigSecretRef.Name = "changed"
 	require.Equal(t, "s3-shared", from.ConfigSecretRef.Name)
+}
+
+// The orchestrator ConfigMap of a recovery is inherited like its backup name: a cluster that names none takes the
+// installation's, an explicit "" resets the cluster to the operator's script, and the reference is copied.
+func TestBackupRecoveryMergeOrchestratorConfigMap(t *testing.T) {
+	installation := &ClusterBackup{Recovery: &BackupRecovery{OrchestratorConfigMapRef: &core.LocalObjectReference{Name: "my-orchestrator"}}}
+	for name, tc := range map[string]struct {
+		to        *ClusterBackup
+		_type     MergeType
+		configMap string
+	}{
+		"a cluster of nothing": {&ClusterBackup{}, MergeTypeFillEmptyValues, "my-orchestrator"},
+		"a cluster of its own": {&ClusterBackup{Recovery: &BackupRecovery{OrchestratorConfigMapRef: &core.LocalObjectReference{Name: "cold"}}},
+			MergeTypeFillEmptyValues, "cold"},
+		"a cluster reset to the operator's": {&ClusterBackup{Recovery: &BackupRecovery{OrchestratorConfigMapRef: &core.LocalObjectReference{Name: ""}}},
+			MergeTypeFillEmptyValues, ""},
+		"an installation over a template": {&ClusterBackup{Recovery: &BackupRecovery{OrchestratorConfigMapRef: &core.LocalObjectReference{Name: "shared"}}},
+			MergeTypeOverrideByNonEmptyValues, "my-orchestrator"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := tc.to.DeepCopy().MergeFrom(installation, tc._type)
+			require.Equal(t, tc.configMap, got.GetRecovery().GetOrchestratorConfigMapName())
+		})
+	}
+	got := (&ClusterBackup{}).MergeFrom(installation, MergeTypeFillEmptyValues)
+	got.Recovery.OrchestratorConfigMapRef.Name = "changed"
+	require.Equal(t, "my-orchestrator", installation.GetRecovery().GetOrchestratorConfigMapName(), "the source is left alone")
+	require.Equal(t, "", (*BackupRecovery)(nil).GetOrchestratorConfigMapName())
+	require.Equal(t, "backup-orchestrator.sh", BackupOrchestratorScriptKey)
+}
+
+// The operations name their orchestrator ConfigMap; a backup that runs a schedule takes the schedule's, as it
+// recorded it, unless it names its own.
+func TestOperationsNameTheirOrchestratorConfigMap(t *testing.T) {
+	ref := func(name string) *core.LocalObjectReference { return &core.LocalObjectReference{Name: name} }
+	require.Equal(t, "", (*ClickHouseBackup)(nil).OrchestratorConfigMap())
+	require.Equal(t, "", (&ClickHouseBackup{}).OrchestratorConfigMap())
+	require.Equal(t, "own", (&ClickHouseBackup{Spec: ClickHouseBackupSpec{OrchestratorConfigMapRef: ref("own")}}).OrchestratorConfigMap())
+
+	scheduled := &ClickHouseBackup{Spec: ClickHouseBackupSpec{ScheduleRef: &BackupScheduleRef{Name: "nightly"}}}
+	require.Equal(t, "", scheduled.OrchestratorConfigMap(), "nothing recorded yet")
+	scheduled.Status.Schedule = &BackupScheduleRecord{Name: "nightly", OrchestratorConfigMapRef: ref("schedules")}
+	require.Equal(t, "schedules", scheduled.OrchestratorConfigMap())
+	scheduled.Spec.OrchestratorConfigMapRef = ref("own")
+	require.Equal(t, "own", scheduled.OrchestratorConfigMap())
+	scheduled.Spec.OrchestratorConfigMapRef = ref("")
+	require.Equal(t, "", scheduled.OrchestratorConfigMap(), "an explicit empty name runs the operator's script")
+
+	require.Equal(t, "s", (&ClickHouseBackupScheduleSpec{OrchestratorConfigMapRef: ref("s")}).GetOrchestratorConfigMapName())
+	require.Equal(t, "", (*ClickHouseBackupScheduleSpec)(nil).GetOrchestratorConfigMapName())
+	require.Equal(t, "r", (&ClickHouseRestoreSpec{OrchestratorConfigMapRef: ref("r")}).GetOrchestratorConfigMapName())
+	require.Equal(t, "", (*ClickHouseRestoreSpec)(nil).GetOrchestratorConfigMapName())
+
+	scheduled.Spec.OrchestratorConfigMapRef = ref("own")
+	copied := scheduled.DeepCopy()
+	copied.Spec.OrchestratorConfigMapRef.Name = "changed"
+	copied.Status.Schedule.OrchestratorConfigMapRef.Name = "changed"
+	require.Equal(t, "own", scheduled.Spec.OrchestratorConfigMapRef.Name)
+	require.Equal(t, "schedules", scheduled.Status.Schedule.OrchestratorConfigMapRef.Name)
 }

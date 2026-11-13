@@ -141,6 +141,28 @@ func TestTopologyFromLayoutCounts(t *testing.T) {
 	require.Equal(t, topology.allReplicas(), topology.hosts(api.ReplicaSelectionAllReplicas))
 }
 
+// A backup of one replica per shard runs on backup.preferredReplica of every shard, the first replica of a shard that
+// has fewer; a backup of every replica, and a restore, are not concerned.
+func TestTopologyBacksUpThePreferredReplica(t *testing.T) {
+	backup := enabledBackup()
+	backup.PreferredReplica = types.NewInt32(1)
+	chi := newCHI("demo", layoutCluster("main", 2, 2, backup))
+	chi.Spec.Configuration.Clusters[0].Layout = &api.ChiClusterLayout{Shards: []*api.ChiShard{
+		{Name: "0", ReplicasCount: 2}, {Name: "1", ReplicasCount: 1},
+	}}
+	_, stored := normalize(t, chi)
+	topology, err := NewTopology(stored, "")
+	require.NoError(t, err)
+	require.Equal(t, []string{"chi-demo-main-0-1", "chi-demo-main-1-0"}, topology.backupHosts(api.ReplicaSelectionFirstPerShard))
+	require.Equal(t, []string{"chi-demo-main-0-0", "chi-demo-main-1-0"}, topology.hosts(api.ReplicaSelectionFirstPerShard))
+	require.Equal(t, topology.allReplicas(), topology.backupHosts(api.ReplicaSelectionAllReplicas))
+
+	_, stored = normalize(t, newCHI("demo", layoutCluster("main", 2, 2, enabledBackup())))
+	topology, err = NewTopology(stored, "")
+	require.NoError(t, err)
+	require.Equal(t, topology.firstPerShard(), topology.backupHosts(api.ReplicaSelectionFirstPerShard))
+}
+
 // Explicit shard and replica lists name their hosts after the listed entries and may give each
 // shard its own replica count; a count-based guess gets both wrong.
 func TestTopologyFromExplicitShardsAndReplicas(t *testing.T) {
@@ -416,6 +438,7 @@ func TestTopologyPodSettings(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, podSettings{
 		image:                    config.DefaultClickHouseBackupDockerImage,
+		imagePullPolicy:          core.PullAlways,
 		securityContext:          &core.PodSecurityContext{FSGroup: ptr.To(int64(101))},
 		containerSecurityContext: &core.SecurityContext{RunAsUser: ptr.To(int64(101))},
 		imagePullSecrets:         []core.LocalObjectReference{{Name: "registry"}},
@@ -424,7 +447,8 @@ func TestTopologyPodSettings(t *testing.T) {
 
 	topology, err = NewTopology(stored, "")
 	require.NoError(t, err)
-	require.Equal(t, podSettings{image: config.DefaultClickHouseBackupDockerImage}, topology.pod(), "the first target cluster uses no pod template")
+	require.Equal(t, podSettings{image: config.DefaultClickHouseBackupDockerImage, imagePullPolicy: core.PullAlways}, topology.pod(),
+		"the first target cluster uses no pod template")
 	require.Equal(t, podSettings{}, (*Topology)(nil).pod())
 
 	// The sidecar's own security context, which the Jobs share an image with, names their identity.

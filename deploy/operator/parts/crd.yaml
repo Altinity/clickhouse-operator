@@ -2661,11 +2661,11 @@ spec:
                             description: |
                               EXPERIMENTAL. Operator-managed backup for this cluster, overriding `chi.spec.backup`.
                               Fields left empty are inherited from `chi.spec.backup`; set `enabled: "no"` to opt this cluster out.
-                              When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
-                              so turning it on or off rolls the cluster's Pods. Customize the sidecar through a container named
-                              clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the cluster
-                              has a `configSecretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
-                              so backup stays off and the operator warns.
+                              When enabled in mode sidecar, the operator injects a clickhouse-backup sidecar into every Pod of the
+                              cluster, so turning it on or off rolls the cluster's Pods. Customize the container through a container
+                              named clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the
+                              cluster has a `configSecretRef`: without it clickhouse-backup would have no storage and no API
+                              credentials, so backup stays off and the operator warns.
                               See docs/backup.md for details.
                             properties:
                               enabled:
@@ -2681,8 +2681,18 @@ spec:
                                 x-kubernetes-preserve-unknown-fields: true
                                 description: |
                                   Enable operator-managed backup: inject the clickhouse-backup sidecar and allow backup/restore resources to target
-                                  the cluster. Takes effect only with `configSecretRef` or `podTemplate` set, which name where the sidecar takes
-                                  its storage from: without either, backup stays off
+                                  the cluster. Takes effect only with `configSecretRef` set, which names where clickhouse-backup takes its
+                                  storage and API credentials from: without it, backup stays off
+                              mode:
+                                type: string
+                                description: |
+                                  How the operator reaches clickhouse-backup on the hosts of the cluster. sidecar (default) injects it into
+                                  every ClickHouse Pod. pod injects nothing: while a backup or a restore of the cluster runs, the operator
+                                  runs one backup Pod per shard on the node of a ready replica, mounting that replica's volumes
+                                enum:
+                                  - ""
+                                  - sidecar
+                                  - pod
                               podTemplate:
                                 type: string
                                 description: |
@@ -2696,14 +2706,46 @@ spec:
                                   of the sidecar, a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket, s3.path,
                                   s3.access_key, s3.secret_key. The operator generates the configuration file of the sidecar from it,
                                   which follows a change of the Secret without a restart. A cluster that leaves it out takes the
-                                  installation's; an explicit `name: ""` on a cluster leaves the cluster without one. Without one, the
-                                  storage is configured by the container of the Pod template `podTemplate` names
+                                  installation's; an explicit `name: ""` on a cluster leaves the cluster without one. Required: without
+                                  one, backup stays off. The configuration must set api.username and api.password of the REST API
                                 properties:
                                   name:
                                     description: |
                                       Name of the referent. More info:
                                       https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                     type: string
+                              preferredReplica:
+                                type: integer
+                                minimum: 0
+                                description: |
+                                  Index, from 0, of the replica of each shard a backup works on, as the backupReplica of the Altinity Cloud Manager.
+                                  With mode pod the backup Pod of the shard works next to it: it mounts the volumes of that replica's Pod and runs
+                                  on the same node, by a nodeSelector on the node's hostname; a shard with fewer replicas, or whose preferred replica
+                                  is not ready, falls back to its next ready replica. With mode sidecar a backup of one replica per shard
+                                  (FirstPerShard) runs on the sidecar of that replica, or on that of the first replica when the shard has fewer
+                                  replicas or the preferred one does not answer when the Job starts. Empty means 0, the first replica
+                              orchestrator:
+                                type: string
+                                enum:
+                                  - ""
+                                  - bash
+                                  - python
+                                description: |
+                                  What the backup, verify and restore Jobs of the cluster run: bash (default), the bash orchestrator script in
+                                  the clickhouse-backup image, or python, its twin in Python in the python:3.14-slim image. An
+                                  orchestratorConfigMapRef has to hold the script of the one the cluster takes, backup-orchestrator.sh or
+                                  backup-orchestrator.py. See docs/backup.md
+                              naming:
+                                type: string
+                                maxLength: 128
+                                pattern: '^([A-Za-z0-9._-]|\{[A-Za-z]+\})+$'
+                                description: |
+                                  Template the backups of the cluster are named by, one name for the backup of each shard, e.g.
+                                  "shard{shard}-{YYYYMMDDHHIISS}" as the Altinity Cloud Manager names them. Placeholders: {shard}, the number
+                                  of the shard from 1, required; {cluster}, {chi}, {namespace}; {prefix}, the backupNamePrefix of the schedule;
+                                  the time by the tokens YYYY, MM, DD, HH, II (minutes) and SS, all required, in braces, e.g. {YYYYMMDDHHIISS}.
+                                  A backup made at once has a T before the hour. Empty, the default, names a backup "<prefix>-<YYYYMMDDHHMMSS>"
+                                  alike on every shard. See docs/backup.md
                               recovery:
                                 type: object
                                 description: |
@@ -2731,6 +2773,18 @@ spec:
                                       backup from the storage paths the {namespace} macro gives there. Empty, the namespace of this installation
                                     maxLength: 63
                                     pattern: "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
+                                  orchestratorConfigMapRef:
+                                    type: object
+                                    description: |
+                                      ConfigMap in the installation's namespace whose key `backup-orchestrator.sh` (`backup-orchestrator.py` for a cluster whose backup.orchestrator is python) the ClickHouseRestore of
+                                      the recovery runs instead of the operator's orchestrator script: it is copied into that restore. An explicit
+                                      `name: ""` on a cluster resets it to the operator's script
+                                    properties:
+                                      name:
+                                        description: |
+                                          Name of the referent. More info:
+                                          https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                        type: string
                           pdbManaged:
                             # StringBool is polymorphic — accepts native YAML bool (true/false),
                             # integer (0/1), or string from the recognized vocabulary
@@ -4176,8 +4230,18 @@ spec:
                       x-kubernetes-preserve-unknown-fields: true
                       description: |
                         Enable operator-managed backup: inject the clickhouse-backup sidecar and allow backup/restore resources to target
-                        the cluster. Takes effect only with `configSecretRef` or `podTemplate` set, which name where the sidecar takes
-                        its storage from: without either, backup stays off
+                        the cluster. Takes effect only with `configSecretRef` set, which names where clickhouse-backup takes its
+                        storage and API credentials from: without it, backup stays off
+                    mode:
+                      type: string
+                      description: |
+                        How the operator reaches clickhouse-backup on the hosts of the cluster. sidecar (default) injects it into
+                        every ClickHouse Pod. pod injects nothing: while a backup or a restore of the cluster runs, the operator
+                        runs one backup Pod per shard on the node of a ready replica, mounting that replica's volumes
+                      enum:
+                        - ""
+                        - sidecar
+                        - pod
                     podTemplate:
                       type: string
                       description: |
@@ -4191,14 +4255,46 @@ spec:
                         of the sidecar, a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket, s3.path,
                         s3.access_key, s3.secret_key. The operator generates the configuration file of the sidecar from it,
                         which follows a change of the Secret without a restart. A cluster that leaves it out takes the
-                        installation's; an explicit `name: ""` on a cluster leaves the cluster without one. Without one, the
-                        storage is configured by the container of the Pod template `podTemplate` names
+                        installation's; an explicit `name: ""` on a cluster leaves the cluster without one. Required: without
+                        one, backup stays off. The configuration must set api.username and api.password of the REST API
                       properties:
                         name:
                           description: |
                             Name of the referent. More info:
                             https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                           type: string
+                    preferredReplica:
+                      type: integer
+                      minimum: 0
+                      description: |
+                        Index, from 0, of the replica of each shard a backup works on, as the backupReplica of the Altinity Cloud Manager.
+                        With mode pod the backup Pod of the shard works next to it: it mounts the volumes of that replica's Pod and runs
+                        on the same node, by a nodeSelector on the node's hostname; a shard with fewer replicas, or whose preferred replica
+                        is not ready, falls back to its next ready replica. With mode sidecar a backup of one replica per shard
+                        (FirstPerShard) runs on the sidecar of that replica, or on that of the first replica when the shard has fewer
+                        replicas or the preferred one does not answer when the Job starts. Empty means 0, the first replica
+                    orchestrator:
+                      type: string
+                      enum:
+                        - ""
+                        - bash
+                        - python
+                      description: |
+                        What the backup, verify and restore Jobs of the cluster run: bash (default), the bash orchestrator script in
+                        the clickhouse-backup image, or python, its twin in Python in the python:3.14-slim image. An
+                        orchestratorConfigMapRef has to hold the script of the one the cluster takes, backup-orchestrator.sh or
+                        backup-orchestrator.py. See docs/backup.md
+                    naming:
+                      type: string
+                      maxLength: 128
+                      pattern: '^([A-Za-z0-9._-]|\{[A-Za-z]+\})+$'
+                      description: |
+                        Template the backups of the cluster are named by, one name for the backup of each shard, e.g.
+                        "shard{shard}-{YYYYMMDDHHIISS}" as the Altinity Cloud Manager names them. Placeholders: {shard}, the number
+                        of the shard from 1, required; {cluster}, {chi}, {namespace}; {prefix}, the backupNamePrefix of the schedule;
+                        the time by the tokens YYYY, MM, DD, HH, II (minutes) and SS, all required, in braces, e.g. {YYYYMMDDHHIISS}.
+                        A backup made at once has a T before the hour. Empty, the default, names a backup "<prefix>-<YYYYMMDDHHMMSS>"
+                        alike on every shard. See docs/backup.md
                     recovery:
                       type: object
                       description: |
@@ -4226,13 +4322,25 @@ spec:
                             backup from the storage paths the {namespace} macro gives there. Empty, the namespace of this installation
                           maxLength: 63
                           pattern: "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
+                        orchestratorConfigMapRef:
+                          type: object
+                          description: |
+                            ConfigMap in the installation's namespace whose key `backup-orchestrator.sh` (`backup-orchestrator.py` for a cluster whose backup.orchestrator is python) the ClickHouseRestore of
+                            the recovery runs instead of the operator's orchestrator script: it is copied into that restore. An explicit
+                            `name: ""` on a cluster resets it to the operator's script
+                          properties:
+                            name:
+                              description: |
+                                Name of the referent. More info:
+                                https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
                   description: |
                     EXPERIMENTAL. Operator-managed backup defaults, applied to every cluster. Each cluster can override
                     them via `chi.spec.configuration.clusters[].backup`, e.g. `enabled: "no"` to opt a cluster out.
-                    When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
-                    so turning it on or off rolls the cluster's Pods. Backup takes effect only where a cluster has a
-                    `configSecretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
-                    so backup stays off and the operator warns.
+                    When enabled in mode sidecar, the operator injects a clickhouse-backup sidecar into every Pod of the
+                    cluster, so turning it on or off rolls the cluster's Pods. Backup takes effect only where a cluster has
+                    a `configSecretRef`: without it clickhouse-backup would have no storage and no API credentials, so
+                    backup stays off and the operator warns.
                     See docs/backup.md for details.
                 useTemplates:
                   type: array
@@ -6923,11 +7031,11 @@ spec:
                             description: |
                               EXPERIMENTAL. Operator-managed backup for this cluster, overriding `chi.spec.backup`.
                               Fields left empty are inherited from `chi.spec.backup`; set `enabled: "no"` to opt this cluster out.
-                              When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
-                              so turning it on or off rolls the cluster's Pods. Customize the sidecar through a container named
-                              clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the cluster
-                              has a `configSecretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
-                              so backup stays off and the operator warns.
+                              When enabled in mode sidecar, the operator injects a clickhouse-backup sidecar into every Pod of the
+                              cluster, so turning it on or off rolls the cluster's Pods. Customize the container through a container
+                              named clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the
+                              cluster has a `configSecretRef`: without it clickhouse-backup would have no storage and no API
+                              credentials, so backup stays off and the operator warns.
                               See docs/backup.md for details.
                             properties:
                               enabled:
@@ -6943,8 +7051,18 @@ spec:
                                 x-kubernetes-preserve-unknown-fields: true
                                 description: |
                                   Enable operator-managed backup: inject the clickhouse-backup sidecar and allow backup/restore resources to target
-                                  the cluster. Takes effect only with `configSecretRef` or `podTemplate` set, which name where the sidecar takes
-                                  its storage from: without either, backup stays off
+                                  the cluster. Takes effect only with `configSecretRef` set, which names where clickhouse-backup takes its
+                                  storage and API credentials from: without it, backup stays off
+                              mode:
+                                type: string
+                                description: |
+                                  How the operator reaches clickhouse-backup on the hosts of the cluster. sidecar (default) injects it into
+                                  every ClickHouse Pod. pod injects nothing: while a backup or a restore of the cluster runs, the operator
+                                  runs one backup Pod per shard on the node of a ready replica, mounting that replica's volumes
+                                enum:
+                                  - ""
+                                  - sidecar
+                                  - pod
                               podTemplate:
                                 type: string
                                 description: |
@@ -6958,14 +7076,46 @@ spec:
                                   of the sidecar, a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket, s3.path,
                                   s3.access_key, s3.secret_key. The operator generates the configuration file of the sidecar from it,
                                   which follows a change of the Secret without a restart. A cluster that leaves it out takes the
-                                  installation's; an explicit `name: ""` on a cluster leaves the cluster without one. Without one, the
-                                  storage is configured by the container of the Pod template `podTemplate` names
+                                  installation's; an explicit `name: ""` on a cluster leaves the cluster without one. Required: without
+                                  one, backup stays off. The configuration must set api.username and api.password of the REST API
                                 properties:
                                   name:
                                     description: |
                                       Name of the referent. More info:
                                       https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                     type: string
+                              preferredReplica:
+                                type: integer
+                                minimum: 0
+                                description: |
+                                  Index, from 0, of the replica of each shard a backup works on, as the backupReplica of the Altinity Cloud Manager.
+                                  With mode pod the backup Pod of the shard works next to it: it mounts the volumes of that replica's Pod and runs
+                                  on the same node, by a nodeSelector on the node's hostname; a shard with fewer replicas, or whose preferred replica
+                                  is not ready, falls back to its next ready replica. With mode sidecar a backup of one replica per shard
+                                  (FirstPerShard) runs on the sidecar of that replica, or on that of the first replica when the shard has fewer
+                                  replicas or the preferred one does not answer when the Job starts. Empty means 0, the first replica
+                              orchestrator:
+                                type: string
+                                enum:
+                                  - ""
+                                  - bash
+                                  - python
+                                description: |
+                                  What the backup, verify and restore Jobs of the cluster run: bash (default), the bash orchestrator script in
+                                  the clickhouse-backup image, or python, its twin in Python in the python:3.14-slim image. An
+                                  orchestratorConfigMapRef has to hold the script of the one the cluster takes, backup-orchestrator.sh or
+                                  backup-orchestrator.py. See docs/backup.md
+                              naming:
+                                type: string
+                                maxLength: 128
+                                pattern: '^([A-Za-z0-9._-]|\{[A-Za-z]+\})+$'
+                                description: |
+                                  Template the backups of the cluster are named by, one name for the backup of each shard, e.g.
+                                  "shard{shard}-{YYYYMMDDHHIISS}" as the Altinity Cloud Manager names them. Placeholders: {shard}, the number
+                                  of the shard from 1, required; {cluster}, {chi}, {namespace}; {prefix}, the backupNamePrefix of the schedule;
+                                  the time by the tokens YYYY, MM, DD, HH, II (minutes) and SS, all required, in braces, e.g. {YYYYMMDDHHIISS}.
+                                  A backup made at once has a T before the hour. Empty, the default, names a backup "<prefix>-<YYYYMMDDHHMMSS>"
+                                  alike on every shard. See docs/backup.md
                               recovery:
                                 type: object
                                 description: |
@@ -6993,6 +7143,18 @@ spec:
                                       backup from the storage paths the {namespace} macro gives there. Empty, the namespace of this installation
                                     maxLength: 63
                                     pattern: "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
+                                  orchestratorConfigMapRef:
+                                    type: object
+                                    description: |
+                                      ConfigMap in the installation's namespace whose key `backup-orchestrator.sh` (`backup-orchestrator.py` for a cluster whose backup.orchestrator is python) the ClickHouseRestore of
+                                      the recovery runs instead of the operator's orchestrator script: it is copied into that restore. An explicit
+                                      `name: ""` on a cluster resets it to the operator's script
+                                    properties:
+                                      name:
+                                        description: |
+                                          Name of the referent. More info:
+                                          https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                        type: string
                           pdbManaged:
                             # StringBool is polymorphic — accepts native YAML bool (true/false),
                             # integer (0/1), or string from the recognized vocabulary
@@ -8438,8 +8600,18 @@ spec:
                       x-kubernetes-preserve-unknown-fields: true
                       description: |
                         Enable operator-managed backup: inject the clickhouse-backup sidecar and allow backup/restore resources to target
-                        the cluster. Takes effect only with `configSecretRef` or `podTemplate` set, which name where the sidecar takes
-                        its storage from: without either, backup stays off
+                        the cluster. Takes effect only with `configSecretRef` set, which names where clickhouse-backup takes its
+                        storage and API credentials from: without it, backup stays off
+                    mode:
+                      type: string
+                      description: |
+                        How the operator reaches clickhouse-backup on the hosts of the cluster. sidecar (default) injects it into
+                        every ClickHouse Pod. pod injects nothing: while a backup or a restore of the cluster runs, the operator
+                        runs one backup Pod per shard on the node of a ready replica, mounting that replica's volumes
+                      enum:
+                        - ""
+                        - sidecar
+                        - pod
                     podTemplate:
                       type: string
                       description: |
@@ -8453,14 +8625,46 @@ spec:
                         of the sidecar, a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket, s3.path,
                         s3.access_key, s3.secret_key. The operator generates the configuration file of the sidecar from it,
                         which follows a change of the Secret without a restart. A cluster that leaves it out takes the
-                        installation's; an explicit `name: ""` on a cluster leaves the cluster without one. Without one, the
-                        storage is configured by the container of the Pod template `podTemplate` names
+                        installation's; an explicit `name: ""` on a cluster leaves the cluster without one. Required: without
+                        one, backup stays off. The configuration must set api.username and api.password of the REST API
                       properties:
                         name:
                           description: |
                             Name of the referent. More info:
                             https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                           type: string
+                    preferredReplica:
+                      type: integer
+                      minimum: 0
+                      description: |
+                        Index, from 0, of the replica of each shard a backup works on, as the backupReplica of the Altinity Cloud Manager.
+                        With mode pod the backup Pod of the shard works next to it: it mounts the volumes of that replica's Pod and runs
+                        on the same node, by a nodeSelector on the node's hostname; a shard with fewer replicas, or whose preferred replica
+                        is not ready, falls back to its next ready replica. With mode sidecar a backup of one replica per shard
+                        (FirstPerShard) runs on the sidecar of that replica, or on that of the first replica when the shard has fewer
+                        replicas or the preferred one does not answer when the Job starts. Empty means 0, the first replica
+                    orchestrator:
+                      type: string
+                      enum:
+                        - ""
+                        - bash
+                        - python
+                      description: |
+                        What the backup, verify and restore Jobs of the cluster run: bash (default), the bash orchestrator script in
+                        the clickhouse-backup image, or python, its twin in Python in the python:3.14-slim image. An
+                        orchestratorConfigMapRef has to hold the script of the one the cluster takes, backup-orchestrator.sh or
+                        backup-orchestrator.py. See docs/backup.md
+                    naming:
+                      type: string
+                      maxLength: 128
+                      pattern: '^([A-Za-z0-9._-]|\{[A-Za-z]+\})+$'
+                      description: |
+                        Template the backups of the cluster are named by, one name for the backup of each shard, e.g.
+                        "shard{shard}-{YYYYMMDDHHIISS}" as the Altinity Cloud Manager names them. Placeholders: {shard}, the number
+                        of the shard from 1, required; {cluster}, {chi}, {namespace}; {prefix}, the backupNamePrefix of the schedule;
+                        the time by the tokens YYYY, MM, DD, HH, II (minutes) and SS, all required, in braces, e.g. {YYYYMMDDHHIISS}.
+                        A backup made at once has a T before the hour. Empty, the default, names a backup "<prefix>-<YYYYMMDDHHMMSS>"
+                        alike on every shard. See docs/backup.md
                     recovery:
                       type: object
                       description: |
@@ -8488,13 +8692,25 @@ spec:
                             backup from the storage paths the {namespace} macro gives there. Empty, the namespace of this installation
                           maxLength: 63
                           pattern: "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
+                        orchestratorConfigMapRef:
+                          type: object
+                          description: |
+                            ConfigMap in the installation's namespace whose key `backup-orchestrator.sh` (`backup-orchestrator.py` for a cluster whose backup.orchestrator is python) the ClickHouseRestore of
+                            the recovery runs instead of the operator's orchestrator script: it is copied into that restore. An explicit
+                            `name: ""` on a cluster resets it to the operator's script
+                          properties:
+                            name:
+                              description: |
+                                Name of the referent. More info:
+                                https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
                   description: |
                     EXPERIMENTAL. Operator-managed backup defaults, applied to every cluster. Each cluster can override
                     them via `chi.spec.configuration.clusters[].backup`, e.g. `enabled: "no"` to opt a cluster out.
-                    When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
-                    so turning it on or off rolls the cluster's Pods. Backup takes effect only where a cluster has a
-                    `configSecretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
-                    so backup stays off and the operator warns.
+                    When enabled in mode sidecar, the operator injects a clickhouse-backup sidecar into every Pod of the
+                    cluster, so turning it on or off rolls the cluster's Pods. Backup takes effect only where a cluster has
+                    a `configSecretRef`: without it clickhouse-backup would have no storage and no API credentials, so
+                    backup stays off and the operator warns.
                     See docs/backup.md for details.
                 useTemplates:
                   type: array
@@ -9513,6 +9729,13 @@ spec:
                         Where in its storage the clickhouse-backup sidecar of a host keeps the object disk data of its backups when
                         the settings of that storage set no object disk path. A template like storagePath.
                         Default: object_disks/{namespace}/{installation}/{cluster}/{shard}
+                    path:
+                      type: string
+                      description: |
+                        Path to the folder of the backup orchestrator scripts, backup-orchestrator.sh and backup-orchestrator.py, which
+                        the backup, verify and restore Jobs run. Relative to the folder of the operator configuration unless absolute.
+                        A script not found there is read from its subfolder python, where the install manifests mount the ConfigMap of
+                        the Python script. Default: backup
                 logger:
                   type: object
                   description: "allow setup clickhouse-operator logger behavior"
@@ -10804,9 +11027,35 @@ spec:
                   message: "a backup that runs a schedule takes its options from it: replicaSelection, tables, partitions and activeDeadlineSeconds are not set with scheduleRef"
                 - rule: "!has(self.scheduleRef) || (has(self.backupName) ? self.backupName : '') == ''"
                   message: "a backup that runs a schedule is named with the schedule's backupNamePrefix: backupName is not set with scheduleRef"
-                - rule: "!has(self.backupName) || !self.backupName.matches('-[0-9]{8}-[0-9]{6}$')"
-                  message: "backupName must not end like the backups of a schedule, -YYYYMMDD-HHMMSS, which the retention of a schedule of that prefix would prune"
+                - rule: "!has(self.scheduleRef) || !has(self.configOverrides)"
+                  message: "a backup that runs a schedule takes no configOverrides: they are not set with scheduleRef"
+                - rule: "!has(self.backupName) || !self.backupName.matches('-[0-9]{14}$')"
+                  message: "backupName must not end like the backups of a schedule, -YYYYMMDDHHMMSS, which the retention of a schedule of that prefix would prune"
               properties:
+                configOverrides:
+                  type: array
+                  nullable: true
+                  maxItems: 16
+                  x-kubernetes-list-type: set
+                  description: |
+                    clickhouse-backup settings the backup is made with in place of those of the sidecar, KEY=VALUE of the env
+                    var of the setting, e.g. S3_STORAGE_CLASS=STANDARD_IA; a leading --env= is stripped. Not the settings the
+                    operator sets, those of where the backups are, of the API or of secrets. Not with scheduleRef
+                  items:
+                    type: string
+                    pattern: '^(--env=)?[A-Z][A-Z0-9_]{0,63}=[A-Za-z0-9_.,:/@+=-]{1,256}$'
+                orchestratorConfigMapRef:
+                  type: object
+                  description: |
+                    ConfigMap in the namespace of the backup whose key `backup-orchestrator.sh` (`backup-orchestrator.py` for a cluster whose backup.orchestrator is python) its Jobs run instead of the
+                    operator's orchestrator script, the one of the operator configuration. With scheduleRef, unset takes the
+                    schedule's
+                  properties:
+                    name:
+                      description: |
+                        Name of the referent. More info:
+                        https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      type: string
                 clickHouseInstallation:
                   type: string
                   minLength: 1
@@ -10837,7 +11086,7 @@ spec:
                 backupName:
                   type: string
                   description: |
-                    Optional explicit backup name, which must not end like the backups of a schedule (-YYYYMMDD-HHMMSS).
+                    Optional explicit backup name, which must not end like the backups of a schedule (-YYYYMMDDHHMMSS).
                     Generated from the resource name and the time the backup is due when empty. Not set with scheduleRef,
                     whose backup is named with the schedule's backupNamePrefix
                   maxLength: 128
@@ -10914,6 +11163,7 @@ spec:
                     - Running
                     - Completed
                     - Failed
+                    - Aborted
                 backupName:
                   type: string
                   description: "Resolved backup name, the same on every cluster"
@@ -10923,6 +11173,16 @@ spec:
                     What a backup that runs a schedule takes from it, recorded anew on every reconcile until the backup is
                     validated and kept from then on: the backup is made with these, whatever the schedule becomes
                   properties:
+                    orchestratorConfigMapRef:
+                      type: object
+                      description: |
+                        The schedule's orchestratorConfigMapRef, which the backup runs unless it names its own
+                      properties:
+                        name:
+                          description: |
+                            Name of the referent. More info:
+                            https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
                     name:
                       type: string
                       description: "Name of the ClickHouseBackupSchedule"
@@ -10939,6 +11199,80 @@ spec:
                     backupNamePrefix:
                       type: string
                       description: "The schedule's backupNamePrefix, which names the backup"
+                    schedules:
+                      type: array
+                      description: "The schedule's entries, which make the backup incremental and the retention after it, as after a scheduled run"
+                      items:
+                        type: object
+                        properties:
+                          period:
+                            type: string
+                          time:
+                            type: string
+                          day:
+                            type: integer
+                            format: int32
+                          keep:
+                            type: integer
+                            format: int32
+                          incremental:
+                            type: string
+                          configOverrides:
+                            type: array
+                            nullable: true
+                            items:
+                              type: string
+                    timeZone:
+                      type: string
+                      description: "The schedule's timeZone"
+                    keepBackups:
+                      type: array
+                      nullable: true
+                      description: "The schedule's retention.keepBackups, which the retention after the backup never deletes"
+                      items:
+                        type: string
+                    previousSchedules:
+                      type: array
+                      nullable: true
+                      description: "The schedule's status.retention.previous, whose backups the retention after the backup holds"
+                      items:
+                        type: object
+                        required:
+                          - changeID
+                        properties:
+                          changeID:
+                            type: string
+                            description: "When the change was made, RFC 3339 in UTC, which identifies it"
+                          schedules:
+                            type: array
+                            nullable: true
+                            description: "The entries before the change"
+                            items:
+                              type: object
+                              properties:
+                                period:
+                                  type: string
+                                time:
+                                  type: string
+                                day:
+                                  type: integer
+                                  format: int32
+                                keep:
+                                  type: integer
+                                  format: int32
+                                incremental:
+                                  type: string
+                                configOverrides:
+                                  type: array
+                                  nullable: true
+                                  items:
+                                    type: string
+                          timeZone:
+                            type: string
+                            description: "The time zone before the change"
+                          keepAll:
+                            type: boolean
+                            description: "Holds every backup made before the change, whatever the entries: the oldest changes merged into one"
                     schemaOnly:
                       type: string
                       description: "The schedule's schemaOnly"
@@ -10982,6 +11316,7 @@ spec:
                           - Running
                           - Completed
                           - Failed
+                          - Aborted
                       jobName:
                         type: string
                         description: "Job that drives the backup on the cluster"
@@ -11073,10 +11408,10 @@ spec:
           description: Target cluster, empty means every backup-enabled cluster
           jsonPath: .spec.cluster
           priority: 1
-        - name: schedule
+        - name: phase
           type: string
-          description: Cron schedule
-          jsonPath: .spec.schedule
+          description: Schedule phase - Active, Suspended or Aborted
+          jsonPath: .status.phase
         - name: suspend
           type: string
           description: Whether the schedule is suspended by its spec
@@ -11111,9 +11446,10 @@ spec:
         openAPIV3Schema:
           description: |
             EXPERIMENTAL. ClickHouseBackupSchedule defines a recurring backup of a ClickHouseInstallation.
-            The operator runs one CronJob per backup-enabled cluster it targets, each driving the
-            clickhouse-backup sidecar it injects into the cluster (see ClickHouseInstallation spec.backup)
-            and, optionally, pruning old backups of this schedule there. The API may change in a future
+            The operator runs one CronJob per backup-enabled cluster it targets, on the cron schedule of the
+            finest of its entries, each driving clickhouse-backup on the cluster (see ClickHouseInstallation
+            spec.backup); a run whose time matches coarser entries counts for them too. After a successful run
+            the backups of the schedule's series that no entry keeps are deleted. The API may change in a future
             release.
           type: object
           required:
@@ -11129,13 +11465,24 @@ spec:
               type: object
               required:
                 - clickHouseInstallation
-                - schedule
+                - schedules
               x-kubernetes-validations:
                 - rule: "self.clickHouseInstallation == oldSelf.clickHouseInstallation && (has(self.cluster) ? self.cluster : '') == (has(oldSelf.cluster) ? oldSelf.cluster : '')"
                   message: "clickHouseInstallation and cluster are immutable; create a new resource"
                 - rule: "(has(oldSelf.backupNamePrefix) ? oldSelf.backupNamePrefix : '') == '' || (has(self.backupNamePrefix) ? self.backupNamePrefix : '') == oldSelf.backupNamePrefix"
                   message: "backupNamePrefix can be set once and is immutable after: a changed prefix would leave the former series unpruned; create a new resource"
               properties:
+                orchestratorConfigMapRef:
+                  type: object
+                  description: |
+                    ConfigMap in the namespace of the schedule whose key `backup-orchestrator.sh` (`backup-orchestrator.py` for a cluster whose backup.orchestrator is python) the runs of its CronJobs
+                    run instead of the operator's orchestrator script, the one of the operator configuration
+                  properties:
+                    name:
+                      description: |
+                        Name of the referent. More info:
+                        https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      type: string
                 clickHouseInstallation:
                   type: string
                   minLength: 1
@@ -11147,16 +11494,80 @@ spec:
                   # Mirrors the ClickHouseInstallation cluster name constraint
                   maxLength: 15
                   pattern: "^[a-zA-Z0-9-]{0,15}$"
-                schedule:
-                  type: string
-                  minLength: 1
-                  description: "Cron schedule in standard Kubernetes CronJob format, e.g. \"0 2 * * *\""
+                schedules:
+                  type: array
+                  minItems: 1
+                  description: |
+                    The periods the schedule backs up at, at most one entry per period. Every entry that sets a time sets the
+                    same, which an hour or 6hours entry that sets none takes, so every slot of a coarser entry is a slot of the
+                    finest one, whose cron schedule the CronJobs run on. A run matches its time against the entries: one backup
+                    is made, for the entry of the longest period it matches, and it counts for each of them. A weekly and a
+                    monthly entry need a daily or finer one beside them
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys:
+                    - period
+                  items:
+                    type: object
+                    required:
+                      - period
+                      - keep
+                    properties:
+                      period:
+                        type: string
+                        description: "How often the entry is due; a minute entry is due every minute, whatever its time"
+                        enum:
+                          - minute
+                          - hour
+                          - 6hours
+                          - daily
+                          - weekly
+                          - monthly
+                      time:
+                        type: string
+                        description: |
+                          HH:MM the entry is due at, in timeZone. Required for daily, weekly and monthly. For hour only its
+                          minute is used, for 6hours its hour modulo 6 and its minute; empty takes the time the other entries
+                          set, 00:00 when none does
+                        pattern: "^(([01][0-9]|2[0-3]):[0-5][0-9])?$"
+                      day:
+                        type: integer
+                        format: int32
+                        minimum: 0
+                        maximum: 31
+                        description: |
+                          Day the entry is due on: for weekly 0..6, 0 being Sunday; for monthly 1..31, a day past the end
+                          of a shorter month meaning its last day. Required for weekly and monthly, not set otherwise
+                      keep:
+                        type: integer
+                        format: int32
+                        minimum: 1
+                        description: "How many of the newest backups made at the slots of the entry are kept, at least 1"
+                      incremental:
+                        # A StringBool, polymorphic as suspend below
+                        x-kubernetes-preserve-unknown-fields: true
+                        description: |
+                          Make the runs of the entry incremental backups on the newest backup of the series while the chain
+                          of incremental backups is shorter than keep; the run after makes a full backup again. At most one
+                          entry
+                      configOverrides:
+                        type: array
+                        nullable: true
+                        maxItems: 16
+                        x-kubernetes-list-type: set
+                        description: |
+                          clickhouse-backup settings the runs of the entry make their backups with in place of those of the
+                          sidecar, KEY=VALUE of the env var of the setting, e.g. S3_STORAGE_CLASS=GLACIER_IR; a leading --env= is
+                          stripped. Those of the heaviest entry of a slot apply. Not the settings the operator sets, those of
+                          where the backups are, of the API or of secrets
+                        items:
+                          type: string
+                          pattern: '^(--env=)?[A-Z][A-Z0-9_]{0,63}=[A-Za-z0-9_.,:/@+=-]{1,256}$'
                 timeZone:
                   type: string
                   maxLength: 64
                   description: |
-                    IANA time zone the schedule is read in, e.g. Europe/Berlin, as the CronJob's timeZone. Empty reads it in
-                    the time zone of the Kubernetes controller manager, UTC as a rule. Backup names carry UTC times either way
+                    IANA time zone the schedules are read in, e.g. Europe/Berlin, as the CronJob's timeZone. Empty reads them in
+                    the time zone of the Kubernetes controller manager, UTC as a rule
                 suspend:
                   description: "Pause creation of new backup Jobs. Jobs already running are not affected"
                   # StringBool is polymorphic — accepts native YAML bool (true/false),
@@ -11231,10 +11642,10 @@ spec:
                 backupNamePrefix:
                   type: string
                   description: |
-                    Prefix of the backup names; each run appends the UTC time it was due. Retention only
-                    ever prunes backups named with this prefix and such a time. Defaults to
+                    Prefix of the backup names; each run appends the time it was due, -YYYYMMDDHHMMSS.
+                    Retention only ever prunes backups named with this prefix and such a time. Defaults to
                     "<namespace>-<installation>-<schedule>", shortened with a hash when longer. At most
-                    112 characters, so the name with its "-YYYYMMDD-HHMMSS" suffix stays within 128.
+                    112 characters, so the name with its suffix stays within 128.
                     Can be set once and is immutable after, as a changed prefix would leave the backups of the
                     former series unpruned. Set later, it replaces the default prefix the same way: meant for a
                     schedule that has not run yet, such as one held for a recovery
@@ -11243,20 +11654,80 @@ spec:
                 retention:
                   type: object
                   description: |
-                    Which backups of the schedule are deleted: a rule of the series of backups named with its backupNamePrefix
-                    and the time of a run, not of any one backup. Backups of other names, one-off backups and those that run
-                    the schedule once among them, are never deleted by it
+                    What retention keeps beyond the entries: backups pinned by name, and the backups the schedule kept
+                    before a change of its entries or time zone, held until released
                   properties:
-                    keepLast:
-                      type: integer
-                      format: int32
-                      minimum: 0
+                    onScheduleChange:
+                      type: string
                       description: |
-                        After each successful run keep the N most recent backups of the series that hold data, and apart from
-                        them the N most recent that hold none, and delete older ones. 0 (default) keeps every backup
+                        What retention does with the backups the entries kept before a change of the entries or of the
+                        time zone: Hold (default) keeps them all until releaseHeld releases the change, and lists in
+                        status.clusters[].heldBackups those the schedule as it is would delete; Prune applies the change at once
+                      enum:
+                        - ""
+                        - Hold
+                        - Prune
+                    keepBackups:
+                      type: array
+                      nullable: true
+                      maxItems: 512
+                      description: |
+                        Backups retention never deletes, as the Altinity Cloud Manager keeps the backups its dialog of a schedule
+                        change pins: their names, or with a naming template the name of the backup of any shard, or the time alone
+                        when the template holds no {prefix}
+                      items:
+                        type: string
+                        maxLength: 128
+                        pattern: '^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$'
+                    releaseHeld:
+                      type: string
+                      description: |
+                        The changeID of status.retention.previous whose held backups, and those of every earlier change, are
+                        released: the next run deletes those neither the entries nor keepBackups keep. A later change is never
+                        released by it
             status:
               type: object
               properties:
+                phase:
+                  type: string
+                  description: "Phase of the schedule"
+                  enum:
+                    - Active
+                    - Suspended
+                    - Aborted
+                reason:
+                  type: string
+                  description: "Why the schedule is in its phase, in one word"
+                message:
+                  type: string
+                  description: "Why the schedule is in its phase, in a sentence"
+                nextScheduleTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  description: "Next time a run of the CronJobs matches an entry of the schedule"
+                entries:
+                  type: array
+                  description: "State of the runs of each entry of the schedule"
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys:
+                    - period
+                  items:
+                    type: object
+                    required:
+                      - period
+                    properties:
+                      period:
+                        type: string
+                        description: "Period of the entry"
+                      lastScheduleTime:
+                        type: string
+                        format: date-time
+                        nullable: true
+                        description: "Last time a run matching the entry was scheduled, made for it or for a coarser entry that matched as well"
+                      lastBackupName:
+                        type: string
+                        description: "Backup the last successful run matching the entry made"
                 clusters:
                   type: array
                   description: |
@@ -11317,6 +11788,15 @@ spec:
                           rejoins retentionHosts is dropped from it.
                         items:
                           type: string
+                      heldBackups:
+                        type: array
+                        nullable: true
+                        description: |
+                          Backups the last successful scheduled run of the cluster found held for a change of the schedule,
+                          status.retention.previous, which the schedule as it is would delete: add those to keep to
+                          spec.retention.keepBackups, then release the change with spec.retention.releaseHeld
+                        items:
+                          type: string
                 lastScheduleTime:
                   type: string
                   format: date-time
@@ -11338,6 +11818,82 @@ spec:
                 lastFailureMessage:
                   type: string
                   description: "Why the last failed scheduled backup Job failed"
+                retention:
+                  type: object
+                  description: "The entries and time zone the CronJobs apply, and the changes of them whose backups retention holds"
+                  properties:
+                    appliedSchedules:
+                      type: array
+                      nullable: true
+                      description: "The entries the CronJobs apply"
+                      items:
+                        type: object
+                        properties:
+                          period:
+                            type: string
+                          time:
+                            type: string
+                          day:
+                            type: integer
+                            format: int32
+                          keep:
+                            type: integer
+                            format: int32
+                          incremental:
+                            type: string
+                          configOverrides:
+                            type: array
+                            nullable: true
+                            items:
+                              type: string
+                    appliedTimeZone:
+                      type: string
+                      description: "The time zone the CronJobs apply"
+                    previous:
+                      type: array
+                      nullable: true
+                      description: "The entries and time zones before each change not released yet, oldest first: retention keeps every backup they kept when the change was made"
+                      items:
+                        type: object
+                        required:
+                          - changeID
+                        properties:
+                          changeID:
+                            type: string
+                            description: "When the change was made, RFC 3339 in UTC, which identifies it"
+                          schedules:
+                            type: array
+                            nullable: true
+                            description: "The entries before the change"
+                            items:
+                              type: object
+                              properties:
+                                period:
+                                  type: string
+                                time:
+                                  type: string
+                                day:
+                                  type: integer
+                                  format: int32
+                                keep:
+                                  type: integer
+                                  format: int32
+                                incremental:
+                                  type: string
+                                configOverrides:
+                                  type: array
+                                  nullable: true
+                                  items:
+                                    type: string
+                          timeZone:
+                            type: string
+                            description: "The time zone before the change"
+                          keepAll:
+                            type: boolean
+                            description: "Holds every backup made before the change, whatever the entries: the oldest changes merged into one"
+                    changeID:
+                      type: string
+                      description: "The changeID of the newest change of previous, which spec.retention.releaseHeld releases with every earlier one"
                 conditions:
                   type: array
                   nullable: true
@@ -11438,6 +11994,17 @@ spec:
                 - rule: "(has(self.sourceInstallation) ? self.sourceInstallation : '') == (has(oldSelf.sourceInstallation) ? oldSelf.sourceInstallation : '') && (has(self.sourceNamespace) ? self.sourceNamespace : '') == (has(oldSelf.sourceNamespace) ? oldSelf.sourceNamespace : '')"
                   message: "sourceInstallation and sourceNamespace are immutable; create a new resource"
               properties:
+                orchestratorConfigMapRef:
+                  type: object
+                  description: |
+                    ConfigMap in the namespace of the restore whose key `backup-orchestrator.sh` (`backup-orchestrator.py` for a cluster whose backup.orchestrator is python) its Jobs run instead of the
+                    operator's orchestrator script, the one of the operator configuration
+                  properties:
+                    name:
+                      description: |
+                        Name of the referent. More info:
+                        https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      type: string
                 clickHouseInstallation:
                   type: string
                   minLength: 1
@@ -11497,6 +12064,33 @@ spec:
                   description: "Optional clickhouse-backup --tables pattern, e.g. db.table or db.*, comma-separated, restricting the schema and the data restored. Empty restores every table"
                   maxLength: 1024
                   pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
+                partitions:
+                  type: array
+                  description: "Optional partition ids the restore is restricted to (clickhouse-backup --partitions): their data is downloaded and attached into the existing tables, replacing those partitions, and the schema is not restored, as the Altinity Cloud Manager restores partitions. Not with schemaOnly or rbac"
+                  nullable: true
+                  items:
+                    type: string
+                    pattern: "^[A-Za-z0-9_-]{1,128}$"
+                skipTables:
+                  type: string
+                  description: "Optional clickhouse-backup table pattern, e.g. db.tmp* or logs.*, comma-separated, of the tables the restore leaves out, on top of the system databases (CLICKHOUSE_SKIP_TABLES)"
+                  maxLength: 1024
+                  pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
+                skipTableEngines:
+                  type: array
+                  description: "Optional table engines, e.g. Kafka, whose tables the restore leaves out (CLICKHOUSE_SKIP_TABLE_ENGINES)"
+                  nullable: true
+                  items:
+                    type: string
+                    pattern: "^[A-Za-z][A-Za-z0-9_]{0,127}$"
+                databaseMapping:
+                  type: object
+                  description: |
+                    Optional mapping of the databases of the backup, the keys, to the databases the restore restores their tables into,
+                    the values (clickhouse-backup --restore-database-mapping). The overwrite guard checks the databases restored into
+                  additionalProperties:
+                    type: string
+                    pattern: "^[A-Za-z0-9_][A-Za-z0-9_-]{0,127}$"
                 rbac:
                   # StringBool is polymorphic — accepts native YAML bool (true/false),
                   # integer (0/1), or string from the recognized vocabulary.
@@ -11523,6 +12117,7 @@ spec:
                     - Running
                     - Completed
                     - Failed
+                    - Aborted
                 backupName:
                   type: string
                   description: "Backup the restore Jobs restore, as it was when the first Job was created"
@@ -11553,6 +12148,7 @@ spec:
                           - Running
                           - Completed
                           - Failed
+                          - Aborted
                       jobName:
                         type: string
                         description: "Job that drives the restore on the cluster"

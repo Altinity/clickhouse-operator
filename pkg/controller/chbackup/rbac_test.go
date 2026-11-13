@@ -105,6 +105,14 @@ func TestOperatorRoleGrantsBackupControllers(t *testing.T) {
 		{clickhouse_altinity_com.APIGroupName, "clickhousebackups/finalizers", []string{"update"}},
 		{clickhouse_altinity_com.APIGroupName, "clickhousebackupschedules/finalizers", []string{"update"}},
 		{clickhouse_altinity_com.APIGroupName, "clickhouserestores/finalizers", []string{"update"}},
+		// The controller of the backup Pods creates and deletes them and the headless Service of each cluster, and
+		// watches them and the Jobs they live as long as
+		{core.GroupName, "pods", []string{"get", "list", "watch", "create", "delete"}},
+		{core.GroupName, "services", []string{"get", "list", "watch", "create", "update", "delete"}},
+		// EnsureOrchestratorServiceAccount keeps the ServiceAccount, Role and RoleBinding of the orchestrator
+		{core.GroupName, "serviceaccounts", []string{"get", "create"}},
+		{rbac.GroupName, "roles", []string{"get", "create", "update"}},
+		{rbac.GroupName, "rolebindings", []string{"get", "create", "update", "delete"}},
 	}
 
 	rules := loadOperatorRoleRules(t)
@@ -116,4 +124,21 @@ func TestOperatorRoleGrantsBackupControllers(t *testing.T) {
 			require.True(t, granted, "the operator role does not grant %q on %q in API group %q", verb, r.resource, r.group)
 		}
 	}
+}
+
+// Kubernetes lets the operator grant no rule it does not hold: every rule of the Role of the orchestrator is one of
+// the operator's role. The operator runs nothing in a pod by exec any more, and holds no pods/exec.
+func TestOperatorRoleGrantsOrchestratorRules(t *testing.T) {
+	rules := loadOperatorRoleRules(t)
+	for _, rule := range orchestratorRules {
+		for _, group := range rule.APIGroups {
+			for _, resource := range rule.Resources {
+				for _, verb := range rule.Verbs {
+					require.True(t, slices.ContainsFunc(rules, func(r rbacRule) bool { return r.allows(group, resource, verb) }),
+						"the operator role does not grant %q on %q in API group %q, which the orchestrator Role does", verb, resource, group)
+				}
+			}
+		}
+	}
+	require.False(t, slices.ContainsFunc(rules, func(r rbacRule) bool { return slices.Contains(r.Resources, "pods/exec") }))
 }

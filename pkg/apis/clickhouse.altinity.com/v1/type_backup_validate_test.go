@@ -30,6 +30,7 @@ import (
 func TestBackupSpecValidate(t *testing.T) {
 	longName := strings.Repeat("a", BackupNameMaxLength+1)
 	longPrefix := strings.Repeat("a", BackupNamePrefixMaxLength+1)
+	daily := []BackupScheduleEntry{{Period: BackupPeriodDaily, Time: "02:00", Keep: 7}}
 	for name, tc := range map[string]struct {
 		validate func() error
 		valid    bool
@@ -63,8 +64,11 @@ func TestBackupSpecValidate(t *testing.T) {
 		}, false},
 		// A schedule's retention would take it for one of its own backups
 		"a name of a schedule's series": {func() error {
-			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupName: "nightly-20261012-020000"}).Validate()
+			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupName: "nightly-20261012020000"}).Validate()
 		}, false},
+		"a name with a date and a time apart": {func() error {
+			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupName: "nightly-20261012-020000"}).Validate()
+		}, true},
 		"a name of a backup that runs a schedule": {func() error {
 			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupName: "nightly-20261012T020000"}).Validate()
 		}, true},
@@ -119,68 +123,77 @@ func TestBackupSpecValidate(t *testing.T) {
 			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: BackupOptions{ActiveDeadlineSeconds: ptr.To(int64(0))}}).Validate()
 		}, false},
 		"a schedule": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *", ConcurrencyPolicy: "Forbid"}).Validate()
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily}).Validate()
 		}, true},
 		"a schedule without a schedule": {func() error {
 			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi"}).Validate()
 		}, false},
-		"an unknown concurrency policy": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *", ConcurrencyPolicy: "Sometimes"}).Validate()
+		"a schedule in a time zone": {func() error {
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, TimeZone: "Europe/Berlin"}).Validate()
+		}, true},
+		"a schedule in an unknown time zone": {func() error {
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, TimeZone: "Mars/Olympus"}).Validate()
 		}, false},
-		// The "-YYYYMMDD-HHMMSS" suffix of a scheduled run must still fit the name.
+		"a negative starting deadline of a schedule": {func() error {
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
+				StartingDeadlineSeconds: ptr.To(int64(-1))}).Validate()
+		}, false},
+		// The "-YYYYMMDDHHMMSS" suffix of a scheduled run must still fit the name.
 		"a prefix too long for the timestamp": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
 				BackupNamePrefix: longPrefix}).Validate()
 		}, false},
 		"the longest prefix": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
 				BackupNamePrefix: strings.Repeat("a", BackupNamePrefixMaxLength)}).Validate()
 		}, true},
 		"a dotted prefix": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
 				BackupNamePrefix: "nightly.eu"}).Validate()
 		}, true},
 		"a prefix that is a command": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
 				BackupNamePrefix: "x$(touch F)"}).Validate()
 		}, false},
 		"a prefix that reads as a flag": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
 				BackupNamePrefix: "-nightly"}).Validate()
 		}, false},
 		"options of a schedule": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
 				BackupOptions: BackupOptions{SchemaOnly: types.NewStringBool(true), ReplicaSelection: ReplicaSelectionAllReplicas,
 					Tables: "db.*", Partitions: []string{"202610"}, ActiveDeadlineSeconds: ptr.To(int64(3600))}}).Validate()
 		}, true},
 		"an unknown replica selection of a schedule": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
 				BackupOptions: BackupOptions{ReplicaSelection: "Some"}}).Validate()
 		}, false},
 		"a table pattern of a schedule that reads as a flag": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
 				BackupOptions: BackupOptions{Tables: "-db.*"}}).Validate()
 		}, false},
 		"a partition of a schedule with a space": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
 				BackupOptions: BackupOptions{Partitions: []string{"2026 10"}}}).Validate()
 		}, false},
 		// The operator learns how a run went from its Job, which must outlive the run.
 		"no successful Job kept": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
 				SuccessfulJobsHistoryLimit: ptr.To(int32(0))}).Validate()
 		}, false},
 		"no failed Job kept": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
 				FailedJobsHistoryLimit: ptr.To(int32(0))}).Validate()
 		}, false},
 		"one Job of each kept": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
 				SuccessfulJobsHistoryLimit: ptr.To(int32(1)), FailedJobsHistoryLimit: ptr.To(int32(1))}).Validate()
 		}, true},
-		"a negative retention": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *",
-				Retention: BackupRetention{KeepLast: ptr.To(int32(-1))}}).Validate()
+		"a concurrency policy": {func() error {
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, ConcurrencyPolicy: "Forbid"}).Validate()
+		}, true},
+		"an unknown concurrency policy": {func() error {
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, ConcurrencyPolicy: "Sometimes"}).Validate()
 		}, false},
 		"a restore": {func() error {
 			return (&ClickHouseRestoreSpec{ClickHouseInstallation: "chi", BackupName: "daily-20261004-020000"}).Validate()
@@ -260,7 +273,7 @@ func TestActiveDeadlineSeconds(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			options := BackupOptions{ActiveDeadlineSeconds: tc.deadline}
 			backup := &ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: options}
-			schedule := &ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedule: "0 2 * * *", BackupOptions: options}
+			schedule := &ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: []BackupScheduleEntry{{Period: BackupPeriodHour, Keep: 1}}, BackupOptions: options}
 			restore := &ClickHouseRestoreSpec{ClickHouseInstallation: "chi", BackupName: "daily-20261004-020000",
 				ActiveDeadlineSeconds: tc.deadline}
 
@@ -280,4 +293,57 @@ func TestActiveDeadlineSeconds(t *testing.T) {
 	}
 	require.Equal(t, defaultBackupActiveDeadlineSeconds, (*BackupOptions)(nil).GetActiveDeadlineSeconds())
 	require.Equal(t, defaultBackupActiveDeadlineSeconds, (*ClickHouseRestoreSpec)(nil).GetActiveDeadlineSeconds())
+}
+
+// The filters of a restore, as the Altinity Cloud Manager has them, become single tokens of clickhouse-backup commands:
+// partition ids, a table pattern, table engines, and a mapping of databases, each strictly bounded.
+func TestValidateRestoreFilters(t *testing.T) {
+	restore := func(set func(*ClickHouseRestoreSpec)) error {
+		spec := &ClickHouseRestoreSpec{ClickHouseInstallation: "chi", BackupName: "daily-20261004-020000"}
+		set(spec)
+		return spec.Validate()
+	}
+	for name, tc := range map[string]struct {
+		set   func(*ClickHouseRestoreSpec)
+		valid bool
+	}{
+		"partitions":               {func(s *ClickHouseRestoreSpec) { s.Partitions = []string{"202601", "all"} }, true},
+		"a partition with a quote": {func(s *ClickHouseRestoreSpec) { s.Partitions = []string{"'a'"} }, false},
+		"an empty partition":       {func(s *ClickHouseRestoreSpec) { s.Partitions = []string{""} }, false},
+		"partitions of the schema alone": {func(s *ClickHouseRestoreSpec) {
+			s.Partitions, s.SchemaOnly = []string{"202601"}, types.NewStringBool(true)
+		}, false},
+		"partitions with access entities": {func(s *ClickHouseRestoreSpec) {
+			s.Partitions, s.RBAC = []string{"202601"}, types.NewStringBool(true)
+		}, false},
+		"partitions over existing tables": {func(s *ClickHouseRestoreSpec) {
+			s.Partitions, s.Overwrite = []string{"202601"}, types.NewStringBool(true)
+		}, true},
+		"tables left out":                {func(s *ClickHouseRestoreSpec) { s.SkipTables = "db.tmp*,logs.*" }, true},
+		"tables left out reading a flag": {func(s *ClickHouseRestoreSpec) { s.SkipTables = "--rbac" }, false},
+		"engines left out":               {func(s *ClickHouseRestoreSpec) { s.SkipTableEngines = []string{"Kafka", "RabbitMQ"} }, true},
+		"an engine with a blank":         {func(s *ClickHouseRestoreSpec) { s.SkipTableEngines = []string{"Kafka x"} }, false},
+		"an engine with a comma":         {func(s *ClickHouseRestoreSpec) { s.SkipTableEngines = []string{"Kafka,Null"} }, false},
+		"a database mapping": {func(s *ClickHouseRestoreSpec) {
+			s.DatabaseMapping = map[string]string{"db1": "db1_restored", "db2": "db-2"}
+		}, true},
+		"a mapping to itself":         {func(s *ClickHouseRestoreSpec) { s.DatabaseMapping = map[string]string{"db1": "db1"} }, false},
+		"a mapping of two to one":     {func(s *ClickHouseRestoreSpec) { s.DatabaseMapping = map[string]string{"a": "c", "b": "c"} }, false},
+		"a chain of mappings":         {func(s *ClickHouseRestoreSpec) { s.DatabaseMapping = map[string]string{"a": "b", "b": "c"} }, false},
+		"a mapping with a colon":      {func(s *ClickHouseRestoreSpec) { s.DatabaseMapping = map[string]string{"a:b": "c"} }, false},
+		"a mapping with a comma":      {func(s *ClickHouseRestoreSpec) { s.DatabaseMapping = map[string]string{"a": "b,c:d"} }, false},
+		"a mapping into system":       {func(s *ClickHouseRestoreSpec) { s.DatabaseMapping = map[string]string{"a": "system"} }, false},
+		"a mapping of the system one": {func(s *ClickHouseRestoreSpec) { s.DatabaseMapping = map[string]string{"INFORMATION_SCHEMA": "a"} }, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := restore(tc.set)
+			if tc.valid {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorIs(t, err, ErrInvalidBackupSpec)
+		})
+	}
+	require.Equal(t, "a:b,c:d", (&ClickHouseRestoreSpec{DatabaseMapping: map[string]string{"c": "d", "a": "b"}}).GetDatabaseMapping())
+	require.Equal(t, "", (*ClickHouseRestoreSpec)(nil).GetDatabaseMapping())
 }

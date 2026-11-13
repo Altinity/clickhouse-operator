@@ -315,7 +315,7 @@ func TestInvalidScheduleReportsTheSeriesOfItsClusters(t *testing.T) {
 	series := captureLastSuccesses(t)
 	succeeded := meta.NewTime(time.Unix(1700000000, 0))
 	chbs := newScheduleCR("s1")
-	chbs.Spec.Schedule = ""
+	chbs.Spec.Schedules = nil
 	chbs.Status.Clusters = []api.ScheduleClusterStatus{{Name: "main", CronJobName: "s1-main-backup", LastSuccessfulTime: &succeeded}}
 	f := newScheduleFixture(t, newFakeCR(readyInstallation(t)), nil, chbs)
 

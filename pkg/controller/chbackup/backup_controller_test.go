@@ -127,7 +127,7 @@ func TestBackupRefusesTargetsWithoutBackup(t *testing.T) {
 
 			require.Equal(t, ctrl.Result{}, f.reconcile("b1"))
 			got := f.backup("b1")
-			require.Equal(t, api.OperationPhaseFailed, got.Status.Phase)
+			require.Equal(t, api.OperationPhaseAborted, got.Status.Phase)
 			require.Equal(t, tc.reason, condition(t, got.Status.Conditions, api.BackupConditionValidated).Reason)
 			require.Equal(t, tc.reason, condition(t, got.Status.Conditions, api.BackupConditionReady).Reason)
 			require.Empty(t, got.Status.Clusters)
@@ -307,6 +307,23 @@ func TestBackupReportsABackupWithoutData(t *testing.T) {
 	})
 }
 
+// A preferred replica that did not answer left the backup of its shard to another replica, which the Job tells in its
+// termination message: the status records the hosts the backup was made on in place of those the Job names.
+func TestBackupRecordsTheReplicasItFellBackTo(t *testing.T) {
+	f := newBackupFixture(t, newFakeCR(readyInstallation(t)), nil, newBackupCR("b1"))
+	f.reconcile("b1")
+	named := f.backup("b1").Status.Clusters[0].Hosts
+	require.NotEmpty(t, named)
+	used := append([]string{"fallback-replica"}, named[1:]...)
+	succeedPodOfJob(t, f.client, "b1-main-backup", model.HostsUsedMessage+" "+strings.Join(used, " ")+"\n")
+	finishJob(t, f.client, "b1-main-backup", batch.JobComplete, "")
+
+	f.reconcile("b1")
+	got := f.backup("b1")
+	require.Equal(t, api.BackupReasonCompleted, condition(t, got.Status.Conditions, api.BackupConditionReady).Reason)
+	require.Equal(t, used, got.Status.Clusters[0].Hosts)
+}
+
 func TestBackupFailureReasons(t *testing.T) {
 	for jobReason, expected := range map[string]string{
 		batch.JobReasonDeadlineExceeded:     api.BackupReasonDeadlineExceeded,
@@ -319,7 +336,7 @@ func TestBackupFailureReasons(t *testing.T) {
 
 			f.reconcile("b1")
 			got := f.backup("b1")
-			require.Equal(t, api.OperationPhaseFailed, got.Status.Phase)
+			require.Equal(t, failurePhase(expected), got.Status.Phase, "a Job that fails by itself fails the backup, one the operator stops aborts it")
 			ready := condition(t, got.Status.Conditions, api.BackupConditionReady)
 			require.Equal(t, meta.ConditionFalse, ready.Status)
 			require.Equal(t, expected, ready.Reason)
@@ -338,7 +355,7 @@ func TestBackupFailsAJobThatNeverStarts(t *testing.T) {
 
 	require.Equal(t, ctrl.Result{}, f.reconcile("b1"))
 	got := f.backup("b1")
-	require.Equal(t, api.OperationPhaseFailed, got.Status.Phase)
+	require.Equal(t, api.OperationPhaseAborted, got.Status.Phase)
 	ready := condition(t, got.Status.Conditions, api.BackupConditionReady)
 	require.Equal(t, api.BackupReasonJobNotStarted, ready.Reason)
 	require.Contains(t, ready.Message, "no pod of Job b1-main-backup started within")
@@ -393,7 +410,7 @@ func TestBackupAsksThePodsWhereReadyIsNotReported(t *testing.T) {
 				requireRunning(t, f.client, "b1-main-backup")
 				return
 			}
-			require.Equal(t, api.OperationPhaseFailed, f.backup("b1").Status.Phase, "a pending pod is not a started one")
+			require.Equal(t, api.OperationPhaseAborted, f.backup("b1").Status.Phase, "a pending pod is not a started one")
 			requireStopped(t, f.client, "b1-main-backup")
 		})
 	}
@@ -467,7 +484,7 @@ func TestBackupAsksThePodsBeforeStoppingAJob(t *testing.T) {
 				requireRunning(t, f.client, "b1-main-backup")
 				return
 			}
-			require.Equal(t, api.OperationPhaseFailed, f.backup("b1").Status.Phase, "pods of other Jobs tell nothing")
+			require.Equal(t, api.OperationPhaseAborted, f.backup("b1").Status.Phase, "pods of other Jobs tell nothing")
 			requireStopped(t, f.client, "b1-main-backup")
 		})
 	}
@@ -540,7 +557,7 @@ func TestBackupReportsALostJob(t *testing.T) {
 
 	f.reconcile("b1")
 	got := f.backup("b1")
-	require.Equal(t, api.OperationPhaseFailed, got.Status.Phase)
+	require.Equal(t, api.OperationPhaseAborted, got.Status.Phase)
 	require.Equal(t, api.BackupReasonJobLost, condition(t, got.Status.Conditions, api.BackupConditionReady).Reason)
 	require.Zero(t, jobCount(t, f.client), "a lost backup must not be run again")
 }
@@ -748,7 +765,7 @@ func TestBackupRecordsTheBackupItsJobMakes(t *testing.T) {
 	original.Spec.BackupName = "made"
 	topology, err := model.NewTopology(readyInstallation(t).GetAncestorT(), "")
 	require.NoError(t, err)
-	job := model.BuildBackupJob(original, readyInstallation(t), topology)
+	job := model.BuildBackupJob(original, readyInstallation(t), topology, testOrchestrator())
 	require.NoError(t, ctrl.SetControllerReference(original, job, newScheme(t)))
 	edited := original.DeepCopy()
 	edited.Spec.BackupName = "edited-later"
@@ -956,7 +973,7 @@ func TestBackupPinsItsClustersAndName(t *testing.T) {
 		cr.set(installation(t, api.StatusCompleted, backupCluster("hot", 2, true)))
 		f.reconcile("b1")
 		got := f.backup("b1")
-		require.Equal(t, api.OperationPhaseFailed, got.Status.Clusters[1].Phase)
+		require.Equal(t, api.OperationPhaseAborted, got.Status.Clusters[1].Phase)
 		require.Equal(t, api.BackupReasonClusterNotFound, got.Status.Clusters[1].Reason)
 		require.Empty(t, got.Status.Clusters[1].JobName)
 		require.Equal(t, api.OperationPhaseRunning, got.Status.Phase, "the other cluster goes on")
@@ -1010,4 +1027,53 @@ func TestBackupVerifiesEveryCluster(t *testing.T) {
 		require.Equal(t, api.OperationPhaseCompleted, got.Status.Phase, "a cluster that can never be verified concludes the verification")
 		require.Equal(t, api.BackupReasonClusterNotFound, condition(t, got.Status.Conditions, api.BackupConditionVerified).Reason)
 	})
+}
+
+// A backup of a cluster with a naming template is named as the template names the backup of its first shard, which
+// the Job names the backup of every other shard after: by the time it is due, or the time its backupName gives, which
+// is all its backupName may be. One backup of several clusters needs one template that names their backups alike.
+func TestBackupOfANamingTemplate(t *testing.T) {
+	acm := func(cluster *api.Cluster) *api.Cluster {
+		cluster.Backup.Naming = types.NewString(api.BackupNamingACM)
+		return cluster
+	}
+	f := newBackupFixture(t, newFakeCR(installation(t, api.StatusCompleted, acm(backupCluster("main", 2, true)))), nil, newBackupCR("b1"))
+	f.reconcile("b1")
+	got := f.backup("b1")
+	require.Regexp(t, `^shard1-[0-9]{8}T[0-9]{6}$`, got.Status.BackupName)
+	require.Equal(t, got.Status.BackupName, jobEnv(t, f.client, "b1-main-backup", "BACKUP_NAME"))
+	require.Equal(t, api.BackupNamingACM, jobEnv(t, f.client, "b1-main-backup", "BACKUP_NAMING"))
+
+	named := newBackupCR("b2")
+	named.Spec.BackupName = "20261113020000"
+	f = newBackupFixture(t, newFakeCR(installation(t, api.StatusCompleted, acm(backupCluster("main", 2, true)))), nil, named)
+	f.reconcile("b2")
+	require.Equal(t, "shard1-20261113020000", f.backup("b2").Status.BackupName)
+
+	for name, tc := range map[string]struct {
+		chi    *api.ClickHouseInstallation
+		backup string
+		reason string
+	}{
+		"a backupName that is no time": {
+			chi: installation(t, api.StatusCompleted, acm(backupCluster("main", 2, true))), backup: "nightly",
+			reason: `backupName "nightly" is no time a backup is named after`,
+		},
+		"clusters of different namings": {
+			chi:    installation(t, api.StatusCompleted, acm(backupCluster("hot", 2, true)), backupCluster("cold", 1, true)),
+			reason: "name their backups by naming templates that differ between them",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			chb := newBackupCR("b3")
+			chb.Spec.BackupName = tc.backup
+			f := newBackupFixture(t, newFakeCR(tc.chi), nil, chb)
+			f.reconcile("b3")
+			got := f.backup("b3")
+			validated := condition(t, got.Status.Conditions, api.BackupConditionValidated)
+			require.Equal(t, api.BackupReasonInvalidSpec, validated.Reason)
+			require.Contains(t, validated.Message, tc.reason)
+			require.Empty(t, got.Status.Clusters, "no Job runs")
+		})
+	}
 }

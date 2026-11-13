@@ -32,6 +32,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	chopFake "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/fake"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/backupconfig"
@@ -98,29 +99,29 @@ func TestReconcileBackupConfigSecretFollowsTheStorageSecret(t *testing.T) {
 	fake := &backupSecretFakeSecret{secrets: map[string]*core.Secret{
 		testStorageSecret: storageSecretWith("s3:\n  bucket: first\n"),
 	}}
-	reconcile := func() {
+	reconcile := func() error {
 		t.Helper()
 		w := newBackupSecretWorker(fake, cr)
 		w.a = a.NewAnnouncer(&recordingEventEmitter{}, nil)
-		require.NoError(t, w.reconcileCRAuxObjectsPreliminaryDomain(context.Background(), cr))
+		return w.reconcileCRAuxObjectsPreliminaryDomain(context.Background(), cr)
 	}
 
-	reconcile()
+	require.NoError(t, reconcile())
 	require.Equal(t, "first", configFile(t, fake.secrets[configSecretName])["s3"]["bucket"])
 	updates := fake.updates
 
-	reconcile()
+	require.NoError(t, reconcile())
 	require.Equal(t, updates, fake.updates, "an unchanged storage Secret leaves the configuration file alone")
 
 	fake.secrets[testStorageSecret] = storageSecretWith("s3:\n  bucket: second\n")
 	fake.secrets[configSecretName].Labels = map[string]string{"kept": "yes"}
-	reconcile()
+	require.NoError(t, reconcile())
 	require.Equal(t, updates+1, fake.updates)
 	require.Equal(t, "second", configFile(t, fake.secrets[configSecretName])["s3"]["bucket"])
 	require.Equal(t, "yes", fake.secrets[configSecretName].Labels["kept"], "the metadata of the Secret stays as it is")
 
 	fake.secrets[testStorageSecret] = storageSecretWith("s3: [")
-	reconcile()
+	require.ErrorIs(t, reconcile(), common.ErrCRUDAbort, "storage settings that cannot be read abort the reconcile")
 	require.Equal(t, updates+1, fake.updates, "storage settings that cannot be read change nothing")
 	require.Equal(t, "second", configFile(t, fake.secrets[configSecretName])["s3"]["bucket"])
 }
@@ -462,7 +463,8 @@ func TestReconcileBackupConfigKeptStorageDropsRemovedCredentials(t *testing.T) {
 	delete(backupSecret.Data, config.ClickHouseBackupSecretKeyClickHousePassword)
 
 	cr := newBackupSecretCR(t, enabledBackup())
-	require.NoError(t, newBackupSecretWorker(fake, cr).reconcileCRAuxObjectsPreliminaryDomain(context.Background(), cr))
+	err := newBackupSecretWorker(fake, cr).reconcileCRAuxObjectsPreliminaryDomain(context.Background(), cr)
+	require.ErrorIs(t, err, common.ErrCRUDAbort, "a storage Secret gone aborts the reconcile")
 	file := configFile(t, fake.secrets[configSecretName])
 	require.Equal(t, "first", file["s3"]["bucket"], "the storage settings are kept")
 	require.Nil(t, file["clickhouse"], "the credentials removed are not")

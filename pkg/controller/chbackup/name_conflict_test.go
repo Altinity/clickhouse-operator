@@ -76,7 +76,7 @@ func TestBackupFailsOnAClusterWhoseJobNameAnotherBackupHolds(t *testing.T) {
 	f.reconcile("a")
 	got := f.backup("a")
 	conflict := clusterStatus(t, got.Status.Clusters, "b-c")
-	require.Equal(t, api.OperationPhaseFailed, conflict.Phase)
+	require.Equal(t, api.OperationPhaseAborted, conflict.Phase)
 	require.Equal(t, api.BackupReasonNameConflict, conflict.Reason)
 	require.Contains(t, conflict.Message, "ClickHouseBackup a-b on cluster c")
 	require.Empty(t, conflict.JobName, "the Job is the other backup's")
@@ -135,7 +135,7 @@ func TestRestoreOfEveryClusterEndsAndReleasesItsHoldOnAJobNameConflict(t *testin
 	reconcileRestore(t, controller, "a")
 	got := getRestore(t, c, "a")
 	conflict := clusterStatus(t, got.Status.Clusters, "b-c")
-	require.Equal(t, api.OperationPhaseFailed, conflict.Phase)
+	require.Equal(t, api.OperationPhaseAborted, conflict.Phase)
 	require.Equal(t, api.BackupReasonNameConflict, conflict.Reason)
 	require.Contains(t, conflict.Message, "ClickHouseRestore a-b on cluster c")
 	require.False(t, mayHaveChanged(conflict), "a Job of another restore changed nothing for this one")
@@ -319,7 +319,7 @@ func TestBackupTellsAJobThatGoesAwayFromOneThatStays(t *testing.T) {
 				require.Zero(t, eventCount(t, f.client, api.BackupReasonNameConflict))
 				return
 			}
-			require.Equal(t, api.OperationPhaseFailed, got.Phase)
+			require.Equal(t, api.OperationPhaseAborted, got.Phase)
 			require.Contains(t, got.Message, tc.message)
 		})
 	}
@@ -372,7 +372,7 @@ func TestBackupTellsAJobOfAControllerItCannotRead(t *testing.T) {
 			}
 			require.NoError(t, err)
 			got := clusterStatus(t, f.backup("a").Status.Clusters, "b-c")
-			require.Equal(t, api.OperationPhaseFailed, got.Phase)
+			require.Equal(t, api.OperationPhaseAborted, got.Phase)
 			require.Equal(t, tc.reason, got.Reason, got.Message)
 		})
 	}
@@ -458,7 +458,7 @@ func TestScheduleLabelsAgainACronJobWhoseLabelsWereEdited(t *testing.T) {
 			require.Equal(t, api.BackupReasonScheduled, readyReason(t, f.schedule("s1")))
 
 			chbs := f.schedule("s1")
-			chbs.Spec.Schedule = "0 4 * * *"
+			chbs.Spec.Schedules = []api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Time: "04:00", Keep: 1}}
 			require.NoError(t, f.client.Update(context.Background(), chbs))
 			f.reconcile("s1")
 			cronJob = f.cronJob("s1-hot-backup")
@@ -524,7 +524,7 @@ func TestScheduleTellsTheClusterOfACronJobWhoseClusterLabelChanged(t *testing.T)
 
 			if tc.invalid {
 				chbs := f.schedule("s1")
-				chbs.Spec.Schedule = ""
+				chbs.Spec.Schedules = nil
 				require.NoError(t, f.client.Update(context.Background(), chbs))
 				f.reconcile("s1")
 				require.True(t, ptr.Deref(f.cronJob("s1-hot-backup").Spec.Suspend, false))

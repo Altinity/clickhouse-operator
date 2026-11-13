@@ -669,6 +669,9 @@
                         "001-templates.json.example": {
                             "type": ["string", "null"]
                         },
+                        "backup-orchestrator.sh": {
+                            "type": ["string", "null"]
+                        },
                         "default-pod-template.yaml.example": {
                             "type": ["string", "null"]
                         },

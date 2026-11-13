@@ -13,7 +13,7 @@
 # of its current context, "default" unless the context names another. Apply them all to one
 # namespace, together with the ClickHouseKeeperInstallation: every reference these examples make
 # names a resource in the namespace of the one making it. The names of the schedule's backups the
-# examples quote, such as default-backup-demo-nightly-20261003-020000, start with "default", as the
+# examples quote, such as default-backup-demo-nightly-20261003023000, start with "default", as the
 # default spec.backupNamePrefix of a schedule starts with its namespace.
 ---
 apiVersion: v1
@@ -61,6 +61,9 @@ spec:
     # The clickhouse-backup configuration of the sidecar, kept in the Secret above
     configSecretRef:
       name: backup-demo-storage
+    # How the operator reaches clickhouse-backup: sidecar, the default, runs it in every ClickHouse Pod; pod runs no
+    # sidecar and starts one backup Pod per shard, on the volumes of a replica, only while a backup or restore runs.
+    # mode: sidecar # or pod
   defaults:
     templates:
       dataVolumeClaimTemplate: data-volume-template

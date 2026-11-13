@@ -27,6 +27,12 @@ function render_file() {
     local src="${1}"
     local dst="${2}"
 
+    if [[ "${dst: -3}" == ".sh" ]] || [[ "${dst: -3}" == ".py" ]]; then
+        # Script: copied verbatim, as a header would come before its shebang and envsubst would expand its variables
+        cat "${src}" > "${dst}"
+        return
+    fi
+
     # Render file header
     if [[ "${dst: -4}" == ".xml" ]]; then
         # XML file

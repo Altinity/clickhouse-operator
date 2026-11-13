@@ -26,6 +26,8 @@ const (
 
 	// TemplatesDirClickHouse specifies folder's name where ClickHouseInstallationTemplates are located
 	TemplatesDirClickHouse = "templates.d"
+	// BackupDir specifies the folder, in the folder of the operator configuration, of the backup orchestrator script
+	BackupDir = "backup"
 )
 
 const (

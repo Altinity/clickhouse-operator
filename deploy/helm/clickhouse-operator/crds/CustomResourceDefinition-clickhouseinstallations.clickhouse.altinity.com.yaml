@@ -1221,19 +1221,29 @@ spec:
                             description: |
                               EXPERIMENTAL. Operator-managed backup for this cluster, overriding `chi.spec.backup`.
                               Fields left empty are inherited from `chi.spec.backup`; set `enabled: "no"` to opt this cluster out.
-                              When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
-                              so turning it on or off rolls the cluster's Pods. Customize the sidecar through a container named
-                              clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the cluster
-                              has a `configSecretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
-                              so backup stays off and the operator warns.
+                              When enabled in mode sidecar, the operator injects a clickhouse-backup sidecar into every Pod of the
+                              cluster, so turning it on or off rolls the cluster's Pods. Customize the container through a container
+                              named clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the
+                              cluster has a `configSecretRef`: without it clickhouse-backup would have no storage and no API
+                              credentials, so backup stays off and the operator warns.
                               See docs/backup.md for details.
                             properties:
                               enabled:
                                 <<: *TypeStringBool
                                 description: |
                                   Enable operator-managed backup: inject the clickhouse-backup sidecar and allow backup/restore resources to target
-                                  the cluster. Takes effect only with `configSecretRef` or `podTemplate` set, which name where the sidecar takes
-                                  its storage from: without either, backup stays off
+                                  the cluster. Takes effect only with `configSecretRef` set, which names where clickhouse-backup takes its
+                                  storage and API credentials from: without it, backup stays off
+                              mode:
+                                type: string
+                                description: |
+                                  How the operator reaches clickhouse-backup on the hosts of the cluster. sidecar (default) injects it into
+                                  every ClickHouse Pod. pod injects nothing: while a backup or a restore of the cluster runs, the operator
+                                  runs one backup Pod per shard on the node of a ready replica, mounting that replica's volumes
+                                enum:
+                                  - ""
+                                  - sidecar
+                                  - pod
                               podTemplate:
                                 type: string
                                 description: |
@@ -1247,14 +1257,46 @@ spec:
                                   of the sidecar, a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket, s3.path,
                                   s3.access_key, s3.secret_key. The operator generates the configuration file of the sidecar from it,
                                   which follows a change of the Secret without a restart. A cluster that leaves it out takes the
-                                  installation's; an explicit `name: ""` on a cluster leaves the cluster without one. Without one, the
-                                  storage is configured by the container of the Pod template `podTemplate` names
+                                  installation's; an explicit `name: ""` on a cluster leaves the cluster without one. Required: without
+                                  one, backup stays off. The configuration must set api.username and api.password of the REST API
                                 properties:
                                   name:
                                     description: |
                                       Name of the referent. More info:
                                       https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                     type: string
+                              preferredReplica:
+                                type: integer
+                                minimum: 0
+                                description: |
+                                  Index, from 0, of the replica of each shard a backup works on, as the backupReplica of the Altinity Cloud Manager.
+                                  With mode pod the backup Pod of the shard works next to it: it mounts the volumes of that replica's Pod and runs
+                                  on the same node, by a nodeSelector on the node's hostname; a shard with fewer replicas, or whose preferred replica
+                                  is not ready, falls back to its next ready replica. With mode sidecar a backup of one replica per shard
+                                  (FirstPerShard) runs on the sidecar of that replica, or on that of the first replica when the shard has fewer
+                                  replicas or the preferred one does not answer when the Job starts. Empty means 0, the first replica
+                              orchestrator:
+                                type: string
+                                enum:
+                                  - ""
+                                  - bash
+                                  - python
+                                description: |
+                                  What the backup, verify and restore Jobs of the cluster run: bash (default), the bash orchestrator script in
+                                  the clickhouse-backup image, or python, its twin in Python in the python:3.14-slim image. An
+                                  orchestratorConfigMapRef has to hold the script of the one the cluster takes, backup-orchestrator.sh or
+                                  backup-orchestrator.py. See docs/backup.md
+                              naming:
+                                type: string
+                                maxLength: 128
+                                pattern: '^([A-Za-z0-9._-]|\{[A-Za-z]+\})+$'
+                                description: |
+                                  Template the backups of the cluster are named by, one name for the backup of each shard, e.g.
+                                  "shard{shard}-{YYYYMMDDHHIISS}" as the Altinity Cloud Manager names them. Placeholders: {shard}, the number
+                                  of the shard from 1, required; {cluster}, {chi}, {namespace}; {prefix}, the backupNamePrefix of the schedule;
+                                  the time by the tokens YYYY, MM, DD, HH, II (minutes) and SS, all required, in braces, e.g. {YYYYMMDDHHIISS}.
+                                  A backup made at once has a T before the hour. Empty, the default, names a backup "<prefix>-<YYYYMMDDHHMMSS>"
+                                  alike on every shard. See docs/backup.md
                               recovery:
                                 type: object
                                 description: |
@@ -1282,6 +1324,18 @@ spec:
                                       backup from the storage paths the {namespace} macro gives there. Empty, the namespace of this installation
                                     maxLength: 63
                                     pattern: "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
+                                  orchestratorConfigMapRef:
+                                    type: object
+                                    description: |
+                                      ConfigMap in the installation's namespace whose key `backup-orchestrator.sh` (`backup-orchestrator.py` for a cluster whose backup.orchestrator is python) the ClickHouseRestore of
+                                      the recovery runs instead of the operator's orchestrator script: it is copied into that restore. An explicit
+                                      `name: ""` on a cluster resets it to the operator's script
+                                    properties:
+                                      name:
+                                        description: |
+                                          Name of the referent. More info:
+                                          https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                        type: string
                           pdbManaged:
                             <<: *TypeStringBool
                             description: |
@@ -1879,10 +1933,10 @@ spec:
                   description: |
                     EXPERIMENTAL. Operator-managed backup defaults, applied to every cluster. Each cluster can override
                     them via `chi.spec.configuration.clusters[].backup`, e.g. `enabled: "no"` to opt a cluster out.
-                    When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
-                    so turning it on or off rolls the cluster's Pods. Backup takes effect only where a cluster has a
-                    `configSecretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
-                    so backup stays off and the operator warns.
+                    When enabled in mode sidecar, the operator injects a clickhouse-backup sidecar into every Pod of the
+                    cluster, so turning it on or off rolls the cluster's Pods. Backup takes effect only where a cluster has
+                    a `configSecretRef`: without it clickhouse-backup would have no storage and no API credentials, so
+                    backup stays off and the operator warns.
                     See docs/backup.md for details.
                 useTemplates:
                   type: array

@@ -94,10 +94,17 @@ cluster: the schedule names the last one in `status.lastBackupName`, see
 [ClickHouseBackupSchedule](#clickhousebackupschedule) for when it lags behind.
 
 **No consistency across shards or clusters.** A backup is not a snapshot of the CHI.
-`clickhouse-backup` freezes one table after another on each host, a Job backs up the hosts of its
-cluster one after another, and the Jobs of different clusters run independently of each other.
-Data written in the meantime is in the copies of some shards and not in those of others, and the
-later a host comes, the newer its copy. The shared name ties the copies together for naming,
+`clickhouse-backup` freezes one table after another on each host, a Job starts the backup on every
+host of its cluster at once - as the Altinity Cloud Manager has every shard make its own - and the
+hosts finish when their data is uploaded, and the Jobs of different clusters run independently of
+each other. Data written in the meantime is in the copies of some shards and not in those of others.
+A host whose backup fails leaves the others to finish theirs, which the Job waits for before it
+fails with the error of every host that failed; once the Job cannot submit the backup to a host, it
+submits it to no further host. `clickhouse-backup` deletes the local backup of a `create_remote`
+whose create fails, but not when its upload fails: the local backup stays, and so does the part of
+the remote backup it uploaded, listed as `broken`. The Job resumes no upload, so on every host the
+backup failed on it deletes both, as well as it can (`OrchestratorFailedBackupDeleted`, or
+`OrchestratorFailedBackupLeft` with a warning), before it fails. The shared name ties the copies together for naming,
 retention and restore, and promises nothing more. Where shards or clusters must match - a batch of
 inserts spread over several shards, tables in two clusters fed by one pipeline - stop writing to
 them for the time of the backup.
@@ -166,10 +173,14 @@ spec:
 
 | Field                    | Meaning                                                                                                                                                                                                                                                    |
 |--------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `enabled`                | `"yes"` turns operator-managed backup on. Accepts the usual yes/no forms (`"yes"`, `"no"`, `true`, `false`, ...). Off by default. Takes effect only with `configSecretRef`, or with `podTemplate`, see below.                                                  |
-| `podTemplate`            | Pod template whose `clickhouse-backup` container the sidecar is built on, see [Customizing the sidecar](#customizing-the-sidecar). `""` on a cluster: the operator's own.                                                                                  |
-| `configSecretRef`        | Secret in the CHI namespace whose key `config.yml` holds the `clickhouse-backup` configuration of the sidecar, see [Backup storage](#backup-storage). `name: ""` on a cluster: none.                                                                       |
-| `recovery`               | `backupName`: the backup a new CHI starts from, see [Recover a new CHI from a backup](#recover-a-new-chi-from-a-backup). `""` on a cluster: nothing to recover there. `sourceInstallation`, `sourceNamespace`: the CHI that made the backup, when another; `""` on a cluster: this CHI. |
+| `enabled`                | `"yes"` turns operator-managed backup on. Accepts the usual yes/no forms (`"yes"`, `"no"`, `true`, `false`, ...). Off by default. Requires `configSecretRef`, see below.                                                                                        |
+| `podTemplate`            | Pod template whose `clickhouse-backup` container the sidecar, and the backup Pods of the `pod` mode, are built on, see [Customizing the sidecar](#customizing-the-sidecar). It customizes the container only: it names no storage. `""` on a cluster: the operator's own. |
+| `configSecretRef`        | Secret in the CHI namespace whose key `config.yml` holds the `clickhouse-backup` configuration of the sidecar, see [Backup storage](#backup-storage). Required where backup is enabled. `name: ""` on a cluster: none.                                     |
+| `mode`                   | How the operator reaches `clickhouse-backup` on the hosts of the cluster: `sidecar` (default), a sidecar in every ClickHouse Pod; `pod`, no sidecar, a backup Pod per shard only while a backup or restore of the cluster runs, see [Backup modes](#backup-modes). |
+| `preferredReplica`       | Index, from 0, of the replica of each shard a backup works on, as the `backupReplica` of ACM; empty is 0, the first replica. With `mode: sidecar` a `FirstPerShard` backup runs on that replica's sidecar, or on the first replica's when the shard has fewer replicas or the preferred one's ClickHouse does not answer when the Job starts (`OrchestratorReplicaFallback` event); with `mode: pod` the backup Pod of the shard runs next to it, see [Which hosts are involved](#which-hosts-are-involved). |
+| `orchestrator`           | What the backup, verify and restore Jobs of the cluster run: `bash` (default), the bash orchestrator script in the `clickhouse-backup` image, or `python`, its twin in Python in `python:3.14-slim`, see [Python orchestrator](#python-orchestrator). |
+| `naming`                 | Template the backups of the cluster are named by, one name per shard, e.g. `shard{shard}-{YYYYMMDDHHIISS}` as ACM names them; empty, the default, names a backup `<prefix>-YYYYMMDDHHMMSS` alike on every shard. See [Backup naming](#backup-naming). |
+| `recovery`               | `backupName`: the backup a new CHI starts from, see [Recover a new CHI from a backup](#recover-a-new-chi-from-a-backup). `""` on a cluster: nothing to recover there. `sourceInstallation`, `sourceNamespace`: the CHI that made the backup, when another; `""` on a cluster: this CHI. `orchestratorConfigMapRef`: the ConfigMap of the [orchestrator script](#the-orchestrator-script) the recovery restore runs, copied into it; `name: ""` on a cluster: the operator's. |
 
 Inheritance follows `spec.security`: a cluster inherits every field it leaves empty from
 `spec.backup`, so a cluster-level value always wins, `configSecretRef` included: a cluster may keep
@@ -186,23 +197,17 @@ Give every backup-enabled cluster a persistent data volume, normally a `dataVolu
 as in [`01-chi-with-backup.yaml`](chb-examples/01-chi-with-backup.yaml); see
 [Data volume](#data-volume) for why.
 
-**Backup needs a storage.** It takes effect only where the cluster has a `configSecretRef`, or
-where `podTemplate` is set, on the cluster or inherited from `spec.backup`. Without
-either, the sidecar would run the bundled image on the operator's settings alone, which name no
-storage, so every backup and restore would fail. Such a cluster runs as one with backup off -
-no sidecar and no port 7171, and no backup user unless another cluster of the CHI backs up with
-both ClickHouse credentials set - and the operator emits a `BackupNoStorage` warning event on the CHI on every reconcile,
-naming the clusters. A backup or restore of such a cluster is refused with `NoBackupStorage` and a
-schedule of it is held, one of every cluster leaves it out with a warning (see
-[Which hosts are involved](#which-hosts-are-involved)), and a recovery waits for it (see
-[Recover a new CHI from a backup](#recover-a-new-chi-from-a-backup)). Setting `configSecretRef`, or
-`podTemplate`, turns backup on with the next reconcile, which rolls the
-cluster's Pods once. Setting `enabled: "no"` on a cluster that inherited backup unasked settles it as
-well, and changes no Pod. The operator looks at these fields only: settings a mutating admission
-webhook injects do not count, and a configuration file a pod template mounts at
-`/etc/clickhouse-backup` gives way to the one the operator generates there. To configure the storage
-in the sidecar's container instead, name its pod template in `podTemplate`, even one whose
-`clickhouse-backup` container sets nothing.
+**Backup needs a storage, or the reconcile is aborted.** A cluster with backup enabled, on the cluster
+or inherited from `spec.backup`, needs a `configSecretRef` whose Secret exists and holds a readable
+`config.yml`, and the backup block has to validate. Otherwise the operator aborts the reconcile of the
+whole CHI before it changes anything: its status turns `Aborted` with the reason
+`BackupConfigInvalid` and a message naming the cluster and what is wrong, and a
+`BackupStorageConfigInvalid` warning event goes to the CHI. `podTemplate` does not stand in for a
+storage: it only customizes the `clickhouse-backup` container. Fix the spec or the Secret - the
+operator reconciles the CHI again once the Secret can be used - or set `enabled: "no"` on a cluster
+that inherited backup unasked, which never aborts anything. The operator looks at these fields only:
+settings a mutating admission webhook injects do not count, and a configuration file a pod template
+mounts at `/etc/clickhouse-backup` gives way to the one the operator generates there.
 
 **Enabling or disabling backup rolls that cluster's Pods only.** Adding or removing the sidecar
 changes the cluster's Pod template, so the operator performs its usual rolling update, host by host.
@@ -272,8 +277,9 @@ For every Pod of a cluster with backup enabled, the operator adds a container na
   backup: the [overwrite guard](#restore-safety) checks those names, and a mapping would make the
   restore drop and replace other tables than the ones it checked.
 * **Access entities reloaded live.** `CLICKHOUSE_RESTART_COMMAND` is set to
-  `sql:SYSTEM RELOAD USERS`, so ClickHouse picks up restored users, roles and grants without a
-  restart; the `clickhouse-backup` default, `systemctl restart clickhouse-server`, cannot work in a
+  `sql:SYSTEM RELOAD USERS; sql:SYSTEM RELOAD CONFIG`, as ACM sets it, so ClickHouse picks up
+  restored users, roles and grants, and configuration, without a restart, in the sidecar and in
+  the backup Pods of `mode: pod` alike; the `clickhouse-backup` default, `systemctl restart clickhouse-server`, cannot work in a
   sidecar. See [Access entities](#access-entities).
 * **One operation at a time.** `API_ALLOW_PARALLEL` is set to `false`, so a sidecar runs one
   backup or restore command at a time and refuses another meanwhile, which the Jobs wait out.
@@ -302,6 +308,12 @@ For every Pod of a cluster with backup enabled, the operator adds a container na
 * **Local copies removed after upload.** `BACKUPS_TO_KEEP_LOCAL` is set to `-1`, so a backup's local
   copy is deleted from the data disk once it has been uploaded. Local copies are hard links that pin
   old data parts and would otherwise grow without bound.
+* **Remote retention is the schedules' alone.** `general.backups_to_keep_remote` is forced to `0`,
+  and `general.rebase_during_delete` and `general.rebase_before_remove_old_remote` to `true`, in the
+  configuration file and as the pinned variables `BACKUPS_TO_KEEP_REMOTE`, `REBASE_DURING_DELETE` and
+  `REBASE_BEFORE_REMOVE_OLD_REMOTE`, over whatever the storage settings say: only the
+  [retention](#retention) of the schedules deletes remote backups, and deleting a backup another one is
+  incremental to rebases that one first.
 The sidecar's configuration is assembled, from lowest to highest precedence, from: the
 configuration file - the storage settings of the storage Secret, with the default paths filled in
 and the credentials above over whatever the storage settings say of `api.username`,
@@ -310,9 +322,10 @@ sidecar: the operator's own settings listed above, and the `env` of the sidecar'
 pod template. `clickhouse-backup` takes an environment variable over the setting of the file it
 stands for, and the operator sets `general.disable_environment_override` to `false` in the file, so
 that the storage settings cannot turn that off. A storage setting that collides with an operator
-setting is therefore ignored. Seven settings are pinned: the operator always sets `API_LISTEN`
+setting is therefore ignored. Ten settings are pinned: the operator always sets `API_LISTEN`
 (`0.0.0.0:7171`), `API_SECURE` (`false`), `RESTORE_SCHEMA_ON_CLUSTER`, `RESTORE_DATABASE_MAPPING`,
-`RESTORE_TABLE_MAPPING`, `API_ALLOW_PARALLEL` and `CLICKHOUSE_RESTART_COMMAND` as above, over the
+`RESTORE_TABLE_MAPPING`, `API_ALLOW_PARALLEL`, `CLICKHOUSE_RESTART_COMMAND`, `BACKUPS_TO_KEEP_REMOTE`,
+`REBASE_DURING_DELETE` and `REBASE_BEFORE_REMOVE_OLD_REMOTE` as above, over the
 container's own, and drops the container's `API_USERNAME`, `API_PASSWORD`, `CLICKHOUSE_USERNAME`,
 `CLICKHOUSE_PASSWORD` and `CLICKHOUSE_BACKUP_CONFIG`, which would override the credentials of the
 file or make `clickhouse-backup` read another file. The Jobs rely on all of them - they reach every
@@ -352,6 +365,7 @@ spec:
           containers:
             - name: clickhouse-backup
               image: altinity/clickhouse-backup:2.8.1
+              imagePullPolicy: IfNotPresent
               resources:
                 requests:
                   cpu: 100m
@@ -361,14 +375,16 @@ spec:
 A `ClickHouseInstallationTemplate` may carry both `spec.backup.podTemplate` and the pod template it
 names, to give every installation that uses it the same sidecar.
 
-* **Yours:** `image` (over the bundled default, `altinity/clickhouse-backup:2.8.1`), `env` (over the
+* **Yours:** `image` (over the default, `altinity/clickhouse-backup:stable`), `imagePullPolicy` (over the
+  default, `Always`, which takes a moved `stable` tag on the next Pod start; pin a version and use
+  `IfNotPresent` for reproducible Pods, as above), `env` (over the
   configuration file and the operator's defaults), `envFrom`, `resources`, `securityContext`,
   `volumeMounts` (of volumes the Pods have), `command`, `args`, `livenessProbe`.
   An `envFrom` of the container's own sets what no `env` entry sets, over the configuration file.
   Without a `securityContext` the sidecar copies the ClickHouse container's; without
   `resources` it has none, which makes a `Guaranteed` Pod `Burstable`, see
   [What the operator runs](#what-the-operator-runs).
-* **Pinned:** the seven settings above are set over the container's own.
+* **Pinned:** the ten settings above are set over the container's own.
 * **Dropped:** the container's `env` entries `API_USERNAME`, `API_PASSWORD`, `CLICKHOUSE_USERNAME`,
   `CLICKHOUSE_PASSWORD` and `CLICKHOUSE_BACKUP_CONFIG`, and its mounts at `/etc/clickhouse-backup`,
   below or above it - as are such mounts of the ClickHouse container, which the sidecar otherwise
@@ -461,9 +477,9 @@ take settings the operator knows nothing of.
 
 Useful `clickhouse-backup` settings to consider in the storage settings:
 
-* Leave `general.backups_to_keep_remote` unset (`0`). It prunes every backup regardless of who made
-  it; use the schedule's [`retention.keepLast`](#retention) instead, which only touches that
-  schedule's backups.
+* `general.backups_to_keep_remote` is forced to `0`, see above: it would prune every backup regardless
+  of who made it. Use the `keep` of the schedule entries, see [retention](#retention), which only
+  touches that schedule's backups.
 * Compression, per storage: `s3.compression_format` (`tar`, `zstd`, `gzip`, ...),
   `gcs.compression_format`, `azblob.compression_format`. Not `lz4`: ClickHouse data is
   lz4-compressed already, so `clickhouse-backup` refuses that configuration, and every backup and
@@ -488,6 +504,74 @@ mapping, a setting the operator reads that is a list - leave the configuration f
 is right, the sidecars pick it up by themselves, as they do any later change of it, see
 [Secret changes](#secret-changes).
 
+### Integration tables
+
+`clickhouse-backup` can create tables in ClickHouse that show the backups and the operations of its
+REST API: `system.backup_list` (the backups, local and remote, with their sizes),
+`system.backup_actions` (the operations it runs and ran - `INSERT INTO system.backup_actions(command)
+VALUES ('...')` runs one) and `system.backup_version`. They are tables of the `URL` engine that read
+`http://127.0.0.1:7171/backup/...` - the REST API of the sidecar in the same Pod - with the API
+credentials of the configuration file in the URL. `clickhouse-backup` creates them when its server
+starts, when `api.create_integration_tables` is `true`; it is `false` by default.
+
+Turn them on in the storage settings, the key `config.yml` of the storage Secret
+(`configSecretRef`): the operator takes the `api` section as it is and sets only `api.username`
+and `api.password` in it, which `clickhouse-backup` puts into the URL of the tables, so every
+ClickHouse user who may read `SHOW CREATE TABLE system.backup_list` sees the API credentials.
+The tables are made by the sidecar of every host, so with `mode: sidecar` only:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backup-demo-storage
+type: Opaque
+stringData:
+  config.yml: |
+    general:
+      remote_storage: s3
+    s3:
+      endpoint: https://s3.us-east-1.amazonaws.com
+      region: us-east-1
+      bucket: clickhouse-backups
+      access_key: "..."
+      secret_key: "..."
+    api:
+      # system.backup_list, system.backup_actions and system.backup_version in every ClickHouse
+      create_integration_tables: true
+---
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: backup-demo
+spec:
+  backup:
+    enabled: "yes"
+    mode: sidecar
+    configSecretRef:
+      name: backup-demo-storage
+  configuration:
+    clusters:
+      - name: main
+        layout:
+          shardsCount: 2
+          replicasCount: 2
+```
+
+```sql
+SELECT name, created, data_size, location, desc FROM system.backup_list ORDER BY created;
+```
+
+The sidecar creates the tables when its server starts, or reloads on `POST /restart` or `SIGHUP`,
+and only if ClickHouse answers then: a change of the setting takes effect at the next restart of the
+sidecars, not when an operation reads the changed Secret (see [Secret changes](#secret-changes)), and
+a sidecar that started before ClickHouse accepted connections has no tables until it restarts.
+Setting it back to `false` leaves the tables that exist: drop them by hand. With `mode: pod` the API runs in a
+backup Pod per shard that exists only while a backup or restore runs, and tables at `127.0.0.1` of
+the ClickHouse Pod would point at nothing: the operator sets `API_CREATE_INTEGRATION_TABLES=false`
+in the backup Pods, over the storage settings and their pod template, and the integration tables
+are not available in that mode.
+
 ### A storage per cluster
 
 `configSecretRef` is inherited like every other field, so a cluster that names a Secret of its own
@@ -511,10 +595,9 @@ spec:
             name: backup-demo-storage-cold
 ```
 
-* **`configSecretRef: {name: ""}` on a cluster** leaves the cluster without a storage Secret: its
-  backup stays off, unless `podTemplate` configures the sidecar, see [Enabling backup](#enabling-backup).
-* **Without `configSecretRef`** the storage is configured by the `clickhouse-backup` container of the
-  pod template `podTemplate` names; without `podTemplate` either, the cluster has no backup storage.
+* **`configSecretRef: {name: ""}` on a cluster** leaves the cluster without a storage Secret: with
+  backup enabled there, the reconcile of the CHI is aborted, see [Enabling backup](#enabling-backup);
+  set `enabled: "no"` on the cluster as well to leave it without backup.
 
 ### Storage paths
 
@@ -556,7 +639,8 @@ anything unless:
 
 * **every shard of its cluster has a storage path of its own**, which no other shard uses, of its
   cluster or of another one on the same storage (the same storage type and bucket, container,
-  endpoint or address). Without `{shard}` the shards of a cluster would write over each other's part
+  endpoint or address) - but the shards of a cluster with a [naming template](#backup-naming), which
+  names the backup of each apart, may share one path, which still no other cluster may use. Without `{shard}` the shards of a cluster would write over each other's part
   of a backup, and without `{cluster}` two clusters on one bucket would mix theirs: as they share the
   backup name, a restore of one cluster could restore the other's data. One cluster with one shard
   needs no macro at all, and clusters on different buckets need no `{cluster}`. A path that two other
@@ -635,8 +719,8 @@ unless their names joined with dashes coincide.
 It also refuses an object disk path that is the same for both CHIs while the storage path is not:
 deleting the copy it downloads would delete the object disk data of the backup.
 
-The copies of the schema the preflight downloads are deleted before the restore steps, and a Job
-that fails deletes the copies it downloaded. One stopped at its `activeDeadlineSeconds`, or evicted,
+The copies of the schema the preflight downloads are deleted before the restore downloads the
+backup itself, and a Job that fails deletes the copies it downloaded. One stopped at its `activeDeadlineSeconds`, or evicted,
 leaves them: the next restore of the backup from the same paths then refuses the hosts that hold
 one, until it is deleted with `clickhouse-backup delete local <backup>` in their sidecar.
 
@@ -644,7 +728,7 @@ A CHI restored from a backup it reads from its own paths - a copy of the same na
 one whose paths hold neither macro - then shares the storage path with the CHI it was restored from,
 and so does every schedule of either. Their backups are told apart by name only:
 [retention](#retention) prunes the schedule's series, the backups named
-`<backupNamePrefix>-YYYYMMDD-HHMMSS`, and a run refuses a name that is already in the
+`<backupNamePrefix>-YYYYMMDDHHMMSS`, and a run refuses a name that is already in the
 storage. Two schedules with the same `backupNamePrefix` on one storage path therefore delete each
 other's backups, and fail each other's runs when they are due at the same time. The default prefix,
 `<namespace>-<chi>-<schedule>`, keeps apart the schedules of one Kubernetes cluster, unless their
@@ -675,6 +759,71 @@ choose it deliberately. Before the recovery is recorded,
 only `backupNamePrefix` does. Any other schedule of a recovered CHI reports the possibly shared path
 as a warning event and in its `Validated` condition (reason `CHIRecovered`).
 
+### Backup naming
+
+By default a backup has one name on every shard - `<backupNamePrefix>-YYYYMMDDHHMMSS` for a scheduled
+one, the name of a `ClickHouseBackup` otherwise - and each shard keeps its part under a storage path
+of its own. `backup.naming`, on the CHI and on a cluster, inherited like `mode`, names the backup of
+every shard by a template instead, as ACM does: `shard{shard}-{YYYYMMDDHHIISS}` names the backup made at
+02:00:37 on 13 November 2026 `shard1-20261113020037` on the first shard and `shard2-20261113020037` on
+the second. As the names differ by shard, the shards of the cluster may keep their backups at one
+storage path, ACM's layout.
+
+| Placeholder | Value |
+|---|---|
+| `{shard}` | The number of the shard in the cluster, from 1, as `shard_num` of `system.clusters` and the `shard<N>` of ACM. **Required**, and kept apart from a digit or another placeholder by a literal that is no digit. |
+| `{cluster}`, `{chi}`, `{namespace}` | The names of the cluster, of the CHI and of its namespace; a restore of the backup of [another CHI](#storage-paths) takes those of `sourceInstallation` and `sourceNamespace`. |
+| `{prefix}` | The `backupNamePrefix` of the schedule that makes the backup, or the name of a `ClickHouseBackup` made without one. |
+| `YYYY` `MM` `DD` `HH` `II` `SS` | The time the backup is named after - year, month, day, hour, minutes, seconds - in braces, alone or several in one, e.g. `{YYYYMMDDHHIISS}` or `{YYYY}-{MM}-{DD}_{HH}{II}{SS}`. **All six are required**: retention and incremental backups order the backups by it. |
+
+Literals are letters, digits, `.`, `_` and `-`. Empty `naming` leaves the names exactly as before. The
+time is that of the slot of a scheduled run, in the schedule's `timeZone`; a backup made at once - a
+`ClickHouseBackup`, of a [schedule](#run-a-schedule-now) or not - is named after the time it is due, in
+UTC, with a `T` before the hour (`shard1-20261113T101500`), which keeps it out of the slots of the
+schedule, as the `<prefix>-YYYYMMDDTHHMMSS` of the default naming does.
+
+* **One name per backup.** A backup is told by the name of the backup of its first shard, which
+  `status.backupName` of a `ClickHouseBackup`, `LAST-BACKUP` of a schedule and the
+  recovered-from annotation show; a `ClickHouseRestore`, a `recovery` and `diffFromRemote` take it, or
+  the name of the backup of any other shard, and restore on every host the backup of its own shard.
+  When the template holds no `{prefix}` they also take the time alone, `20261113020037`, as ACM tells a
+  backup. The `backupName` of a `ClickHouseBackup` of such a cluster may only be such a time. One
+  `ClickHouseBackup` of several clusters needs one template that holds no `{cluster}`; back up the
+  clusters one by one otherwise.
+* **One storage path for the shards.** The storage path check lets the shards of a cluster with a
+  template share a path, e.g. `s3.path: backup/{namespace}/{installation}/{cluster}` without
+  `{shard}`, and the object disk path likewise; it still refuses a path two clusters share. A template
+  without `{shard}` is refused, as the shards would overwrite each other's backups there. Each host
+  lists, prunes and restores the backups of its own shard, whatever the others at the path.
+* **A slot tolerance of 30 minutes.** ACM names a scheduled backup after the time its run started,
+  up to 30 minutes after the slot (its refresh rate times 1.5). With a template a backup belongs to
+  the slot of an entry when its time is from the slot to 30 minutes after it, so retention counts the
+  backups ACM made for the entries of the same times.
+* **Retention prunes the whole template.** Without `{prefix}` in the template, retention of a schedule
+  takes every name the template makes on its cluster as the schedule's, as ACM's cleanup does: run one
+  schedule per cluster.
+
+Changing `naming` on a cluster with backups leaves the backups of the former naming where they are:
+retention no longer finds them, and restores name them by the names they have.
+
+#### Migrating from ACM
+
+1. Stop the backups of the cluster in ACM (its schedule), so that two cleaners never prune one path.
+2. Create the storage Secret with ACM's storage settings and **its path, shared by the shards**: ACM
+   keeps the backups of a cluster at `<environment path>/<cluster>`, or `<kubeNamespace>/<cluster>`
+   when the environment sets no path, and the object disk data at `object_disks/<that path>`. Set
+   `s3.path` (or `gcs.path`, ...) and the object disk path to those, without `{shard}`.
+3. Set `backup.naming: "shard{shard}-{YYYYMMDDHHIISS}"` on the CHI or the cluster, and
+   `preferredReplica` to ACM's `backupReplica`.
+4. Create a `ClickHouseBackupSchedule` with ACM's entries, the same `time`s, and `timeZone` set to the
+   zone of the ACM backend, as its tags are wall times there. Keep the `keep`s: retention then counts
+   the backups ACM made, with the 30-minute tolerance, as ACM would have.
+5. Copy the backups ACM keeps by hand - its "manual" backups and those pinned in its dialog of a
+   schedule change - into `spec.retention.keepBackups` of the schedule, by their time: the operator's
+   retention does not know ACM's records of them, nor did ACM's schedule hold any change.
+6. Check with `kubectl get chbs` and `clickhouse-backup list remote` on a sidecar that the first runs
+   keep what you expect; restore an ACM backup by its time (`backupName: "20261112021503"`).
+
 ### Secret changes
 
 The sidecar reads its configuration file anew for every operation, from the configuration file
@@ -688,8 +837,8 @@ other contents therefore takes effect by itself:
 * **Within a few minutes, without a restart.** Neither ClickHouse nor the sidecar restarts, and the
   Pod stays Ready. The generated Secret is updated only when its contents change.
 * **Operation by operation.** An operation that runs keeps the settings it started with; the next
-  one takes the new ones. A Job drives the hosts of its cluster one after another, so a change while
-  a backup or restore runs leaves it with the old settings on some hosts and the new ones on others:
+  one takes the new ones. A Job starts its steps on the hosts of its cluster at different times, so a
+  change while a backup or restore runs leaves it with the old settings on some hosts and the new ones on others:
   change the storage Secret only while no backup or restore runs.
 * **A removed setting counts.** The file is generated from the Secret as it is, so a setting removed
   from it is gone from the file too. A deleted storage Secret, or one without `config.yml` or with an
@@ -717,9 +866,10 @@ Editing the credentials in the Secret in place works too, but the two kinds take
   configuration. The operator therefore watches its backup Secret and reconciles the CHI when they
   change - set, edited or removed. The reconcile writes the users configuration first and the configuration files after it; a
   renamed user replaces the old one. The check once a minute keeps the ClickHouse credentials of the
-  configuration files as they are until the users configuration has the ones of the Secret, so a
-  sidecar never connects as a user, or with a password, ClickHouse does not know yet - and a reconcile
-  that wrote the users configuration but failed before the configuration files leaves them to it.
+  configuration files as they are until the users configuration has the ones of the Secret, so the
+  operator never hands a sidecar a user, or a password, before it has handed it to ClickHouse - and a
+  reconcile that wrote the users configuration but failed before the configuration files leaves them
+  to it.
   Removed credentials work the same way: the files go on connecting as the backup user until the
   reconcile has removed it. Credentials of no user the operator manages - one of the two not set -
   are taken as they are. A storage Secret gone while the files keep their storage settings does not
@@ -729,6 +879,18 @@ Editing the credentials in the Secret in place works too, but the two kinds take
   and `-`, not starting with a digit, `.` or `-`), and neither `default` nor the operator's own user;
   any other name aborts the reconcile with reason `BackupSecretUnresolved`. A user of that name the CHI
   defines in `configuration.users` is taken over, its profile and quota aside.
+
+  Within a Pod the order is not kept: Kubernetes updates the users configuration of ClickHouse and
+  the configuration file of the sidecar, two volumes, each in its own time, up to about a minute or
+  two apart. Until both have the change, the sidecar may connect with credentials ClickHouse no
+  longer takes - the old user after a rename or the old password after a change - or does not take
+  yet. `clickhouse-backup` retries a connection that fails without end, with the credentials it read
+  when the operation started, so an operation started in that window waits until ClickHouse takes
+  those credentials, and after a rename or a password change it never does: the operation hangs, and
+  so does the Job that drives it, until its `activeDeadlineSeconds` (24h by default) stops it. Change the ClickHouse credentials only while no
+  backup or restore runs or is about to start by a schedule, and wait until every Pod has the change -
+  the sidecar reads the new credentials from `/etc/clickhouse-backup/config.yml` and ClickHouse lets
+  the user in with them - before starting one.
 * **REST API credentials** (`API_USERNAME`, `API_PASSWORD`) concern the sidecar and the Jobs alone,
   and the configuration files follow them as above, without a reconcile.
 
@@ -761,22 +923,24 @@ spec:
 | `clickHouseInstallation`  | one of the two  | CHI to back up, in the same namespace. Exactly one of it and `scheduleRef` is set.                                                                                                                                           |
 | `scheduleRef.name`        |                 | Make the backup of this `ClickHouseBackupSchedule` once, with its CHI, clusters, options and `backupNamePrefix`, see [Run a schedule now](#run-a-schedule-now).                                                              |
 | `cluster`                 | all             | Back up only this cluster. Empty means every cluster with backup enabled, each in a Job of its own; with `scheduleRef`, every cluster the schedule backs up.                                                                 |
-| `backupName`              | generated       | Backup name, the same on every cluster; generated from the resource name and the time it is due when empty, see `status.backupName`. Refused with `scheduleRef`, or if it ends like a schedule's, `-YYYYMMDD-HHMMSS`.        |
+| `backupName`              | generated       | Backup name, the same on every cluster; generated from the resource name and the time it is due when empty, see `status.backupName`. Refused with `scheduleRef`, or if it ends like a schedule's, `-YYYYMMDDHHMMSS`.        |
 | `scheduledTime`           | when created    | RFC 3339 time, with its offset, the backup is due at, see [Back up at a later time](#back-up-at-a-later-time).                                                                                                               |
 | `startingDeadlineSeconds` |                 | How late, from the time it is due, the backup may start on a cluster; unset, it waits as long as it takes.                                                                                                                   |
 | `diffFromRemote`          |                 | Make this an [incremental backup](#incremental-backups) on top of this existing backup.                                                                                                                                      |
+| `configOverrides`         | none            | `clickhouse-backup` settings the backup is made with in place of the sidecar's, e.g. `["S3_STORAGE_CLASS=STANDARD_IA"]`, see [Config overrides](#config-overrides). Not with `scheduleRef`. |
 | `verify`                  | `false`         | [Verify](#verification) the backup after it is uploaded.                                                                                                                                                                     |
 | `schemaOnly`              | `false`         | Back up table and database definitions only, no data.                                                                                                                                                                        |
 | `replicaSelection`        | `FirstPerShard` | `FirstPerShard` backs up one replica of each shard, which is complete for `Replicated*` tables. `AllReplicas` backs up every replica, needed when a cluster holds non-replicated tables whose data differs between replicas. |
 | `tables`                  | all             | `clickhouse-backup --tables` pattern, e.g. `db.table`, `db.*`, comma-separated.                                                                                                                                              |
 | `partitions`              | all             | List of partition ids to back up.                                                                                                                                                                                            |
 | `activeDeadlineSeconds`   | `86400` (24h)   | How long each Job may run before it is stopped and the backup of its cluster fails.                                                                                                                                          |
+| `orchestratorConfigMapRef` | the operator's | ConfigMap in the namespace of the resource whose key `backup-orchestrator.sh` the Jobs of the backup run instead of the operator's script, see [The orchestrator script](#the-orchestrator-script). With `scheduleRef`, unset takes the schedule's; `name: ""` runs the operator's. |
 
 The spec is validated when the resource is created: backup names (`backupName`, `diffFromRemote`,
 `backupNamePrefix`) start with a letter or digit, contain only letters, digits and `_ - .`, never two
 dots in a row (`clickhouse-backup` would strip them and store the backup under another name), and are
 at most 128 characters - a schedule's `backupNamePrefix` at most 112, leaving room for the timestamp.
-A one-off backup's `backupName` must not end like the backups of a schedule, `-YYYYMMDD-HHMMSS`: the
+A one-off backup's `backupName` must not end like the backups of a schedule, `-YYYYMMDDHHMMSS`: the
 [retention](#retention) of a schedule of that prefix would take it for one of its own.
 `tables` may only contain letters, digits and `_ . * ? , -` (up to 1024 characters), and each
 partition id must match `^[A-Za-z0-9_-]{1,128}$`. The on/off fields of backups, schedules and
@@ -809,20 +973,29 @@ spec:
   # verify: true
 ```
 
-* It takes the CHI, the clusters (unless `cluster` names one of them), the `backupNamePrefix` and
-  every backup option of the schedule (`schemaOnly`, `replicaSelection`, `tables`, `partitions`,
-  `activeDeadlineSeconds`) as they are when the backup is validated, and records them in
-  `status.schedule`: an edit of the schedule afterwards changes nothing about it. None of these
+* It takes the CHI, the clusters (unless `cluster` names one of them), the `backupNamePrefix`, the
+  `orchestratorConfigMapRef` and every backup option of the schedule (`schemaOnly`, `replicaSelection`,
+  `tables`, `partitions`, `activeDeadlineSeconds`) as they are when the backup is validated, and records
+  them in `status.schedule`: an edit of the schedule afterwards changes nothing about it. None of these
   options can be set on the backup itself, nor can `backupName`; its own fields, `cluster` (one of
-  the clusters the schedule backs up), `verify`, `diffFromRemote`, `scheduledTime` and
-  `startingDeadlineSeconds`, keep their meaning.
+  the clusters the schedule backs up), `verify`, `diffFromRemote`, `scheduledTime`,
+  `startingDeadlineSeconds` and `orchestratorConfigMapRef`, which overrides the schedule's, keep their
+  meaning.
 * It is always named `<backupNamePrefix>-<UTC time it is due, as YYYYMMDDTHHMMSS>`, e.g.
   `default-backup-demo-nightly-20261012T101507`: a `backupName` is refused with `scheduleRef`
   (`a backup that runs a schedule is named with the schedule's backupNamePrefix: backupName is not
   set with scheduleRef`), so the name always tells the schedule the backup came from. The `T` keeps
-  it out of the schedule's series: [retention](#retention) never deletes it, and creating such
-  backups never pushes one of the schedule's out - delete it by hand when it is no longer needed.
+  it out of the schedule's slots: creating such backups never pushes one of the schedule's out, and
+  [retention](#retention) keeps it as long as it is no older than the oldest scheduled backup some
+  entry keeps, then deletes it.
   The prefix also lets the [recovery prefix guard](#storage-paths) tell where it came from.
+* It runs as a run of the schedule, with its entries and `timeZone`, which `status.schedule` records
+  too: as ACM makes a backup by hand, it is incremental, on the newest backup of the schedule, as the first
+  entry with `incremental: true` says - full when that entry's chain is `keep` long, or when no entry
+  is incremental - and [retention](#retention) runs after it as after a scheduled run, on the same
+  hosts, skipped while a restore holds the schedule's runs of the cluster. Like a scheduled backup it
+  is a base of the next incremental backup while it is the newest, as ACM makes a backup incremental
+  on the newest backup of the cluster whether made by hand or on schedule.
 * It runs as any `ClickHouseBackup` does, also while the schedule is suspended or held for a restore:
   it is not part of the series those protect. A schedule that does not exist yet - both applied at
   once - is waited for (`ScheduleNotFound`), as is one whose spec the operator finds invalid
@@ -872,8 +1045,8 @@ backup it keeps, a backup starts at once unless its deadline has passed: keep
 
 ## ClickHouseBackupSchedule
 
-Recurring backups through Kubernetes `CronJob`s. See
-[`04-backup-schedule.yaml`](chb-examples/04-backup-schedule.yaml).
+Recurring backups at several periods, each keeping its own number of backups, through one Kubernetes
+`CronJob` per cluster. See [`04-backup-schedule.yaml`](chb-examples/04-backup-schedule.yaml).
 
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
@@ -882,59 +1055,81 @@ metadata:
   name: nightly
 spec:
   clickHouseInstallation: backup-demo
-  schedule: "0 2 * * *"
-  retention:
-    keepLast: 7
+  schedules:
+    - period: hour
+      keep: 24
+    - period: daily
+      time: "02:30"
+      keep: 7
+    - period: weekly
+      time: "02:30"
+      day: 0
+      keep: 4
 ```
 
 | Field                                                                             | Default                               | Meaning                                                                                                                                                                                                                       |
 |-----------------------------------------------------------------------------------|---------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `clickHouseInstallation`                                                          | required                              | CHI to back up, in the same namespace.                                                                                                                                                                                        |
 | `cluster`                                                                         | all                                   | Back up only this cluster. Empty means every cluster with backup enabled, each through a CronJob of its own.                                                                                                                  |
-| `schedule`                                                                        | required                              | Cron expression, as in a Kubernetes `CronJob`.                                                                                                                                                                                |
-| `timeZone`                                                                        | the controller manager's, usually UTC | IANA time zone `schedule` is read in, e.g. `Europe/Berlin`, as the `CronJob`'s, which Kubernetes before 1.25 ignores. Backup names carry UTC times either way.                                                                |
+| `schedules`                                                                       | required                              | The periods the schedule backs up at, at least one, at most one entry per period, see below.                                                                                                                                  |
+| `schedules[].period`                                                              |                                       | `minute`, `hour`, `6hours`, `daily`, `weekly` or `monthly`.                                                                                                                                                                   |
+| `schedules[].time`                                                                | `00:00`                               | `HH:MM` in `timeZone`; required for `daily`, `weekly` and `monthly`. Every entry that sets a time sets the same one; `hour` takes only its minute, `6hours` its hour modulo 6 and its minute, `minute` none.                  |
+| `schedules[].day`                                                                 |                                       | `weekly`: `0`..`6`, `0` being Sunday; `monthly`: `1`..`31`, a day past the end of a shorter month meaning its last day. Required for these two, refused for the others.                                                       |
+| `schedules[].keep`                                                                | required                              | At least `1`: how many of the newest backups of the runs that match the entry [retention](#retention) keeps.                                                                                                                  |
+| `schedules[].incremental`                                                         | `false`                               | At most one entry: its runs make [incremental backups](#incremental-backups) on the newest backup of the series while the chain is shorter than its `keep`.                                                                  |
+| `schedules[].configOverrides`                                                     | none                                  | `clickhouse-backup` settings the runs of the entry make their backups with, e.g. `["S3_STORAGE_CLASS=GLACIER_IR"]` on a monthly entry: those of the heaviest entry of a slot apply. See [Config overrides](#config-overrides). |
+| `timeZone`                                                                        | the controller manager's, usually UTC | IANA time zone the entries are read in, e.g. `Europe/Berlin`, as the `CronJob`'s. Backup names carry the time of the slot in this zone.                                                                                       |
 | `suspend`                                                                         | `false`                               | Stop starting new runs. A run already in progress continues.                                                                                                                                                                  |
 | `concurrencyPolicy`                                                               | `Forbid`                              | What to do when a run is due while the previous one still runs: `Forbid` starts it only once that one has finished, and not at all past `startingDeadlineSeconds`; `Allow` starts it anyway; `Replace` stops the running one. |
 | `startingDeadlineSeconds`                                                         |                                       | How late a missed run may still start.                                                                                                                                                                                        |
 | `successfulJobsHistoryLimit`                                                      | `3`                                   | Finished successful Jobs to keep, at least 1: the operator learns from its Job which backup a run made and whether it holds data.                                                                                             |
 | `failedJobsHistoryLimit`                                                          | `1`                                   | Failed Jobs to keep, at least 1: the operator learns from its Job why a run failed.                                                                                                                                           |
 | `schemaOnly`, `replicaSelection`, `tables`, `partitions`, `activeDeadlineSeconds` |                                       | As in [`ClickHouseBackup`](#clickhousebackup); `activeDeadlineSeconds` bounds each Job of a run.                                                                                                                              |
-| `backupNamePrefix`                                                                | `<namespace>-<chi>-<schedule>`        | Backup names are `<prefix>-<UTC time the run was due>`, e.g. `default-backup-demo-nightly-20261003-020000`. Also scopes [retention](#retention). Can be set once and is immutable after, see below.                           |
-| `retention.keepLast`                                                              | `0` (keep all)                        | [Retention](#retention): how many of this schedule's backups with data, and apart from them without, to keep.                                                                                                                 |
+| `backupNamePrefix`                                                                | `<namespace>-<chi>-<schedule>`        | Backup names are `<prefix>-<YYYYMMDDHHMMSS>`, the time the run was due in `timeZone`, e.g. `default-backup-demo-nightly-20261003023000`. Also scopes [retention](#retention). Can be set once and is immutable after.         |
+| `orchestratorConfigMapRef` | the operator's | ConfigMap in the namespace of the resource whose key `backup-orchestrator.sh` the runs of its CronJobs run instead of the operator's script, see [The orchestrator script](#the-orchestrator-script). A backup that runs the schedule takes it too. |
+| `retention.onScheduleChange` | `Hold` | What [retention](#schedule-changes) does with the backups the schedule kept before a change of its entries or `timeZone`: `Hold` keeps them all until the change is released, `Prune` applies the change at once. |
+| `retention.keepBackups` | none | Backups retention never deletes, at most 512: names, or with a [naming template](#backup-naming) the name of the backup of any shard or its time alone. |
+| `retention.releaseHeld` | none | The `changeID` of `status.retention.previous` whose held backups, and those of every earlier change, are released. |
 
-A schedule runs one CronJob for each cluster it backs up, named after the schedule and the cluster,
-with the cluster's own Pod settings; `concurrencyPolicy` and the history limits apply to each of
-them. All of them follow the same `schedule`, so the runs of one slot make one backup name on every
-cluster, and each cluster's runs prune that cluster's backups, see [Retention](#retention). A
+**One CronJob per cluster, on the finest entry.** A schedule runs one CronJob for each cluster it
+backs up, named `<schedule>-<cluster>-backup`, with the cron schedule of its finest entry - every hour
+at :30 above. Validation makes every entry that sets a time set the same one, so every slot of a
+coarser entry is a slot of the finest. Each run is one slot: its Job, which the CronJob controller
+names `<cronjob>-<minutes since the epoch of the slot>`, takes the slot from its name, matches it
+against the entries in `timeZone`, and counts for every entry it matches - the run of Sunday 02:30
+is the weekly, the daily and the hourly one; the heaviest of them decides whether it is incremental.
+A late run still makes the backup of its slot, so the runs of one slot make one backup name on every
+cluster. There is no `ClickHouseBackup` per scheduled run: the schedule's status reports them. A
 cluster that joins - added to the CHI, backup enabled - gets its CronJob once the CHI has completed
-its reconcile; a cluster that leaves loses it (see
-[Hosts that leave a schedule](#hosts-that-leave-a-schedule)).
+its reconcile; a cluster that leaves loses it (see [Hosts that leave a schedule](#hosts-that-leave-a-schedule)).
 
 The default prefix joins the namespace, CHI and schedule names, shortened with a hash past 112
 characters, so that schedules of the same name of different CHIs, or of CHIs of the same name in
 different namespaces, get different prefixes; see [Storage paths](#storage-paths) for why that
-matters.
+matters. `backupNamePrefix` can be set once and is immutable after, which Kubernetes enforces from
+1.25 on: [retention](#retention) knows the current prefix only. To change the prefix of a schedule
+that has run, create a new schedule. To make a schedule's backup at once, see
+[Run a schedule now](#run-a-schedule-now); `diffFromRemote` and `verify` are only available on a
+`ClickHouseBackup`.
 
-`backupNamePrefix` can be set once and is immutable after (`backupNamePrefix can be set once and is
-immutable after: a changed prefix would leave the former series unpruned; create a new resource`),
-which Kubernetes enforces from 1.25 on: [retention](#retention) knows the current prefix only, and
-would never prune the backups of a former series. Set it when the schedule is created, or later only
-on a schedule that has not run yet, such as one held for a [recovery](#storage-paths), which setting
-it releases: on a schedule that has run, any prefix but the default changes the one its runs so far
-used. To change the prefix of a schedule that has run, create a new schedule. Either way, the
-backups of the former prefix stay in the storage until they are deleted by hand. Choose an explicit
-prefix deliberately, unique among the schedules that write to the same storage path.
+**Phase.** `status.phase` tells, with `status.reason` and `status.message`, whether the schedule runs:
 
-Each run names its backup after the time it was due - the minute of its schedule slot, which the
-CronJob controller puts in the name of every Job it creates - not after the time it happens to start.
-A run late by a few minutes still makes `default-backup-demo-nightly-20261003-020000`, and the
-operator knows the name of every backup the schedule makes. The Job reads its name from the
-`job-name` label of its Pod, which Kubernetes sets on every version the operator supports, besides
-`batch.kubernetes.io/job-name` from 1.27 on. To make a schedule's backup at once, see
-[Run a schedule now](#run-a-schedule-now).
+* `Active`: the CronJobs run it - also while a restore holds them, which the `Ready` condition tells
+  (`SuspendedForRestore`);
+* `Suspended`: `spec.suspend` is set;
+* `Aborted`: it cannot run until somebody acts - an invalid spec (`InvalidSpec`), a missing CHI or
+  cluster (`CHINotFound`, `ClusterNotFound`), backup disabled or without a storage (`BackupDisabled`,
+  `NoBackupStorage`), a stopped CHI (`CHIStopped`), no [orchestrator script](#the-orchestrator-script)
+  (`OrchestratorScriptMissing`), a CronJob name another owner holds (`NameConflict`), a held default
+  prefix (`SharesSourcePrefix`) - or the last observed scheduled run failed (`LastBackupFailed`), until a
+  later run succeeds; the CronJobs keep running the schedule in that last case only.
 
-Scheduled backups are always full backups; `diffFromRemote` and `verify` are only available on a
-`ClickHouseBackup`. The status tells how the runs went, for each cluster in `status.clusters`:
+`status.nextScheduleTime` is the next slot of any entry, empty while the schedule is suspended or
+aborted for another reason than a failed run. `status.entries[]` tells, per `period`, the
+`lastScheduleTime` of the newest run whose slot matches the entry, and the `lastBackupName` of the
+newest such run that completed, as far as the Jobs the CronJobs keep tell.
+
+The status also tells how the runs went, for each cluster in `status.clusters`:
 
 * `cronJobName`: the cluster's CronJob; `configSecret`: the `configSecretRef` its runs keep their
   backups by, as the CronJob was last built - for a cluster that lost its CronJob, the storage its
@@ -950,29 +1145,24 @@ Scheduled backups are always full backups; `diffFromRemote` and `verify` are onl
 Over all clusters, `status.lastSuccessfulTime` is the oldest of their last successes - by then every
 cluster had been backed up - and `status.lastBackupName` the backup every cluster made last, the
 one to [recover the whole CHI from](#recover-a-new-chi-from-a-backup). Both are empty while a
-cluster has not completed a run yet - one that has just joined the schedule, or one whose CronJob
-cannot be created (`NameConflict`, see [Backup and restore Jobs](#backup-and-restore-jobs)).
-`lastBackupName` follows the clusters' own `lastBackupName`s:
-
-* while the runs of a slot complete one after the other, it stays at the backup of the slot before,
-  until every cluster has made the new one. A cluster that completed the new run may have pruned the
-  older backup by then - with `retention.keepLast: 1`, or when the runs of another cluster outlast the
-  schedule's period and miss slots (`concurrencyPolicy: Forbid`) while it goes on making newer ones;
-* while the last run of a cluster failed, it is cleared as soon as another cluster completes a run
-  newer than that cluster's last backup, which the [retention](#retention) of the other clusters is
-  then going to prune.
-
-So check that a backup exists on every cluster before you recover from it - a recovery from a
-missing backup fails, before it changes anything - or recover each cluster from the backup of its
-own entry, `status.clusters[].lastBackupName`, which its retention keeps, as that cluster's
-`recovery.backupName` (see [Recover a new CHI from a backup](#recover-a-new-chi-from-a-backup)).
+cluster has not completed a run yet. While the runs of a slot complete one after the other,
+`lastBackupName` stays at the backup of the slot before until every cluster has made the new one;
+while the last run of a cluster failed, it is cleared as soon as another cluster completes a newer
+run. Check that a backup exists on every cluster before you recover from it, or recover each
+cluster from its own `status.clusters[].lastBackupName`.
 
 The `LastBackupSucceeded` condition tells whether the last finished runs succeeded, with the reason
 of a failure otherwise (`JobFailed`, `DeadlineExceeded`, `JobNotStarted`). While a last run failed,
-`Ready` is `False` with reason `LastBackupFailed`; the CronJobs keep running the schedule, and the
-next successful run makes the schedule `Ready` again. A run whose backup
+`Ready` is `False` with reason `LastBackupFailed` and the phase is `Aborted`; the next successful run
+makes the schedule `Active` and `Ready` again. A run whose backup
 [holds no data](#backup-and-restore-jobs) succeeded, with the reason `CompletedWithoutData`, and
 `Ready` stays `True` with the reason `LastBackupWithoutData` until a run backs up data again.
+
+**Events** on the schedule: `CronJobCreated` and `CronJobUpdated` when the operator creates or rebuilds
+the CronJob of a cluster; `ScheduleActive`, `ScheduleSuspended` and `ScheduleAborted` (a warning, with
+the reason) on every change of the phase; `ScheduledBackupSucceeded` for every completed run, naming
+its backup and Job, and the warning `ScheduledBackupFailed` for every failed one, with its Job and the
+end of the error it reported; the [orchestrator](#the-orchestrator-script) of every run adds its own.
 
 `kubectl get chbs` shows the reason of the `Ready` condition (`STATUS`) - whether the schedule runs,
 why it does not, or that a last run failed or backed up no data - and the last success, `-o wide`
@@ -989,7 +1179,7 @@ metadata:
   name: backup-demo-restore
 spec:
   clickHouseInstallation: backup-demo-restored
-  backupName: default-backup-demo-nightly-20261003-020000
+  backupName: default-backup-demo-nightly-20261003023000
 ```
 
 | Field                    | Default            | Meaning                                                                                                                                   |
@@ -1001,10 +1191,15 @@ spec:
 | `sourceNamespace`        | the restored CHI's | Namespace of the CHI that made the backup, when another and the paths hold `{namespace}`. Immutable.                                      |
 | `schemaOnly`             | `false`            | Restore table and database definitions only, no data.                                                                                     |
 | `tables`                 | all                | Restore only the matching tables: a `clickhouse-backup` pattern as for a backup, e.g. `db.table`, `db.*`, comma-separated.                |
+| `partitions`             | all                | Restore the data of only these partition ids (`--partitions`), e.g. `["202601", "202602"]`, into the existing tables, replacing those partitions; the schema is not restored. Not with `schemaOnly` or `rbac`. See [Restore filters](#restore-filters). |
+| `skipTables`             | none               | Leave out the matching tables: a `clickhouse-backup` pattern, as `tables` (`CLICKHOUSE_SKIP_TABLES`).                                    |
+| `skipTableEngines`       | none               | Leave out the tables of these engines, e.g. `["Kafka", "RabbitMQ"]` (`CLICKHOUSE_SKIP_TABLE_ENGINES`).                                    |
+| `databaseMapping`        | none               | Restore the tables of a database of the backup into another one: `{source: target}` (`--restore-database-mapping`).                      |
 | `rbac`                   | `false`            | Also restore the [access entities](#access-entities) of the backup. Only with an empty `cluster`.                                         |
 | `overwrite`              | `false`            | Allow restoring over existing tables, which are dropped first. See [Restore safety](#restore-safety).                                     |
 | `validateTopology`       | `true`             | Refuse the restore unless every target shard holds the backup, and, from another CHI, a backup named as its base at the own paths.        |
 | `activeDeadlineSeconds`  | `86400` (24h)      | How long each Job may run before it is stopped and the restore of its cluster fails.                                                      |
+| `orchestratorConfigMapRef` | the operator's | ConfigMap in the namespace of the resource whose key `backup-orchestrator.sh` the Jobs of the restore run instead of the operator's script, see [The orchestrator script](#the-orchestrator-script). |
 
 `tables` follows the rules of a backup's `tables`. The target CHI needs backup enabled and the same
 backup storage configuration as the source, with the same cluster names and shard layout; a backup
@@ -1012,9 +1207,20 @@ of a CHI of another name, or of another namespace, is found by naming that CHI i
 `sourceInstallation`, and its namespace in `sourceNamespace`, see
 [Restoring into another CHI](#storage-paths).
 
-On each cluster, the schema is restored on every replica, each from the copy of its shard, and the
-data on one replica of each shard; replication then copies `Replicated*` tables to the other
-replicas. The schema is restored replica by replica, not `ON CLUSTER`, to keep every table as the
+On each cluster the restore runs in the order of the Altinity Cloud Manager. First every host
+downloads the backup, all at once: the hosts that restore data download it whole, hard-linking every
+file of it already on their disks (`--hardlink-exists-files`) instead of downloading it again, the
+others the schema alone. A host short of disk space fails the restore here, before anything is
+dropped, and the copies the others downloaded are deleted again; a host that already holds a local
+copy of the backup restores from that one. An incomplete local copy - one a download that failed or
+was stopped left, which `clickhouse-backup` lists as `broken` - is never deleted: the host downloads
+the backup again, which `clickhouse-backup` resumes where the copy ends (`use_resumable_state`, on by
+default), and a restore whose download fails again leaves it for the next one to resume. Then the schema is restored on every replica, each from
+the copy of its shard, one after another - with the access entities, when the restore restores
+them - then the data on one replica of each shard, all at once; replication copies `Replicated*` tables to the other replicas. Each step
+restores from the downloaded copy (`POST /backup/restore`), which is deleted once the restore is
+done. A restore that reads the backup of [another CHI](#storage-paths) runs the same steps as
+commands of the `actions` endpoint (`download`, then `restore`), with the storage paths of that CHI. The schema is restored replica by replica, not `ON CLUSTER`, to keep every table as the
 backup describes it: restoring `ON CLUSTER`, `clickhouse-backup` re-points every `Distributed`
 table that names another cluster - `all-sharded`, or another cluster of the CHI - at the cluster
 it restores. `status.backupName` records the backup the Jobs restore, fixed when the Jobs are
@@ -1088,12 +1294,62 @@ resolve the same in both, as for a CHI of the same name in another namespace - j
 replication instead of becoming an independent copy, and a `TRUNCATE`, `ALTER DELETE` or
 `DROP PARTITION` on the copy then reaches the source.
 
+### Restore filters
+
+As the restore of the Altinity Cloud Manager, a `ClickHouseRestore` can narrow what it restores
+beyond `tables`:
+
+```yaml
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseRestore"
+metadata:
+  name: backup-demo-restore-events
+spec:
+  clickHouseInstallation: backup-demo-restored
+  backupName: default-backup-demo-nightly-20261003023000
+  tables: "analytics.*"
+  # The data of two months only
+  partitions: ["202609", "202610"]
+  # Neither the scratch tables nor the queue consumers
+  skipTables: "analytics.tmp_*"
+  skipTableEngines: ["Kafka"]
+  # Into a database of another name, next to the live one
+  databaseMapping:
+    analytics: analytics_restored
+```
+
+* `partitions` restores those partition ids into the tables as they are, as ACM restores partitions:
+  the download and the data restore are narrowed to them (`--partitions`), and the schema step is
+  left out entirely, so nothing is dropped or recreated and the [overwrite guard](#restore-safety)
+  and `overwrite` do not apply. The tables must exist. On the first replica of each shard
+  `clickhouse-backup` drops each of those partitions where a table holds it, which replication
+  carries to the other replicas, and attaches the parts of the backup without checking the replicas
+  first (`CLICKHOUSE_CHECK_REPLICAS_BEFORE_ATTACH=0`). The other replicas download nothing. As the
+  access entities come with the schema, `partitions` takes neither `schemaOnly` nor `rbac`. An id
+  is letters, digits, `_` and `-`, the form `system.parts` shows as `partition_id`.
+* `skipTables` and `skipTableEngines` leave tables out of every step, through `CLICKHOUSE_SKIP_TABLES`
+  - on top of the system databases `clickhouse-backup` leaves out anyway - and
+  `CLICKHOUSE_SKIP_TABLE_ENGINES`. The overwrite guard still counts the tables they leave out.
+* `databaseMapping` restores the schema and the data of each database it names into the database it
+  maps it to (`--restore-database-mapping`), which overrides the empty `RESTORE_DATABASE_MAPPING` the
+  sidecar pins. The overwrite guard, and the checks of an overwrite, look at the databases restored
+  into: a table of `analytics_restored` that the restore would replace refuses it, a table of
+  `analytics`, which it leaves alone, does not. A database may be mapped once, not to itself, not to a
+  database another one is mapped to or that is mapped itself, and not to or from a system database.
+
+Every value becomes a single token of a `clickhouse-backup` command, so each is checked strictly -
+the patterns as `tables`, engines and databases of letters, digits, `_` (and `-` for databases) - and
+a restore that fails the check ends `Aborted`. `skipTables`, `skipTableEngines` and `partitions` set
+`clickhouse-backup` settings of the restore, which only commands of the `actions` endpoint take: the
+steps then run as such commands (`download`, `restore`) rather than typed requests.
+
 ### Access entities
 
 A backup holds the access entities created with SQL - users, roles, grants, row policies, quotas
 and settings profiles - which `clickhouse-backup` backs up by default. `rbac: true` restores them
-too, after the schema and the data, on every host of the CHI, and ClickHouse reloads them live with
-`SYSTEM RELOAD USERS`. `rbac` needs an empty `cluster`, as access entities belong to the whole CHI,
+too, with the schema of every host of the CHI (`restore --schema --rm --rbac`), before the data, as
+ACM restores them - existing access entities of the same names are replaced - and ClickHouse
+reloads them live with `SYSTEM RELOAD USERS`. `rbac` needs an empty `cluster`, as access entities belong to the whole CHI,
 the more so in a `replicated` user directory, which every cluster using its Keeper path shares.
 [Recovery](#recover-a-new-chi-from-a-backup) always restores them. A restore of access entities
 holds the schedules, backups and verifications of every cluster of the CHI until it has finished,
@@ -1122,7 +1378,7 @@ hand, in the sidecar of every host, while no backup or restore of its cluster ru
 
 ```bash
 kubectl exec chi-backup-demo-main-0-0-0 -c clickhouse-backup -- \
-  clickhouse-backup restore_remote --rbac-only default-backup-demo-nightly-20261003-020000
+  clickhouse-backup restore_remote --rbac-only default-backup-demo-nightly-20261003023000
 ```
 
 ## Which hosts are involved
@@ -1159,9 +1415,20 @@ included - holds its CronJobs the same way (`InvalidSpec`) until the spec is fix
 is resolved, the hosts of each cluster, which `status.clusters[].hosts` records for a backup or
 restore, are:
 
-* **Backup:** one replica per shard (`FirstPerShard`) or every replica (`AllReplicas`).
-* **Retention:** every host of the cluster the backup ran on, which the schedule lists in
-  `status.clusters[].retentionHosts`.
+* **Backup:** one replica per shard (`FirstPerShard`) or every replica (`AllReplicas`). The one replica
+  is `backup.preferredReplica` of the cluster, the first replica (0) by default, as ACM backs up its
+  `backupReplica`: a lag-free replica, or one on a node with spare disk or network, can take the
+  load of the backup off the replica that serves the queries. A shard with fewer replicas backs up
+  its first one, and so does a shard whose preferred replica's ClickHouse does not answer through
+  the sidecar when the Job starts; the Job tells it in a warning and an `OrchestratorReplicaFallback`
+  event. Every replica of a shard keeps a `FirstPerShard` backup at the same storage path, without
+  `{replica}`, so the choice changes neither where the backup is nor what restores it.
+  `status.clusters[].hosts` records the preferred replicas while the Job runs, and once it has
+  completed the replicas the backup was actually made on: a replica it fell back to takes the place
+  of the preferred one, as the Job tells in its termination message.
+* **Retention:** one host per shard of the cluster the backup ran on - the first replica, which
+  lists the same backups as the preferred one -, or every replica with `AllReplicas`, which the
+  schedule lists in `status.clusters[].retentionHosts`.
 * **Verification:** the first replica of each shard.
 * **Restore:** the schema on every replica, the data on one replica per shard, access entities on
   every replica; with `overwrite`, one host first runs the `ON CLUSTER` pass when a shard has more
@@ -1189,16 +1456,17 @@ be created anew. One whose owner is deleted or being deleted, or that is being d
 its way out instead: the resource, or the schedule's cluster, waits until Kubernetes has removed it
 (`WaitingForGarbageCollection`).
 
-A Job runs `bash` (4.4 or newer) and `curl` from the backup image of its cluster and drives the
-sidecars of that cluster through their REST API with the credentials of
-`<chi-name>-auto-backup-secret`. It needs no access to the Kubernetes API, so no service account
-token is mounted. Each Job makes a single attempt, bounded by `activeDeadlineSeconds`.
+A Job runs the [orchestrator script](#the-orchestrator-script) with `bash` (4.4 or newer) and `curl`
+from the backup image of its cluster - `altinity/clickhouse-backup:stable` unless the pod template
+names another - pulled anew every time (`imagePullPolicy: Always`), and drives the `clickhouse-backup`
+REST API of that cluster - the sidecars, or the backup Pods of the `pod` [mode](#backup-modes) - with the
+credentials of `<chi-name>-auto-backup-secret`. Its container is named `backup-orchestrator`. Each Job
+makes a single attempt, bounded by `activeDeadlineSeconds`.
 
-* **Pod settings follow the ClickHouse Pods.** The Job's Pod runs the image of the sidecar, with its
-  pull policy, and takes the `imagePullSecrets`, the `serviceAccountName` and the pod-level
-  `securityContext` of the pod template the first host of its cluster runs, so it meets the
+* **Pod settings follow the ClickHouse Pods.** The Job's Pod takes the `imagePullSecrets` and the
+  pod-level `securityContext` of the pod template the first host of its cluster runs, so it meets the
   same pod-level rules as the ClickHouse Pods and can pull the backup image from the same private
-  registry.
+  registry. It runs as the operator's ServiceAccount, see [The orchestrator script](#the-orchestrator-script).
   The Job container itself always runs with `allowPrivilegeEscalation: false` and every capability
   dropped, as the restricted Pod Security Standard and the OpenShift `restricted-v2` SCC require; it
   does not set `readOnlyRootFilesystem`. Inherited `sysctls` are dropped, since the Job may land on
@@ -1260,52 +1528,209 @@ token is mounted. Each Job makes a single attempt, bounded by `activeDeadlineSec
   is a backup when a host cannot be listed then, or lists its copy broken, or with a
   `clickhouse-backup` older than 2.6.6, which lists no sizes.
 
+### The orchestrator script
+
+What a Job does is the script `backup-orchestrator.sh` - or its Python twin `backup-orchestrator.py`, see
+[Python orchestrator](#python-orchestrator) - an operator configuration file in a folder of
+its own, `backup.path` of the operator configuration - `backup`, next to `config.yaml`, by default, a path
+relative to the folder of `config.yaml` unless absolute, as `template.chi.path`. The install bundles and the
+Helm chart ship it in the ConfigMap `etc-clickhouse-operator-backup-files` (Helm value
+`configs.backupFiles`), mounted in the operator container at `/etc/clickhouse-operator/backup`; in the
+repository it is `deploy/builder/templates-config/backup/backup-orchestrator.sh`, from which
+`config/backup/backup-orchestrator.sh` is generated. Edit that ConfigMap to change the script without an
+operator release. Before it creates a Job or a CronJob, the operator reads it and copies it to the ConfigMap `<chi>-<cluster>-backup-orchestrator`, key
+`backup-orchestrator.sh`, owned by the CHI, which the Job mounts read-only at
+`/etc/clickhouse-backup-orchestrator` and runs as `bash /etc/clickhouse-backup-orchestrator/backup-orchestrator.sh`.
+The SHA-256 of the script is the annotation `clickhouse.altinity.com/backup-orchestrator-sha256` on the
+pod template, so a changed script rebuilds the CronJobs, whose next runs take it. A ConfigMap of that
+name the CHI does not control is never overwritten: the operation is aborted instead.
+
+To run a script of your own, put it in a ConfigMap of the namespace under the key
+`backup-orchestrator.sh` and name the ConfigMap in `spec.orchestratorConfigMapRef` of the
+`ClickHouseBackup`, `ClickHouseBackupSchedule` or `ClickHouseRestore`: its Jobs, or the runs of its CronJobs,
+mount it instead, and the operator never writes it. The choice belongs to the operation, not to the CHI, so
+a single backup can try a new script while the schedules keep theirs:
+
+```yaml
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackup"
+metadata:
+  name: try-new-orchestrator
+spec:
+  clickHouseInstallation: backup-demo
+  orchestratorConfigMapRef:
+    name: my-backup-orchestrator
+```
+
+A `ClickHouseBackup` with `scheduleRef` takes the schedule's `orchestratorConfigMapRef`, as it recorded it in
+`status.schedule`, unless it names one of its own; `name: ""` runs the operator's script. A
+[recovery](#recover-a-new-chi-from-a-backup) takes `spec.backup.recovery.orchestratorConfigMapRef` of the CHI,
+or of the cluster, and copies it into the `ClickHouseRestore` it creates.
+
+Without a script - the folder `backup.path` or the file in it missing or empty, or the ConfigMap
+`orchestratorConfigMapRef` names missing
+or without the key - no Job can run: that backup or restore is `Aborted` with the reason
+`OrchestratorScriptMissing` and a warning event naming the file or the ConfigMap, and a schedule is
+`Aborted` with that reason, its CronJobs suspended, until the script is back.
+
+The script reads every input from its environment - no value is ever part of the script text - among
+them `OPERATION`, `CLUSTER`, the host lists, `BACKUP_TRANSPORT` (`sidecar` or `pod`), and, for a
+scheduled run, `SCHEDULES`, `SCHEDULE_TIMEZONE`, `BACKUP_NAME_PREFIX`, `CRON_JOB_NAME`, `JOB_NAME`
+(from the `job-name` label of its Pod), `RETENTION_HOSTS` and `RESTORE_IN_PROGRESS`. It posts
+Kubernetes Events of its steps (reasons starting with `Orchestrator`, source component
+`clickhouse-backup-orchestrator`) on the resource it works for, which `EVENT_OBJECT_API_VERSION`,
+`EVENT_OBJECT_KIND`, `EVENT_OBJECT_NAME` and `EVENT_OBJECT_UID` name, from `POD_NAMESPACE` and as
+`POD_NAME`, set by the downward API. To post them the Pod runs as the operator's ServiceAccount
+(`OPERATOR_POD_SERVICE_ACCOUNT`, `clickhouse-operator` by default), with its token mounted: in another
+namespace than the operator's the operator keeps a ServiceAccount of that name there, with a Role that
+grants only what the script needs. An Event that cannot be posted never fails the operation.
+
+Every request the script sends to a `clickhouse-backup` API that starts or changes something -
+`create_remote`, `download`, `restore`, `delete`, a command of the `actions` endpoint - shows as it is
+sent in a Normal event `OrchestratorCommand`: the method, the host and port, the path and the query
+string as `curl` URL-encodes it, and for the `actions` endpoint its JSON body with the command, for
+example
+
+```
+chi-demo-main-0-0: create_remote: POST chi-demo-main-0-0:7171/backup/create_remote?name=nightly-20260101000000&diff-from-remote=nightly-20251231000000
+chi-demo-main-0-0: restore schema: POST chi-demo-main-0-0:7171/backup/actions {"command":"restore --schema --rm --env=S3_PATH=... nightly-20260101000000"}
+```
+
+When an operation ends, `OrchestratorCommandFinished` tells its operation id, its status and the
+command `clickhouse-backup` reports it ran. The API credentials travel in a header and never show in
+an event; a message longer than the 1024 bytes an event takes is cut. The polling requests (status,
+lists of backups, actions) show in none.
+
+### Python orchestrator
+
+`backup.orchestrator: python`, on the CHI or on a cluster, inherited like `mode`, makes the Jobs of the
+cluster run `backup-orchestrator.py` instead: a port of the bash script to Python 3.10 or newer with its
+standard library alone, which does exactly the same - the same environment, the same requests to the
+`clickhouse-backup` API in the same order, the same Events, termination messages and exit codes, the same
+retention, naming, held changes, config overrides and restores. It talks to the API with `urllib`, through
+`http_proxy` as `curl` does, and posts the Events with the token and the CA of the Pod's service account.
+The Job runs it as `python3 /etc/clickhouse-backup-orchestrator/backup-orchestrator.py` in the image
+`python:3.14-slim`, pulled `Always` as the bash Job's image, rather than in the `clickhouse-backup` image;
+the hosts keep their sidecars or backup Pods as they are. Its messages quote the exit codes `curl` would have
+failed with, so a failure reads the same with either.
+
+```yaml
+spec:
+  backup:
+    enabled: "yes"
+    configSecretRef:
+      name: backup-demo-storage
+    orchestrator: python
+```
+
+The script lies next to the bash one, `backup-orchestrator.py` in the folder `backup.path` - in the repository
+`deploy/builder/templates-config/backup/backup-orchestrator.py`, generated to `config/backup`. The install
+bundles and the Helm chart ship it in a ConfigMap of its own, `etc-clickhouse-operator-backup-python-files`
+(Helm value `configs.backupPythonFiles`), mounted in the subfolder `python` of the bash script's mount, at
+`/etc/clickhouse-operator/backup/python`: each script alone fills much of what the data of one ConfigMap may
+take in the Helm chart generation, so the files of the folder are split by type, `*.sh` in
+`etc-clickhouse-operator-backup-files` and `*.py` in this one. The operator reads each script from `backup.path`,
+or, when it is not there, from its subfolder `python`, so one setting covers both, and an edit of either
+ConfigMap reaches the Jobs as before. The operator copies it to the ConfigMap `<chi>-<cluster>-backup-orchestrator`
+under the key `backup-orchestrator.py`; switching `orchestrator` replaces the key there. A ConfigMap of your own
+that `orchestratorConfigMapRef` names has to hold the script of the cluster's orchestrator under its key -
+`backup-orchestrator.sh` for `bash`, `backup-orchestrator.py` for `python`, or both: one that holds only the
+other one aborts the operation, and holds the schedule, with the reason `OrchestratorScriptMismatch`.
+
+The script tests of the repository run every scenario against both orchestrators, the same fake
+`clickhouse-backup` and Kubernetes APIs and the same expectations, so a change of one that the other does not
+follow fails them.
+
+### Backup modes
+
+`backup.mode` chooses how the Jobs reach `clickhouse-backup` on a cluster:
+
+* `sidecar` (default): the sidecar of every ClickHouse Pod, port 7171 of every host's Service; the host
+  lists of the Job name the hosts;
+* `pod`: no sidecar. While a backup or restore of the cluster runs, the operator runs one backup Pod per
+  shard, on the node of a ready replica, mounting the volumes of that replica and serving the REST API;
+  the host lists of the Job name these Pods by DNS, one per shard, and the script waits for them to
+  answer (`BACKUP_POD_WAIT_SECONDS`, 600 by default). The [integration tables](#integration-tables)
+  are not available in this mode.
+
 ## Retention
 
-`retention.keepLast: N` makes every successful run of a schedule delete that schedule's older
-backups on the cluster it ran on, keeping the `N` most recent that hold data and, apart from them,
-the `N` most recent that hold none (see below). Retention is a rule of the schedule's series - the
-backups its runs name `<backupNamePrefix>-YYYYMMDD-HHMMSS` - not of any one backup, which is why a
-`ClickHouseBackup` sets none, not even one that [runs the schedule](#run-a-schedule-now). As the
-prefix names the series, it can be set once and is immutable after (see
-[ClickHouseBackupSchedule](#clickhousebackupschedule)): retention would never prune the backups of
-a former prefix. Retention is deliberately narrow:
+After every successful scheduled run, the [orchestrator](#the-orchestrator-script) prunes the
+schedule's backups on the cluster it ran on, newest first, as the cleanup of ACM does:
 
-* it only considers the backups of the series, so backups of other schedules and one-off backups are
-  never touched - the backups that [run a schedule now](#run-a-schedule-now) included, and a one-off
-  `backupName` of the series' form is refused. Give each schedule its own prefix. The default
-  prefix, `<namespace>-<chi>-<schedule>`, differs between the schedules of one Kubernetes cluster,
-  even across CHIs that share a storage path, unless their names joined with dashes coincide; a
-  prefix set by hand must be unique among all schedules writing to that path, or each schedule's
-  retention deletes the other's backups (see [Storage paths](#storage-paths));
-* it works per cluster: each cluster's runs prune on every host of that cluster the backup ran on,
-  since each shard (and, with `AllReplicas`, each replica) stores its own part of the backup, and on
-  those only. A cluster whose runs keep failing does not stop the others from pruning, and a host
-  that leaves them is pruned no more, see
-  [Hosts that leave a schedule](#hosts-that-leave-a-schedule);
-* it never deletes the backup the run has just made, nor a backup that a kept backup depends on as
-  its incremental base;
-* a backup that `clickhouse-backup` lists as broken - an upload that never completed, for example -
-  does not count toward the `N` kept, so failed uploads never push restorable backups out. Broken
-  backups newer than the `N`-th kept backup (with data or without, whichever is newer, see below)
-  are left alone, as an upload still in progress looks broken too; older ones are deleted, unless
-  another host's copy holds data (see the next bullet);
-* a backup, with data or without, counts toward the `N` kept only if every host of the cluster
-  that retention runs on lists it complete: a run that failed on one host leaves copies on the
-  others that cannot be restored on their own. Such a copy with data - made before a host was
-  added, for example - is kept until `N` backups with data that every host holds are; any other is
-  kept and deleted like a broken backup. When a host cannot be listed, retention skips that run;
-* a backup without data - of a `tables` pattern that matches nothing any more, or of an installation
-  recreated empty - does not count toward the `N` kept either: retention keeps the `N` newest
-  backups with data and, apart from them, the `N` newest without, so runs without data - every run
-  of a `schemaOnly` schedule among them - never push out the backups that hold data, and a host that
-  never holds data still prunes. Data on an object disk counts as data, and so does every backup of
-  a `clickhouse-backup` older than 2.6.6, which does not list sizes. A run without data that is not
-  `schemaOnly` is [reported](#backup-and-restore-jobs) on the schedule. A backup holds data when any
-  host's copy of it does, so every host of the cluster keeps and deletes the same backups - an empty
-  shard prunes its copies of the backups another shard filled only along with that shard.
+* **Only the schedule's own backups count.** Retention looks at the backups named
+  `<backupNamePrefix>-YYYYMMDDHHMMSS` - the scheduled ones, the time being their slot in `timeZone` -
+  and `<backupNamePrefix>-YYYYMMDDTHHMMSS` - those that [run the schedule now](#run-a-schedule-now) -
+  or, with a [naming template](#backup-naming), at every name the template makes of the shard of each
+  host, with the schedule's prefix when it holds `{prefix}`, keyed by their time.
+  Nothing else is ever touched: backups of other schedules, one-off backups, and any other name. Give
+  each schedule its own prefix. The default prefix, `<namespace>-<chi>-<schedule>`, differs between
+  the schedules of one Kubernetes cluster, even across CHIs that share a storage path, unless their
+  names joined with dashes coincide; a prefix set by hand must be unique among all schedules writing to
+  that path, or each schedule's retention deletes the other's backups (see [Storage paths](#storage-paths)).
+  As the prefix names the series, it can be set once and is immutable after.
+* **Every entry keeps its newest `keep` backups.** A scheduled backup counts for every entry whose
+  slot its time is - the Sunday 02:30 backup of the example counts for the hourly, the daily and the
+  weekly entry - and stays as long as any entry keeps it. The newest backup, and the one the run has
+  just made, are always kept.
+* **Run-now backups are kept while they are recent.** A backup that ran the schedule now stays as long
+  as it is no older than the oldest scheduled backup some entry keeps, and goes after that.
+* **Incomplete backups never count, and go once a complete one is newer.** A backup that is not
+  listed complete on every host retention runs on - a run that failed on one host, a broken copy,
+  a backup made before a host joined the cluster - never counts toward any `keep`, nor as the
+  newest backup. Once it is older than the newest backup every host lists complete it is deleted,
+  newest first among the others, on every host that holds it, as ACM deletes every backup of a
+  size, and so is one a host lists `broken`, whatever its size, as that is an upload that failed;
+  a newer one, which may still be uploading, is left. A backup no host lists with a size above 0
+  nor as broken, and one a host lists complete with size 0, is neither counted nor deleted: clean
+  it up by hand. When a host cannot be listed, retention skips that run.
+* **Incremental bases are rebased, not protected.** The operator forces
+  `rebase_during_delete` and `rebase_before_remove_old_remote` on, so `clickhouse-backup` rebases a
+  backup that another one is incremental to before it deletes it.
+* **Per cluster, never during a restore.** Each cluster's runs prune on every host of that cluster the
+  backup ran on - one per shard, or every replica with `AllReplicas`, as each keeps its own part of the
+  backup - and on those only, see [Hosts that leave a schedule](#hosts-that-leave-a-schedule).
+  Retention is skipped while a restore of the cluster has not finished (`RESTORE_IN_PROGRESS`), and a
+  failed retention warns: it never fails the backup.
 
-`0`, the default, keeps every backup.
+### Schedule changes
+
+Retention keeps what the entries keep, so a change of the entries or of `timeZone` would make the next
+run delete what the schedule kept until then: a shifted `time` matches no slot of the backups made
+before, a removed weekly entry leaves its backups to the daily one, a lowered `keep` drops the
+excess. ACM asks first, in a dialog that lists what the change would delete and lets you check what to
+keep. A schedule does the same declaratively, with `spec.retention`:
+
+* **`onScheduleChange: Hold`, the default.** The operator records the entries and the zone before
+  every change in `status.retention.previous`, under a `changeID` - the time of the change - and warns
+  (`RetentionHeld` event). Every run then keeps, of the backups made before each change, all those the
+  schedule before it kept - the newest, the newest `keep` of every entry, the run-now backups in their
+  window - whatever the entries are now. The backups the schedule as it is would delete are listed in
+  `status.clusters[].heldBackups` by the runs of each cluster (and an `OrchestratorRetentionHeld`
+  event): that is ACM's dialog. Backups made after the change follow the entries as they are.
+* **`keepBackups`** pins backups retention never deletes, as the boxes checked in that dialog, and
+  ACM's manual backups, do.
+* **`releaseHeld: <changeID>`** releases that change and every earlier one: the next run deletes the
+  backups none of the remaining changes, the entries and `keepBackups` keep. A later change is never
+  released by an earlier `changeID`, so the field can stay in a manifest under GitOps.
+* **`onScheduleChange: Prune`** holds nothing: the next run applies the change at once, as before.
+
+```yaml
+spec:
+  schedules:
+    - {period: daily, time: "03:00", keep: 7}   # was 02:00
+  retention:
+    keepBackups: [default-backup-demo-nightly-20261001020000]
+    # After reading status.clusters[].heldBackups, release the change:
+    releaseHeld: "2026-11-12T12:00:00Z"
+```
+
+A change is a change of the period, the time, the day or the `keep` of an entry, of the entries, or
+of `timeZone`; `incremental` is none. Up to 16 changes are kept; beyond that the oldest two are merged
+into one that holds every backup made before the newer of them. The operator starts recording on the
+first reconcile of a schedule, an upgraded one included: a change made before then is not held. A
+backup [run now](#run-a-schedule-now) from the schedule takes the pins and the held changes along, as
+its retention is that of a run of the schedule.
 
 ### Hosts that leave a schedule
 
@@ -1361,7 +1786,7 @@ kubectl exec chi-backup-demo-main-0-0-0 -c clickhouse-backup -- \
 # With object disks, add the object disk path of the shard:
 # --env S3_OBJECT_DISK_PATH=object_disks/default/backup-demo/main/1
 kubectl exec chi-backup-demo-main-0-0-0 -c clickhouse-backup -- \
-  clickhouse-backup --env S3_PATH=backup/default/backup-demo/main/1 delete remote default-backup-demo-nightly-20261003-020000
+  clickhouse-backup --env S3_PATH=backup/default/backup-demo/main/1 delete remote default-backup-demo-nightly-20261003023000
 
 # Once done, clear the record of the cluster - here the first entry of status.clusters, see
 #   kubectl get chbs nightly -o jsonpath='{.status.clusters[*].name}'
@@ -1370,12 +1795,60 @@ kubectl patch chbs nightly --subresource=status --type=json \
   -p '[{"op": "remove", "path": "/status/clusters/0/unprunedHosts"}]'
 ```
 
+## Config overrides
+
+ACM makes a backup with `--env S3_STORAGE_CLASS=...` to keep, say, the monthly backups in a colder
+storage class. `configOverrides` does the same, on each entry of a schedule and on a one-off
+`ClickHouseBackup`:
+
+```yaml
+spec:
+  clickHouseInstallation: prod
+  schedules:
+  - {period: daily,   time: "03:00", keep: 7, incremental: true}
+  - {period: weekly,  time: "03:00", day: 0, keep: 4,  configOverrides: [S3_STORAGE_CLASS=STANDARD_IA]}
+  - {period: monthly, time: "03:00", day: 1, keep: 12, configOverrides: [S3_STORAGE_CLASS=GLACIER_IR]}
+# GCS: GCS_STORAGE_CLASS=NEARLINE
+```
+
+* **What an override is.** `KEY=VALUE`, the environment variable `clickhouse-backup` knows the
+  setting by; a leading `--env=`, as ACM writes it, is stripped. The key is upper-case letters,
+  digits and `_`, the value letters, digits and `_ . , : / @ + = -`, so every override is one token of
+  a command. At most 16, each key once.
+* **Which apply.** A scheduled run takes the overrides of the heaviest entry of its slot, as it takes
+  its `incremental`: the Sunday run of the example is weekly, `STANDARD_IA`, the 1st of the month
+  monthly. A backup [run now](#run-a-schedule-now) from a schedule takes none, and `configOverrides`
+  is not set with `scheduleRef`; a restore takes none, as the storage class matters only on upload.
+* **How.** The typed `create_remote` request of the REST API takes no setting, so a backup with
+  overrides runs as the command `create_remote ... --env=KEY=VALUE NAME` of the `actions` endpoint,
+  on every host at once as the typed request does; one without overrides runs as before.
+* **Refused** - by the operator (`InvalidSpec`) and again by the Job - are the settings the operator
+  pins or sets in the sidecar (see [What the operator runs](#what-the-operator-runs)), every `API_*`
+  setting, the credentials, those that tell where the backups are - `REMOTE_STORAGE`, bucket,
+  endpoint, account, `*_PATH`, `*_OBJECT_DISK_PATH` - which the listings, retention and restores of
+  the backup, made with the sidecar's settings, would not find it by, and any setting of a secret
+  (a key holding `PASSWORD`, `SECRET`, `ACCESS_KEY`, `TOKEN`, `CREDENTIAL`, `SAS`, ...): secrets belong
+  in the configuration Secret.
+* **A sidecar restart loses them.** A sidecar that restarts during the upload resumes it by itself,
+  from what it keeps of the command, which leaves out the `--env` flags: the Job follows the resumed
+  upload, as for a typed request, and warns (`OrchestratorOverridesNotResumed` event) that the parts
+  uploaded after the restart got the sidecar's settings.
+* **Rebased parts.** Retention rebases a backup another one is incremental to before it deletes it,
+  copying parts with the sidecar's settings: a rebased part takes the sidecar's storage class.
+  Archive classes (`GLACIER`, `DEEP_ARCHIVE`) make listings, retention and restores read objects
+  that `clickhouse-backup` must first restore; prefer instant-retrieval classes.
+
 ## Incremental backups
 
 `diffFromRemote: <existing backup>` on a `ClickHouseBackup` uploads only the data parts that are
 not already in that backup. Each cluster's backup builds on that cluster's copy of the base, so the
-base must exist on every cluster the backup targets. Restoring an incremental backup needs its whole
-chain of bases in the storage. Retention never deletes a base that a kept backup still needs, but
+base must exist on every cluster the backup targets. On a schedule, the runs of the one entry with
+`incremental: true` make incremental backups on the newest backup of the series as long as the chain
+of incremental backups is shorter than that entry's `keep`; the run after makes a full backup again.
+The series takes the backups [run now](#run-a-schedule-now) from the schedule too, ordered by the time
+they are named after, as ACM bases a backup on the newest backup whether made by hand or on schedule.
+Restoring an incremental backup needs its whole chain of bases in the storage. Retention rebases a
+base that a kept backup still needs before it deletes it, but
 deleting bases by other means (`BACKUPS_TO_KEEP_REMOTE`, a bucket lifecycle rule, manual removal)
 breaks every backup built on them.
 
@@ -1407,12 +1880,15 @@ anything:
    replica must be reachable. Set `overwrite: true` to drop and recreate the restored tables, see
    [ClickHouseRestore](#clickhouserestore). This guard is the only protection for existing data:
    `clickhouse-backup` recreates every restored table during the schema restore, whether or not
-   `overwrite` is set.
+   `overwrite` is set. A restore of `partitions` has no schema restore, and no guard: it replaces
+   those partitions in the existing tables, see [Restore filters](#restore-filters).
 4. **What an overwrite needs** (`overwrite: true`): no table above `max_table_size_to_drop` that a
    drop could not get past, and, where the restore drops the tables `ON CLUSTER`, the same tables in
    the backup of every shard, see [ClickHouseRestore](#clickhouserestore).
 
-Only when every host passes does the restore start. The recommended path is restoring into a fresh,
+Only when every host passes does the restore start, and it downloads the backup to every host
+before it drops anything: a host that cannot hold it fails the restore while the cluster is as it
+was. The recommended path is restoring into a fresh,
 empty CHI and switching clients over once it is verified.
 
 Do not change the target CHI while a restore runs. A change that rolls its Pods restarts the
@@ -1491,7 +1967,7 @@ spec:
     configSecretRef:
       name: backup-demo-storage
     recovery:
-      backupName: default-backup-demo-nightly-20261003-020000
+      backupName: default-backup-demo-nightly-20261003023000
       # The CHI that made the backup, when another one - its namespace too, when another and the
       # storage paths hold {namespace}: the backup lies under the storage paths of that CHI
       sourceInstallation: backup-demo
@@ -1532,7 +2008,7 @@ spec:
     configSecretRef:
       name: backup-demo-storage
     recovery:
-      backupName: default-backup-demo-nightly-20261003-020000
+      backupName: default-backup-demo-nightly-20261003023000
   configuration:
     clusters:
       - name: main
@@ -1614,9 +2090,15 @@ When the source CHI keeps running on the same ZooKeeper or Keeper, the new CHI n
 
 Every resource reports progress in `status`:
 
-* `phase` (backups and restores): `Pending`, `Running`, `Completed` or `Failed`, over all their
-  clusters - `Completed` once every cluster has completed, `Failed` once every cluster has finished
-  and any of them failed, and `Pending` or `Running` until then;
+* `phase` (backups and restores): `Pending`, `Running`, `Completed`, `Failed` or `Aborted`, over all
+  their clusters - `Completed` once every cluster has completed; `Failed` once every cluster has
+  finished and the Job of any of them failed, or it completed on some; `Aborted` once every cluster
+  has finished and the operator stopped the operation on every one that did not complete - an invalid
+  spec, the CHI or cluster missing or stopped, backup disabled, a starting or active deadline exceeded,
+  a Job that never started or was lost, a name conflict, no [orchestrator script](#the-orchestrator-script);
+  `Pending` or `Running` until then. A cluster's own `phase` follows the same rule;
+* `phase`, `reason`, `message`, `nextScheduleTime` and `entries` (schedules): `Active`, `Suspended` or
+  `Aborted`, see [ClickHouseBackupSchedule](#clickhousebackupschedule);
 * `clusters` (backups and restores): one entry per cluster, fixed when the resource is validated,
   with the cluster's `phase`, `jobName`, `hosts`, `configSecret` - the `configSecretRef` of the storage
   the Job keeps the backup in, or reads it from, as the Job was built - `startTime` and `completionTime`, and the
@@ -1667,6 +2149,7 @@ The condition `reason` says why, with the details in `message`:
 | `JobFailedUnchanged`                                 | Restores: a Job failed before it changed anything; the message carries the error it reported. Holds no schedule.                                                                                                                                                                                 |
 | `JobNotStarted`                                      | No Pod of a Job started within about 10 minutes; the events of the Job and its Pod say why. Restores: keeps holding its schedules.                                                                                                                                                               |
 | `JobLost`                                            | A Job disappeared before it finished.                                                                                                                                                                                                                                                            |
+| `OrchestratorScriptMissing`                          | No [orchestrator script](#the-orchestrator-script) to run: the operation, or the schedule, is aborted.                                                                                                                                                                                         |
 | `DeadlineExceeded`                                   | A Job ran past `activeDeadlineSeconds`.                                                                                                                                                                                                                                                          |
 | `Verifying`, `Verified`, `VerificationFailed`        | Backups with `verify: true`: verification is running, passed or failed.                                                                                                                                                                                                                          |
 | `Scheduled`, `Suspended`, `SuspendedForRestore`      | Schedules: the CronJobs are active, suspended by `spec.suspend`, or held for a restore of their cluster or of access entities, or one that reads their backup, see above - or, once no restore holds them any longer, kept suspended until the CHI completes the reconcile it is in. |
@@ -1683,7 +2166,11 @@ kubectl logs job/<status.clusters[].jobName>      # what the Job of a cluster di
 kubectl logs job/backup-demo-once-main-backup     # with verify: true, the backup Job of cluster main
 ```
 
-The operator also emits Kubernetes Events on the resources when the operation of a cluster starts,
+The operator also emits Kubernetes Events on the resources on every change of the phase of a backup
+or restore - `BackupPending`, `BackupRunning`, `BackupCompleted`, `BackupFailed`, `BackupAborted`, and
+`Restore...` alike, a warning for `Failed` and `Aborted`, naming the reason and the message of the
+outcome, for a failed Job its name and the end of the error it reported - and of a schedule (see
+[ClickHouseBackupSchedule](#clickhousebackupschedule)), when the operation of a cluster starts,
 completes and fails, an `UnprunedHosts` warning on a schedule when hosts leave it while retention is
 on, a warning event `CompletedWithoutData` for a backup that holds no data, which the metrics count
 as completed, a warning event `RBACNotRestored` for a restore that left out access entities, a

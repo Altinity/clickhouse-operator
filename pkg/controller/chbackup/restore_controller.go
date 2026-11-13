@@ -77,6 +77,7 @@ func (c *RestoreController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	c.announcePhase(next, cur.Status.Phase, next.Status.Phase, next.Status.Conditions, &out)
 	return c.commitStatus(ctx, next, !apiEquality.Semantic.DeepEqual(cur.Status, next.Status), result, out)
 }
 
@@ -251,7 +252,16 @@ func (c *RestoreController) start(
 		return ctrl.Result{RequeueAfter: waiting.requeue}, nil
 	}
 
-	job := model.BuildRestoreJob(chr, target.chi, target.topology)
+	orchestrator, missing, err := c.orchestrator(ctx, target.chi, cluster.Name, chr.Spec.GetOrchestratorConfigMapName())
+	switch {
+	case err != nil:
+		return ctrl.Result{}, err
+	case missing != nil:
+		failOn(cluster, missing.reason, missing.message)
+		out.add(c.failed(chr, cluster))
+		return ctrl.Result{}, nil
+	}
+	job := model.BuildRestoreJob(chr, target.chi, target.topology, orchestrator)
 	gate := c.jobGate(chr, cluster.Name, target.topology.EnabledClusterNames())
 	return c.startJob(ctx, chr, chr.Spec.ClickHouseInstallation, cluster.Name, job, gate, func(reason, message string) {
 		waitOn(cluster, reason, message)
@@ -393,7 +403,7 @@ func holdsSchedules(chr *api.ClickHouseRestore) bool {
 		return false
 	case chr.Status.Phase == api.OperationPhaseCompleted:
 		return false
-	case chr.Status.Phase == api.OperationPhaseFailed:
+	case failedPhase(chr.Status.Phase):
 		for _, cluster := range chr.Status.Clusters {
 			if mayHaveChanged(cluster) {
 				return true
@@ -406,7 +416,7 @@ func holdsSchedules(chr *api.ClickHouseRestore) bool {
 
 // mayHaveChanged reports whether a restore failed on a cluster after its Job may have changed something.
 func mayHaveChanged(cluster api.OperationClusterStatus) bool {
-	return (cluster.Phase == api.OperationPhaseFailed) && (cluster.JobName != "") && (cluster.Reason != api.BackupReasonJobFailedUnchanged)
+	return failedPhase(cluster.Phase) && (cluster.JobName != "") && (cluster.Reason != api.BackupReasonJobFailedUnchanged)
 }
 
 // heldCluster returns the cluster whose schedules a restore holds, "" when it holds the schedules of

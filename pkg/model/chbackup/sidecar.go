@@ -64,7 +64,7 @@ type sidecarSettings struct {
 // vars of the sidecar. What the Job cannot follow makes the settings unverifiable: env vars from an envFrom source,
 // a command that may name another configuration file, and a value that resolves otherwise in a pod of the Job.
 func newSidecarSettings(host *api.Host, containers interfaces.IContainerManager) sidecarSettings {
-	sidecar, _ := containers.NewBackupContainer(host)
+	sidecar, _ := containers.NewBackupServerContainer(host)
 	settings := sidecarSettings{sources: map[string][]core.EnvVar{}}
 	// What the operator does not set itself comes from the clickhouse-backup container of the pod template the
 	// cluster's backup names

@@ -73,6 +73,17 @@ spec:
                 - rule: "(has(self.sourceInstallation) ? self.sourceInstallation : '') == (has(oldSelf.sourceInstallation) ? oldSelf.sourceInstallation : '') && (has(self.sourceNamespace) ? self.sourceNamespace : '') == (has(oldSelf.sourceNamespace) ? oldSelf.sourceNamespace : '')"
                   message: "sourceInstallation and sourceNamespace are immutable; create a new resource"
               properties:
+                orchestratorConfigMapRef:
+                  type: object
+                  description: |
+                    ConfigMap in the namespace of the restore whose key `backup-orchestrator.sh` (`backup-orchestrator.py` for a cluster whose backup.orchestrator is python) its Jobs run instead of the
+                    operator's orchestrator script, the one of the operator configuration
+                  properties:
+                    name:
+                      description: |
+                        Name of the referent. More info:
+                        https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      type: string
                 clickHouseInstallation:
                   type: string
                   minLength: 1
@@ -122,6 +133,33 @@ spec:
                   description: "Optional clickhouse-backup --tables pattern, e.g. db.table or db.*, comma-separated, restricting the schema and the data restored. Empty restores every table"
                   maxLength: 1024
                   pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
+                partitions:
+                  type: array
+                  description: "Optional partition ids the restore is restricted to (clickhouse-backup --partitions): their data is downloaded and attached into the existing tables, replacing those partitions, and the schema is not restored, as the Altinity Cloud Manager restores partitions. Not with schemaOnly or rbac"
+                  nullable: true
+                  items:
+                    type: string
+                    pattern: "^[A-Za-z0-9_-]{1,128}$"
+                skipTables:
+                  type: string
+                  description: "Optional clickhouse-backup table pattern, e.g. db.tmp* or logs.*, comma-separated, of the tables the restore leaves out, on top of the system databases (CLICKHOUSE_SKIP_TABLES)"
+                  maxLength: 1024
+                  pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
+                skipTableEngines:
+                  type: array
+                  description: "Optional table engines, e.g. Kafka, whose tables the restore leaves out (CLICKHOUSE_SKIP_TABLE_ENGINES)"
+                  nullable: true
+                  items:
+                    type: string
+                    pattern: "^[A-Za-z][A-Za-z0-9_]{0,127}$"
+                databaseMapping:
+                  type: object
+                  description: |
+                    Optional mapping of the databases of the backup, the keys, to the databases the restore restores their tables into,
+                    the values (clickhouse-backup --restore-database-mapping). The overwrite guard checks the databases restored into
+                  additionalProperties:
+                    type: string
+                    pattern: "^[A-Za-z0-9_][A-Za-z0-9_-]{0,127}$"
                 rbac:
                   <<: *TypeStringBool
                   description: |
@@ -143,6 +181,7 @@ spec:
                     - Running
                     - Completed
                     - Failed
+                    - Aborted
                 backupName:
                   type: string
                   description: "Backup the restore Jobs restore, as it was when the first Job was created"
@@ -173,6 +212,7 @@ spec:
                           - Running
                           - Completed
                           - Failed
+                          - Aborted
                       jobName:
                         type: string
                         description: "Job that drives the restore on the cluster"

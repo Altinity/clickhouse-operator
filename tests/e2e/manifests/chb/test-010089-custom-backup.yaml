@@ -1,0 +1,12 @@
+# test_010089
+# Names an orchestrator ConfigMap without the script: the backup is aborted.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackup"
+metadata:
+  name: custom-backup-089
+spec:
+  clickHouseInstallation: test-089
+  cluster: custom
+  backupName: e2e-089-custom
+  orchestratorConfigMapRef:
+    name: test-089-custom-orchestrator

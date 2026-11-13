@@ -30,6 +30,8 @@ spec:
         checksum/configd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-clickhouse-operator-configd-files.yaml") }}
         checksum/templatesd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-clickhouse-operator-templatesd-files.yaml") }}
         checksum/usersd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-clickhouse-operator-usersd-files.yaml") }}
+        checksum/backup-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-clickhouse-operator-backup-files.yaml") }}
+        checksum/backup-python-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-clickhouse-operator-backup-python-files.yaml") }}
         checksum/keeper-confd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-keeper-operator-confd-files.yaml") }}
         checksum/keeper-configd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-keeper-operator-configd-files.yaml") }}
         checksum/keeper-templatesd-files: {{ include "altinity-clickhouse-operator.configMapContentHash" (dict "ctx" . "name" "/generated/ConfigMap-etc-keeper-operator-templatesd-files.yaml") }}
@@ -52,6 +54,12 @@ spec:
         - name: etc-clickhouse-operator-usersd-folder
           configMap:
             name: {{ include "altinity-clickhouse-operator.fullname" . }}-usersd-files
+        - name: etc-clickhouse-operator-backup-folder
+          configMap:
+            name: {{ include "altinity-clickhouse-operator.fullname" . }}-backup-files
+        - name: etc-clickhouse-operator-backup-python-folder
+          configMap:
+            name: {{ include "altinity-clickhouse-operator.fullname" . }}-backup-python-files
         - name: etc-keeper-operator-confd-folder
           configMap:
             name: {{ include "altinity-clickhouse-operator.fullname" . }}-keeper-confd-files
@@ -87,6 +95,10 @@ spec:
               mountPath: /etc/clickhouse-operator/chi/templates.d
             - name: etc-clickhouse-operator-usersd-folder
               mountPath: /etc/clickhouse-operator/chi/users.d
+            - name: etc-clickhouse-operator-backup-folder
+              mountPath: /etc/clickhouse-operator/backup
+            - name: etc-clickhouse-operator-backup-python-folder
+              mountPath: /etc/clickhouse-operator/backup/python
             - name: etc-keeper-operator-confd-folder
               mountPath: /etc/clickhouse-operator/chk/conf.d
             - name: etc-keeper-operator-configd-folder

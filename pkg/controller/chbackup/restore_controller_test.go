@@ -133,7 +133,7 @@ func TestRestoreIsNeverRerun(t *testing.T) {
 
 	reconcileRestore(t, controller, "r1")
 	got := getRestore(t, c, "r1")
-	require.Equal(t, api.OperationPhaseFailed, got.Status.Phase)
+	require.Equal(t, api.OperationPhaseAborted, got.Status.Phase)
 	require.Equal(t, api.BackupReasonJobLost, condition(t, got.Status.Conditions, api.BackupConditionReady).Reason)
 
 	reconcileRestore(t, controller, "r1")
@@ -161,7 +161,7 @@ func TestRestoreFailsAJobThatNeverStarts(t *testing.T) {
 
 	require.Equal(t, ctrl.Result{}, reconcileRestore(t, controller, "r1"))
 	got := getRestore(t, c, "r1")
-	require.Equal(t, api.OperationPhaseFailed, got.Status.Phase)
+	require.Equal(t, api.OperationPhaseAborted, got.Status.Phase)
 	require.Equal(t, api.BackupReasonJobNotStarted, condition(t, got.Status.Conditions, api.BackupConditionReady).Reason)
 	requireStopped(t, c, "r1-main-restore")
 }
@@ -310,7 +310,7 @@ func TestRestoreRecordsTheBackupItRestores(t *testing.T) {
 		original := newRestoreCR("r2")
 		topology, err := model.NewTopology(readyInstallation(t).GetAncestorT(), "")
 		require.NoError(t, err)
-		job := model.BuildRestoreJob(original, readyInstallation(t), topology)
+		job := model.BuildRestoreJob(original, readyInstallation(t), topology, testOrchestrator())
 		require.NoError(t, ctrl.SetControllerReference(original, job, newScheme(t)))
 		edited := original.DeepCopy()
 		edited.Spec.BackupName = "edited-later"
@@ -393,7 +393,7 @@ func TestRestoreDeadlineExceeded(t *testing.T) {
 
 	reconcileRestore(t, controller, "r1")
 	got := getRestore(t, c, "r1")
-	require.Equal(t, api.OperationPhaseFailed, got.Status.Phase)
+	require.Equal(t, api.OperationPhaseAborted, got.Status.Phase)
 	require.Equal(t, api.BackupReasonDeadlineExceeded, condition(t, got.Status.Conditions, api.BackupConditionReady).Reason)
 	require.Equal(t, 1, eventCount(t, c, api.BackupReasonDeadlineExceeded))
 }
@@ -521,7 +521,7 @@ func TestRestoreRefusesTargetsWithoutBackup(t *testing.T) {
 
 	require.Equal(t, ctrl.Result{}, reconcileRestore(t, controller, "r1"))
 	got := getRestore(t, c, "r1")
-	require.Equal(t, api.OperationPhaseFailed, got.Status.Phase)
+	require.Equal(t, api.OperationPhaseAborted, got.Status.Phase)
 	require.Equal(t, api.BackupReasonBackupDisabled, condition(t, got.Status.Conditions, api.BackupConditionReady).Reason)
 	require.False(t, holdsSchedules(got))
 	require.Zero(t, jobCount(t, c))
@@ -539,7 +539,7 @@ func TestRestoreOfAClusterWithoutStorage(t *testing.T) {
 	controller := NewRestoreController(c, c, c.Scheme(), cr)
 	require.Equal(t, ctrl.Result{}, reconcileRestore(t, controller, "r1"))
 	got := getRestore(t, c, "r1")
-	require.Equal(t, api.OperationPhaseFailed, got.Status.Phase)
+	require.Equal(t, api.OperationPhaseAborted, got.Status.Phase)
 	ready := condition(t, got.Status.Conditions, api.BackupConditionReady)
 	require.Equal(t, api.BackupReasonNoBackupStorage, ready.Reason)
 	require.Contains(t, ready.Message, api.BackupStorageHint)

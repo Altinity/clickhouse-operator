@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"time"
 
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 
@@ -50,11 +51,14 @@ const (
 	OperationPhaseRunning   OperationPhase = "Running"
 	OperationPhaseCompleted OperationPhase = "Completed"
 	OperationPhaseFailed    OperationPhase = "Failed"
+	// OperationPhaseAborted: the operator stopped the operation, or never started it, for a reason other than a
+	// failure of its Job: an invalid spec, a missing or stopped installation, a deadline exceeded, a lost Job.
+	OperationPhaseAborted OperationPhase = "Aborted"
 )
 
 // IsTerminal reports whether the operation has finished, successfully or not.
 func (p OperationPhase) IsTerminal() bool {
-	return (p == OperationPhaseCompleted) || (p == OperationPhaseFailed)
+	return (p == OperationPhaseCompleted) || (p == OperationPhaseFailed) || (p == OperationPhaseAborted)
 }
 
 // OperationClusterStatus is the observed state of a backup or a restore on one of the clusters it
@@ -62,7 +66,7 @@ func (p OperationPhase) IsTerminal() bool {
 type OperationClusterStatus struct {
 	// Name is the name of the cluster.
 	Name string `json:"name" yaml:"name"`
-	// Phase is one of Pending, Running, Completed, Failed.
+	// Phase is one of Pending, Running, Completed, Failed, Aborted.
 	Phase OperationPhase `json:"phase,omitempty" yaml:"phase,omitempty"`
 	// JobName is the Job that drives the operation on the cluster: the backup or restore Job, then,
 	// while a backup is verified, the verify Job.
@@ -204,6 +208,10 @@ const (
 	// retention no longer prunes the backups they made. Only the event that announces it
 	// carries this reason; the schedule's status keeps the hosts.
 	BackupReasonUnprunedHosts = "UnprunedHosts"
+	// BackupReasonRetentionHeld: a change of the entries or the time zone of a schedule is held, its retention
+	// keeping every backup the schedule kept before it until spec.retention.releaseHeld releases it. Only the event
+	// that announces it carries this reason; the schedule's status keeps the change.
+	BackupReasonRetentionHeld = "RetentionHeld"
 )
 
 const (
@@ -218,12 +226,13 @@ const (
 	BackupStartingDeadlineMaxSeconds = math.MaxInt32
 	// BackupNameScheduleSuffix is the form of the suffix a scheduled run appends to the backup name prefix, the time
 	// the run was due, as messages tell it.
-	BackupNameScheduleSuffix = "-YYYYMMDD-HHMMSS"
+	BackupNameScheduleSuffix = "-YYYYMMDDHHMMSS"
 	// BackupNameScheduleSuffixLength is the length of the suffix a scheduled run appends.
 	BackupNameScheduleSuffixLength = len(BackupNameScheduleSuffix)
-	// BackupNamePrefixMaxLength leaves room for the schedule suffix, so a generated name still fits
-	// BackupNameMaxLength. Mirrored by the CRD schema maxLength.
-	BackupNamePrefixMaxLength = BackupNameMaxLength - BackupNameScheduleSuffixLength
+	// BackupNamePrefixMaxLength leaves room for the schedule suffix, and for the "T" of the "-YYYYMMDDTHHMMSS" suffix
+	// of a backup that runs a schedule once, so a generated name still fits BackupNameMaxLength. Mirrored by the CRD
+	// schema maxLength.
+	BackupNamePrefixMaxLength = BackupNameMaxLength - BackupNameScheduleSuffixLength - 1
 	// BackupSourceInstallationMaxLength and BackupSourceNamespaceMaxLength bound the installation, and its
 	// namespace, a restore reads the backup of: an object name and a namespace name. Mirrored by the CRD schema
 	// maxLength.
@@ -247,12 +256,19 @@ var (
 	// backupTablesRegexp bounds clickhouse-backup --tables patterns: db.table, db.*, comma-separated.
 	// No leading "-": a Job passes the pattern as an argument, which must never read as a flag.
 	backupTablesRegexp = regexp.MustCompile(`^[A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*$`)
-	// scheduledBackupNameRegexp matches the end of the names the runs of a schedule make, "-YYYYMMDD-HHMMSS", which
+	// scheduledBackupNameRegexp matches the end of the names the runs of a schedule make, "-YYYYMMDDHHMMSS", which
 	// the retention of a schedule prunes: a one-off backup of such a name would join the series of the schedule whose
 	// prefix it carries, and push out the backups the schedule made.
-	scheduledBackupNameRegexp = regexp.MustCompile(`-[0-9]{8}-[0-9]{6}$`)
+	scheduledBackupNameRegexp = regexp.MustCompile(`-[0-9]{14}$`)
 	// backupPartitionRegexp bounds one clickhouse-backup --partitions id.
 	backupPartitionRegexp = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
+	// backupEngineRegexp bounds a table engine a restore leaves out. Mirrored by the CRD schema patterns.
+	backupEngineRegexp = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,127}$`)
+	// backupDatabaseRegexp bounds a database of the database mapping of a restore: no ":" or ",", which separate the
+	// pairs of the mapping, nor anything a command line would split. Mirrored by the CRD schema patterns.
+	backupDatabaseRegexp = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_-]{0,127}$`)
+	// restoreSystemDatabases are the databases a database mapping must not name, as the restore never touches them
+	restoreSystemDatabases = map[string]bool{"system": true, "information_schema": true, "_temporary_and_external_tables": true}
 	// backupSourceRegexp bounds the installation and the namespace a restore reads the backup of: the values of the
 	// {installation} and {namespace} macros of the storage paths there, which a Job puts into the command line of
 	// clickhouse-backup actions. Mirrored by the CRD schema patterns.
@@ -422,8 +438,31 @@ type ClickHouseBackupSpec struct {
 	// a cluster whose Job is not created by then fails, as does the backup when it is not validated by then.
 	// Unset waits as long as it takes.
 	StartingDeadlineSeconds *int64 `json:"startingDeadlineSeconds,omitempty" yaml:"startingDeadlineSeconds,omitempty"`
+	// OrchestratorConfigMapRef names a ConfigMap in the namespace of the backup whose key backup-orchestrator.sh
+	// (backup-orchestrator.py for a cluster whose backup.orchestrator is python) its Jobs run instead of the operator's
+	// orchestrator script. With ScheduleRef, unset takes the schedule's.
+	OrchestratorConfigMapRef *core.LocalObjectReference `json:"orchestratorConfigMapRef,omitempty" yaml:"orchestratorConfigMapRef,omitempty"`
+	// ConfigOverrides are clickhouse-backup settings the backup is made with in place of those of the sidecar, as
+	// KEY=VALUE of the env var of the setting, e.g. S3_STORAGE_CLASS=STANDARD_IA, see type_backup_overrides.go. Not
+	// with ScheduleRef: a backup that runs a schedule takes no overrides.
+	ConfigOverrides []string `json:"configOverrides,omitempty" yaml:"configOverrides,omitempty"`
 
 	BackupOptions `json:",inline" yaml:",inline"`
+}
+
+// OrchestratorConfigMap returns the ConfigMap whose backup-orchestrator.sh the Jobs of the backup run, "" for the
+// operator's script: the one its spec names, else, for a backup that runs a schedule, the schedule's as the backup
+// recorded it. Nil-safe.
+func (chb *ClickHouseBackup) OrchestratorConfigMap() string {
+	switch {
+	case chb == nil:
+		return ""
+	case chb.Spec.OrchestratorConfigMapRef != nil:
+		return chb.Spec.OrchestratorConfigMapRef.Name
+	case chb.Spec.ScheduleRef != nil:
+		return chb.Status.Schedule.GetOrchestratorConfigMapName()
+	}
+	return ""
 }
 
 // BackupScheduleRef names the ClickHouseBackupSchedule a backup makes the backup of once.
@@ -505,6 +544,12 @@ func (spec *ClickHouseBackupSpec) Validate() error {
 	case spec.BackupName != "":
 		return fmt.Errorf("%w: a backup that runs a schedule is named with the schedule's backupNamePrefix: "+
 			"backupName is not set with scheduleRef", ErrInvalidBackupSpec)
+	case len(spec.ConfigOverrides) > 0:
+		return fmt.Errorf("%w: a backup that runs a schedule takes no configOverrides: they are not set with scheduleRef",
+			ErrInvalidBackupSpec)
+	}
+	if err := ValidateConfigOverrides("configOverrides", spec.ConfigOverrides); err != nil {
+		return err
 	}
 	if err := validateBackupName("backupName", spec.BackupName, BackupNameMaxLength); err != nil {
 		return err
@@ -532,7 +577,7 @@ func (spec *ClickHouseBackupSpec) Validate() error {
 
 // ClickHouseBackupStatus defines the observed state of a ClickHouseBackup.
 type ClickHouseBackupStatus struct {
-	// Phase is one of Pending, Running, Completed, Failed.
+	// Phase is one of Pending, Running, Completed, Failed, Aborted.
 	Phase OperationPhase `json:"phase,omitempty" yaml:"phase,omitempty"`
 	// BackupName is the resolved backup name.
 	BackupName string `json:"backupName,omitempty" yaml:"backupName,omitempty"`
@@ -566,8 +611,29 @@ type BackupScheduleRecord struct {
 	Cluster string `json:"cluster,omitempty" yaml:"cluster,omitempty"`
 	// BackupNamePrefix is the backup name prefix of the schedule, which names the backup.
 	BackupNamePrefix string `json:"backupNamePrefix,omitempty" yaml:"backupNamePrefix,omitempty"`
+	// OrchestratorConfigMapRef is the schedule's orchestratorConfigMapRef, which the backup runs unless it names
+	// its own.
+	OrchestratorConfigMapRef *core.LocalObjectReference `json:"orchestratorConfigMapRef,omitempty" yaml:"orchestratorConfigMapRef,omitempty"`
+	// Schedules are the schedule's entries, which tell whether the backup is incremental, and which backups the
+	// retention that follows it keeps, as after a scheduled run.
+	Schedules []BackupScheduleEntry `json:"schedules,omitempty" yaml:"schedules,omitempty"`
+	// TimeZone is the schedule's timeZone.
+	TimeZone string `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
+	// KeepBackups are the backups the schedule's retention never deletes, spec.retention.keepBackups.
+	KeepBackups []string `json:"keepBackups,omitempty" yaml:"keepBackups,omitempty"`
+	// PreviousSchedules are the changes of the schedule whose backups its retention holds, status.retention.previous.
+	PreviousSchedules []RetiredScheduleRules `json:"previousSchedules,omitempty" yaml:"previousSchedules,omitempty"`
 
 	BackupOptions `json:",inline" yaml:",inline"`
+}
+
+// GetOrchestratorConfigMapName returns the schedule's ConfigMap of the orchestrator script the record holds, "" for
+// none, nil-safe.
+func (record *BackupScheduleRecord) GetOrchestratorConfigMapName() string {
+	if record == nil {
+		return ""
+	}
+	return orchestratorConfigMapName(record.OrchestratorConfigMapRef)
 }
 
 // GetClickHouseInstallation returns the installation the record names, nil-safe.

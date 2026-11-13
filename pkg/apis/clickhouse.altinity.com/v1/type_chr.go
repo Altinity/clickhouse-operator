@@ -16,7 +16,10 @@ package v1
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -66,11 +69,39 @@ type ClickHouseRestoreSpec struct {
 	// Tables optionally restricts the restore to tables matching this clickhouse-backup pattern
 	// (e.g. "db.table", "db.*"), in the schema and the data alike. Empty restores everything.
 	Tables string `json:"tables,omitempty" yaml:"tables,omitempty"`
+	// Partitions optionally restricts the restore to the data of the given partition ids of the tables
+	// (clickhouse-backup --partitions), downloaded and attached into the tables as they are, as the Altinity Cloud
+	// Manager restores partitions: the schema is not restored, nothing is dropped but those partitions, which
+	// clickhouse-backup drops before it attaches them, and the tables must exist. Not with schemaOnly or rbac.
+	Partitions []string `json:"partitions,omitempty" yaml:"partitions,omitempty"`
+	// SkipTables optionally leaves out of the restore the tables matching this clickhouse-backup pattern (e.g.
+	// "db.table", "db.*"), on top of the system databases (CLICKHOUSE_SKIP_TABLES).
+	SkipTables string `json:"skipTables,omitempty" yaml:"skipTables,omitempty"`
+	// SkipTableEngines optionally leaves out of the restore the tables of these engines, e.g. Kafka
+	// (CLICKHOUSE_SKIP_TABLE_ENGINES).
+	SkipTableEngines []string `json:"skipTableEngines,omitempty" yaml:"skipTableEngines,omitempty"`
+	// DatabaseMapping optionally restores the tables of a database of the backup, the key, into another database,
+	// the value (clickhouse-backup --restore-database-mapping). The overwrite guard checks the databases restored
+	// into.
+	DatabaseMapping map[string]string `json:"databaseMapping,omitempty" yaml:"databaseMapping,omitempty"`
 	// RBAC also restores the users, roles, grants and other access entities the backup holds. They
 	// belong to the whole installation, so only a restore of every cluster may set it.
 	RBAC *types.StringBool `json:"rbac,omitempty" yaml:"rbac,omitempty"`
 	// ActiveDeadlineSeconds bounds how long the restore Job may run. Defaults to 24 hours.
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
+	// OrchestratorConfigMapRef names a ConfigMap in the namespace of the restore whose key backup-orchestrator.sh
+	// (backup-orchestrator.py for a cluster whose backup.orchestrator is python) its Jobs run instead of the operator's
+	// orchestrator script.
+	OrchestratorConfigMapRef *core.LocalObjectReference `json:"orchestratorConfigMapRef,omitempty" yaml:"orchestratorConfigMapRef,omitempty"`
+}
+
+// GetOrchestratorConfigMapName returns the ConfigMap of the orchestrator script of the restore, "" for the operator's
+// script, nil-safe.
+func (spec *ClickHouseRestoreSpec) GetOrchestratorConfigMapName() string {
+	if spec == nil {
+		return ""
+	}
+	return orchestratorConfigMapName(spec.OrchestratorConfigMapRef)
 }
 
 // TargetCluster returns the cluster the restore targets, "" for every backup-enabled cluster: the one
@@ -137,6 +168,18 @@ func (spec *ClickHouseRestoreSpec) Validate() error {
 	if err := validateTables(spec.Tables); err != nil {
 		return err
 	}
+	if err := validateRestoreFilters(spec); err != nil {
+		return err
+	}
+	// A restore of partitions attaches their data into the tables as they are, without the schema step, which
+	// restores the access entities too
+	if len(spec.Partitions) > 0 && spec.SchemaOnly.IsTrue() {
+		return fmt.Errorf("%w: partitions restore data, which schemaOnly leaves out", ErrInvalidBackupSpec)
+	}
+	if len(spec.Partitions) > 0 && spec.RBAC.IsTrue() {
+		return fmt.Errorf("%w: partitions restore no schema, which the access entities rbac asks for are restored with",
+			ErrInvalidBackupSpec)
+	}
 	if err := validateBackupSource("sourceInstallation", spec.SourceInstallation, BackupSourceInstallationMaxLength); err != nil {
 		return err
 	}
@@ -161,7 +204,7 @@ func (spec *ClickHouseRestoreSpec) Validate() error {
 
 // ClickHouseRestoreStatus defines the observed state of a ClickHouseRestore.
 type ClickHouseRestoreStatus struct {
-	// Phase is one of Pending, Running, Completed, Failed.
+	// Phase is one of Pending, Running, Completed, Failed, Aborted.
 	Phase OperationPhase `json:"phase,omitempty" yaml:"phase,omitempty"`
 	// BackupName is the backup the restore Jobs restore, as it was when the first Job was created.
 	BackupName string `json:"backupName,omitempty" yaml:"backupName,omitempty"`
@@ -190,4 +233,63 @@ type ClickHouseRestoreList struct {
 	meta.TypeMeta `json:",inline"  yaml:",inline"`
 	meta.ListMeta `json:"metadata" yaml:"metadata"`
 	Items         []ClickHouseRestore `json:"items" yaml:"items"`
+}
+
+// validateRestoreFilters checks the partitions, the tables and engines left out, and the database mapping of a
+// restore: every value becomes a single token of a clickhouse-backup command of a restore Job.
+func validateRestoreFilters(spec *ClickHouseRestoreSpec) error {
+	for _, partition := range spec.Partitions {
+		if !backupPartitionRegexp.MatchString(partition) {
+			return fmt.Errorf("%w: partition %q must match %s", ErrInvalidBackupSpec, partition, backupPartitionRegexp)
+		}
+	}
+	if (len(spec.SkipTables) > backupTablesMaxLength) || ((spec.SkipTables != "") && !backupTablesRegexp.MatchString(spec.SkipTables)) {
+		return fmt.Errorf("%w: skipTables %q must match %s and be at most %d characters", ErrInvalidBackupSpec,
+			spec.SkipTables, backupTablesRegexp, backupTablesMaxLength)
+	}
+	for _, engine := range spec.SkipTableEngines {
+		if !backupEngineRegexp.MatchString(engine) {
+			return fmt.Errorf("%w: skipTableEngines %q must match %s", ErrInvalidBackupSpec, engine, backupEngineRegexp)
+		}
+	}
+	targets := map[string]string{}
+	for source, target := range spec.DatabaseMapping {
+		for _, name := range []string{source, target} {
+			if !backupDatabaseRegexp.MatchString(name) || restoreSystemDatabases[strings.ToLower(name)] {
+				return fmt.Errorf("%w: databaseMapping %q: %q must match %s and name no system database", ErrInvalidBackupSpec,
+					source+":"+target, name, backupDatabaseRegexp)
+			}
+		}
+		if source == target {
+			return fmt.Errorf("%w: databaseMapping maps %q to itself", ErrInvalidBackupSpec, source)
+		}
+		if other, taken := targets[target]; taken {
+			first, second := other, source
+			if second < first {
+				first, second = second, first
+			}
+			return fmt.Errorf("%w: databaseMapping maps both %q and %q to %q", ErrInvalidBackupSpec, first, second, target)
+		}
+		targets[target] = source
+	}
+	for source := range spec.DatabaseMapping {
+		if _, mapped := targets[source]; mapped {
+			return fmt.Errorf("%w: databaseMapping maps %q, which another database is mapped to", ErrInvalidBackupSpec, source)
+		}
+	}
+	return nil
+}
+
+// GetDatabaseMapping returns the database mapping as clickhouse-backup takes it, "source:target" pairs separated by
+// commas, sorted, empty for none, nil-safe
+func (spec *ClickHouseRestoreSpec) GetDatabaseMapping() string {
+	if spec == nil {
+		return ""
+	}
+	pairs := make([]string, 0, len(spec.DatabaseMapping))
+	for source, target := range spec.DatabaseMapping {
+		pairs = append(pairs, source+":"+target)
+	}
+	sort.Strings(pairs)
+	return strings.Join(pairs, ",")
 }

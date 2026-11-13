@@ -75,6 +75,10 @@ type topologyCluster struct {
 	// maxTableSizeToDrop is the smallest max_table_size_to_drop of the hosts of the cluster, 0 when none
 	// of them limits the size of a table it drops
 	maxTableSizeToDrop uint64
+	// preferredReplica is the index of the replica of each shard a backup of one replica per shard runs on
+	preferredReplica int
+	// naming is the naming template of the backups of the cluster, "" for the default naming
+	naming string
 }
 
 // podSettings are the settings a Job inherits from a host it drives: the image of its clickhouse-backup
@@ -310,9 +314,11 @@ func newTopologyCluster(
 	containers interfaces.IContainerManager,
 ) topologyCluster {
 	cluster := topologyCluster{
-		name:         c.GetName(),
-		configSecret: c.GetBackup().GetConfigSecretName(),
-		replicated:   !c.GetZookeeper().IsEmpty(),
+		name:             c.GetName(),
+		configSecret:     c.GetBackup().GetConfigSecretName(),
+		replicated:       !c.GetZookeeper().IsEmpty(),
+		preferredReplica: c.GetBackup().GetPreferredReplica(),
+		naming:           c.GetBackup().GetNaming(),
 	}
 	if c.GetLayout() == nil {
 		return cluster
@@ -388,7 +394,7 @@ func smallerLimit(x, y uint64) uint64 {
 // newPodSettings returns what a Job inherits from a host: the image, its pull policy and the identity of the
 // host's clickhouse-backup sidecar, and what its pod template sets at the pod level
 func newPodSettings(host *api.Host, containers interfaces.IContainerManager) podSettings {
-	sidecar, _ := containers.NewBackupContainer(host)
+	sidecar, _ := containers.NewBackupServerContainer(host)
 	settings := podSettings{
 		image:                    sidecar.Image,
 		imagePullPolicy:          sidecar.ImagePullPolicy,
@@ -434,6 +440,34 @@ func (t *Topology) firstPerShard() []string {
 	return hosts
 }
 
+// preferredPerShard returns the preferred replica of every shard, backup.preferredReplica, or its first one when the
+// shard has fewer replicas: the replicas a backup of one replica per shard runs on.
+func (t *Topology) preferredPerShard() []string {
+	if t == nil {
+		return nil
+	}
+	var hosts []string
+	for _, cluster := range t.clusters {
+		for _, shard := range cluster.shards {
+			if cluster.preferredReplica < len(shard.hosts) {
+				hosts = append(hosts, shard.hosts[cluster.preferredReplica])
+			} else {
+				hosts = append(hosts, shard.hosts[0])
+			}
+		}
+	}
+	return hosts
+}
+
+// backupHosts returns the hosts a backup with the given replica selection makes its parts on: every replica, or the
+// preferred replica of every shard, see preferredPerShard.
+func (t *Topology) backupHosts(selection api.ReplicaSelection) []string {
+	if selection == api.ReplicaSelectionAllReplicas {
+		return t.allReplicas()
+	}
+	return t.preferredPerShard()
+}
+
 // allReplicas returns every host of every shard.
 func (t *Topology) allReplicas() []string {
 	if t == nil {
@@ -454,6 +488,68 @@ func (t *Topology) hosts(selection api.ReplicaSelection) []string {
 		return t.allReplicas()
 	}
 	return t.firstPerShard()
+}
+
+// Naming returns the naming template of the backups of the cluster a Job built from the topology targets, "" for the
+// default naming.
+func (t *Topology) Naming() string {
+	if (t == nil) || (len(t.clusters) == 0) {
+		return ""
+	}
+	return t.clusters[0].naming
+}
+
+// ClusterNamings returns the naming template of every cluster the topology targets, by cluster, "" for the default
+// naming.
+func (t *Topology) ClusterNamings() map[string]string {
+	namings := map[string]string{}
+	if t == nil {
+		return namings
+	}
+	for _, cluster := range t.clusters {
+		namings[cluster.name] = cluster.naming
+	}
+	return namings
+}
+
+// Installation returns the name of the installation of the topology, the value of {chi} in a naming template.
+func (t *Topology) Installation() string {
+	if t == nil {
+		return ""
+	}
+	return t.installation
+}
+
+// Namespace returns the namespace of the installation of the topology, the value of {namespace} in a naming template.
+func (t *Topology) Namespace() string {
+	if t == nil {
+		return ""
+	}
+	return t.namespace
+}
+
+// shardNumbers returns the number, from 1, of the shard of every host of the cluster a Job built from the topology
+// targets, as "host=number" in shard and replica order, of every host as the Job reaches it: every replica with the
+// sidecar transport, the backup Pod of every shard with the pod transport. The number is the place of the shard among
+// the shards of the cluster that have hosts, as the shard_num of system.clusters and the shard<N> of the Altinity Cloud
+// Manager.
+func (t *Topology) shardNumbers(orchestrator Orchestrator) []string {
+	if (t == nil) || (len(t.clusters) == 0) {
+		return nil
+	}
+	cluster := t.clusters[0]
+	var numbers []string
+	for i, shard := range cluster.shards {
+		number := strconv.Itoa(i + 1)
+		if orchestrator.IsPodTransport() {
+			numbers = append(numbers, ShardPodHost(t.namespace, t.installation, cluster.name, shard.name)+"="+number)
+			continue
+		}
+		for _, host := range shard.hosts {
+			numbers = append(numbers, host+"="+number)
+		}
+	}
+	return numbers
 }
 
 // pod returns what the operation Job inherits from a pod template, taken from the first target

@@ -263,6 +263,38 @@ func (r *reconciler) backupHoldsNoData(ctx context.Context, job *batch.Job) (boo
 	return false, nil
 }
 
+// backupHeld returns the backups the retention of a succeeded scheduled backup Job held for a change of the schedule
+// that the schedule as it is would delete, which its script tells in the termination message of its pod; none when it
+// tells none, or its pods are gone.
+func (r *reconciler) backupHeld(ctx context.Context, job *batch.Job) ([]string, error) {
+	pods, err := r.jobPods(ctx, job)
+	if err != nil {
+		return nil, err
+	}
+	for i := range pods {
+		if held := model.JobHeldBackups(&pods[i]); len(held) > 0 {
+			return held, nil
+		}
+	}
+	return nil, nil
+}
+
+// backupHostsUsed returns the hosts a succeeded backup Job made its backup on when a preferred replica fell back to
+// another one, which its script tells in the termination message of its pod; none when it tells none, as when every
+// preferred replica answered, or its pods are gone.
+func (r *reconciler) backupHostsUsed(ctx context.Context, job *batch.Job) ([]string, error) {
+	pods, err := r.jobPods(ctx, job)
+	if err != nil {
+		return nil, err
+	}
+	for i := range pods {
+		if hosts := model.JobHostsUsed(&pods[i]); len(hosts) > 0 {
+			return hosts, nil
+		}
+	}
+	return nil, nil
+}
+
 // noDataCause tells why the backup a Job made holds no data, by the table pattern and the partitions
 // the Job backed up.
 func noDataCause(job *batch.Job) string {

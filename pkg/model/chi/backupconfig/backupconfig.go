@@ -55,6 +55,9 @@ const (
 	sectionAPI        = "api"
 
 	keyDisableEnvironmentOverride = "disable_environment_override"
+	keyBackupsToKeepRemote        = "backups_to_keep_remote"
+	keyRebaseDuringDelete         = "rebase_during_delete"
+	keyRebaseBeforeRemoveOld      = "rebase_before_remove_old_remote"
 	keyUsername                   = "username"
 	keyPassword                   = "password"
 	keyPath                       = "path"
@@ -156,6 +159,12 @@ func Build(storageConfig []byte, credentials Credentials, defaults Defaults) (*C
 		return nil, err
 	}
 	general[keyDisableEnvironmentOverride] = false
+	// Retention is the orchestrator's alone, by the schedules: clickhouse-backup deleting remote backups on its own
+	// would remove what the schedules keep. Deleting a backup another one is incremental to rebases that one on the
+	// next older backup, so that no backup loses its base.
+	general[keyBackupsToKeepRemote] = 0
+	general[keyRebaseDuringDelete] = true
+	general[keyRebaseBeforeRemoveOld] = true
 
 	api, err := sectionOf(file, sectionAPI)
 	if err != nil {
