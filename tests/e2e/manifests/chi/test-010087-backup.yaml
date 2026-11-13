@@ -18,12 +18,15 @@ spec:
     clusters:
       # Both inherit spec.backup and share its storage Secret, whose path keeps every
       # (cluster, shard) apart. Their shapes differ: hot has two shards of one replica holding
-      # different row counts, cold one shard of two replicas.
+      # different row counts, cold one shard of two replicas. hot runs the bash orchestrator,
+      # cold the Python one, so that both run every step end to end.
       - name: hot
         layout:
           shardsCount: 2
           replicasCount: 1
       - name: cold
+        backup:
+          orchestrator: python
         layout:
           shardsCount: 1
           replicasCount: 2

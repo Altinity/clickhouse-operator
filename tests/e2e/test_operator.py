@@ -8669,6 +8669,14 @@ backup_operator_service_account = "clickhouse-operator"
 # The script of the operator configuration, config/backup of the repository, which the install manifests ship in
 # ConfigMap etc-clickhouse-operator-backup-files, mounted at /etc/clickhouse-operator/backup.
 backup_orchestrator_script_path = f"../../config/backup/{backup_orchestrator_script}"
+# The orchestrators a cluster runs, backup.orchestrator: the script the operator copies to the ConfigMap of the cluster,
+# from the folder of the operator configuration, the image its Jobs run it in and the interpreter.
+backup_orchestrators = {
+    "bash": {"script": backup_orchestrator_script, "path": backup_orchestrator_script_path, "image": backup_image,
+             "interpreter": "bash"},
+    "python": {"script": "backup-orchestrator.py", "path": "../../config/backup-python/backup-orchestrator.py",
+               "image": "python:3.14-slim", "interpreter": "python3"},
+}
 # The backup Pods of the shards of a pod-mode cluster, mirrored from pkg/model/chbackup/shard_pod.go.
 backup_shard_pod_selector = "clickhouse.altinity.com/backup-component=shard-pod"
 backup_shard_pod_replica_uid = "clickhouse.altinity.com/backup-replica-pod-uid"
@@ -8689,8 +8697,8 @@ def backup_orchestrator_configmap(chi, cluster):
     return f"{chi}-{cluster}-backup-orchestrator"
 
 
-def backup_repository_script():
-    with open(util.get_full_path(backup_orchestrator_script_path)) as f:
+def backup_repository_script(orchestrator="bash"):
+    with open(util.get_full_path(backup_orchestrators[orchestrator]["path"])) as f:
         return f.read()
 
 
@@ -8720,23 +8728,26 @@ def check_backup_events(kind, name, operator_reasons, orchestrator_reasons, time
                 )
 
 
-def check_orchestrator_job(job, chi, cluster, transport, configmap=None):
+def check_orchestrator_job(job, chi, cluster, transport, configmap=None, orchestrator="bash"):
     """Checks that a Job runs the orchestrator script from the ConfigMap of its cluster, in the clickhouse-backup image,
-    as the operator's ServiceAccount, over the transport of the cluster."""
+    or the Python one in the Python image, as the operator's ServiceAccount, over the transport of the cluster."""
     configmap = configmap or backup_orchestrator_configmap(chi, cluster)
+    runs = backup_orchestrators[orchestrator]
     data = kubectl.get("job", job)
     spec = data["spec"]["template"]["spec"]
     containers = {c["name"]: c for c in spec["containers"]}
     assert list(containers) == [backup_orchestrator_container], error(f"Job {job}: containers {sorted(containers)}")
     container = containers[backup_orchestrator_container]
-    assert container.get("image") == backup_image, error(f"Job {job}: image {container.get('image')}")
+    assert container.get("image") == runs["image"], error(f"Job {job}: image {container.get('image')}")
     assert container.get("imagePullPolicy") == "Always", error(f"Job {job}: imagePullPolicy {container.get('imagePullPolicy')}")
     command = (container.get("command") or []) + (container.get("args") or [])
-    assert command == ["bash", f"{backup_orchestrator_mount}/{backup_orchestrator_script}"], error(f"Job {job}: command {command}")
+    assert command == [runs["interpreter"], f"{backup_orchestrator_mount}/{runs['script']}"], error(f"Job {job}: command {command}")
     mounts = {m["mountPath"]: m["name"] for m in container.get("volumeMounts") or []}
     volumes = {v["name"]: v for v in spec.get("volumes") or []}
     mounted = (volumes.get(mounts.get(backup_orchestrator_mount)) or {}).get("configMap") or {}
     assert mounted.get("name") == configmap, error(f"Job {job}: {backup_orchestrator_mount} mounts {mounted}")
+    keys = [item.get("key") for item in mounted.get("items") or []]
+    assert keys == [runs["script"]], error(f"Job {job}: {backup_orchestrator_mount} mounts the keys {keys}")
     assert spec.get("serviceAccountName") == backup_operator_service_account, error(
         f"Job {job}: serviceAccountName {spec.get('serviceAccountName')}"
     )
@@ -8746,15 +8757,19 @@ def check_orchestrator_job(job, chi, cluster, transport, configmap=None):
     return env
 
 
-def check_orchestrator_configmap(chi, cluster):
-    """Checks that the operator keeps the script of its configuration in the ConfigMap of the cluster, owned by the CHI."""
+def check_orchestrator_configmap(chi, cluster, orchestrator="bash"):
+    """Checks that the operator keeps the script of its configuration in the ConfigMap of the cluster, owned by the CHI:
+    that of the orchestrator of the cluster, under its own key alone."""
     name = backup_orchestrator_configmap(chi, cluster)
+    runs = backup_orchestrators[orchestrator]
     configmap = kubectl.get("configmap", name)
     owners = [(o.get("kind"), o.get("name")) for o in configmap["metadata"].get("ownerReferences") or []]
     assert ("ClickHouseInstallation", chi) in owners, error(f"ConfigMap {name}: owners {owners}")
-    script = (configmap.get("data") or {}).get(backup_orchestrator_script)
-    assert script == backup_repository_script(), error(
-        f"ConfigMap {name}: {backup_orchestrator_script} is not {backup_orchestrator_script_path} ({len(script or '')} bytes)"
+    data = configmap.get("data") or {}
+    assert list(data) == [runs["script"]], error(f"ConfigMap {name}: keys {sorted(data)}")
+    script = data.get(runs["script"])
+    assert script == backup_repository_script(orchestrator), error(
+        f"ConfigMap {name}: {runs['script']} is not {runs['path']} ({len(script or '')} bytes)"
     )
 
 
@@ -9086,6 +9101,8 @@ def test_010087(self):
     scheduled_name_pattern = re.escape(schedule_prefix) + r"-\d{14}"
 
     hot, cold = "hot", "cold"
+    # The orchestrator every backup-enabled cluster runs, as the installation sets backup.orchestrator
+    orchestrator_of = {hot: "bash", cold: "python"}
     disabled_cluster = "disabled"
     # (shards, replicas) of every backup-enabled cluster
     layout = {hot: (2, 1), cold: (1, 2)}
@@ -9503,11 +9520,12 @@ def test_010087(self):
             expected = {f"{backup}-{cluster}-{step}": cluster for cluster in backup_clusters for step in ("backup", "verify")}
             assert labelled == expected, error(f"{backup}: Jobs by cluster label {labelled}, expected {expected}")
 
-        with And("Every Job ran the orchestrator script of the operator configuration, from the ConfigMap of its cluster, over the sidecars"):
+        with And("Every Job ran the orchestrator script of the operator configuration, from the ConfigMap of its cluster, over the sidecars: the bash one on hot, the Python one on cold"):
             for cluster in backup_clusters:
-                check_orchestrator_configmap(chi, cluster)
+                orchestrator = orchestrator_of[cluster]
+                check_orchestrator_configmap(chi, cluster, orchestrator)
                 for step in ("backup", "verify"):
-                    env = check_orchestrator_job(f"{backup}-{cluster}-{step}", chi, cluster, "sidecar")
+                    env = check_orchestrator_job(f"{backup}-{cluster}-{step}", chi, cluster, "sidecar", orchestrator=orchestrator)
                     if step == "backup":
                         hosts = sorted((env.get("BACKUP_HOSTS") or "").split())
                         assert hosts and all(f"-{cluster}-" in item for item in hosts), error(
