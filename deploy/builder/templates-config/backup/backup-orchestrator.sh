@@ -1268,26 +1268,39 @@ clean_path() {
 	REPLY=${rooted}${elements[*]}
 }
 
-expand_macros() {
-	local rest=$1 out= macro name
+# substitute_macros TEMPLATE STRICT INSTALLATION NAMESPACE [CLUSTER SHARD] sets REPLY to TEMPLATE with its macros
+# replaced: with STRICT, {installation}, {namespace}, {cluster} and {shard}, keeping {replica} and failing at any other,
+# UNKNOWN_MACRO; without, {installation} and {namespace} alone, of a value that is not empty
+substitute_macros() {
+	local rest=$1 out= macro value
 	while [[ ${rest} =~ \{([^{}]*)\} ]]; do
 		macro=${BASH_REMATCH[0]}
-		name=${BASH_REMATCH[1]}
-		out+=${rest%%"${macro}"*}
-		rest=${rest#*"${macro}"}
-		case ${name} in
-		installation) out+=${PATH_INSTALLATION:-} ;;
-		namespace) out+=${PATH_NAMESPACE:-} ;;
-		cluster) out+=$2 ;;
-		shard) out+=$3 ;;
-		replica) out+=${macro} ;;
+		case ${BASH_REMATCH[1]} in
+		installation) value=$3 ;;
+		namespace) value=$4 ;;
+		cluster) value=${5-} ;;
+		shard) value=${6-} ;;
+		replica) value=${macro} ;;
 		*)
-			UNKNOWN_MACRO=${macro}
-			return 1
+			if [[ -n $2 ]]; then
+				UNKNOWN_MACRO=${macro}
+				return 1
+			fi
+			value=
 			;;
 		esac
+		if [[ -z $2 ]]; then
+			value=${value:-${macro}}
+		fi
+		out+=${rest%%"${macro}"*}${value}
+		rest=${rest#*"${macro}"}
 	done
 	REPLY=${out}${rest}
+}
+
+# expand_macros PATH CLUSTER SHARD expands the macros of the storage path PATH of shard SHARD of cluster CLUSTER
+expand_macros() {
+	substitute_macros "$1" strict "${PATH_INSTALLATION:-}" "${PATH_NAMESPACE:-}" "$2" "$3"
 }
 
 # default_path INDEX NAME sets REPLY to the default path NAME
@@ -1308,6 +1321,17 @@ path_check_inconclusive() {
 	advise "the storage path check is skipped: $3"
 }
 
+# path_unknown INDEX COUNT NAME WHY [WHY_OF_ANOTHER] stops at a cluster whose paths the check cannot tell: the target
+# cluster ends it, as path_check_inconclusive does of COUNT clusters, and returns 0; another is left out of it
+path_unknown() {
+	if [[ $1 == "${PATH_SELF:-}" ]]; then
+		path_check_inconclusive "$2" "$3" "$4"
+		return 0
+	fi
+	advise "cluster $3 is left out of the storage path check: ${5:-$4}"
+	return 1
+}
+
 # check_storage_paths refuses, before anything changes, a storage path the target cluster shares
 check_storage_paths() {
 	local index storage prefix identity key template object shard name what value self=${PATH_SELF:-} self_name= shared=
@@ -1316,8 +1340,7 @@ check_storage_paths() {
 	local -A owners=() self_owned=()
 	read -r -a indexes <<<"${PATH_CLUSTERS:-}"
 	if ((${#indexes[@]} == 0)); then
-		SELF_PATHS_UNKNOWN="PATH_CLUSTERS names no cluster"
-		advise "the storage path check is skipped: ${SELF_PATHS_UNKNOWN}"
+		path_check_inconclusive 0 "" "PATH_CLUSTERS names no cluster"
 		return 0
 	fi
 	for index in "${indexes[@]}"; do
@@ -1344,12 +1367,9 @@ check_storage_paths() {
 		path_setting "${index}" UNVERIFIABLE
 		what=${REPLY//[[:cntrl:]]/ }
 		if [[ -n ${what} ]]; then
-			what="the operator cannot tell the sidecar settings of cluster ${name}: ${what}"
-			if [[ ${index} == "${self}" ]]; then
-				path_check_inconclusive "${#indexes[@]}" "${name}" "${what}"
+			if path_unknown "${index}" "${#indexes[@]}" "${name}" "the operator cannot tell the sidecar settings of cluster ${name}: ${what}"; then
 				return 0
 			fi
-			advise "cluster ${name} is left out of the storage path check: ${what}"
 			continue
 		fi
 		path_setting "${index}" REMOTE_STORAGE
@@ -1362,11 +1382,9 @@ check_storage_paths() {
 			else
 				what="it keeps its backups in ${storage} storage, where the check cannot tell their paths"
 			fi
-			if [[ ${index} == "${self}" ]]; then
-				path_check_inconclusive "${#indexes[@]}" "${name}" "${what}"
+			if path_unknown "${index}" "${#indexes[@]}" "${name}" "${what}"; then
 				return 0
 			fi
-			advise "cluster ${name} is left out of the storage path check: ${what}"
 			continue
 		fi
 		identity=${storage}
@@ -1411,11 +1429,10 @@ check_storage_paths() {
 		fi
 		for value in "${template}" "${object}"; do
 			if ! expand_macros "${value}" "${name}" ""; then
-				if [[ ${index} == "${self}" ]]; then
-					path_check_inconclusive "${#indexes[@]}" "${name}" "the path '${value}' of cluster ${name} holds ${UNKNOWN_MACRO}, a macro whose value it does not know"
+				if path_unknown "${index}" "${#indexes[@]}" "${name}" "the path '${value}' of cluster ${name} holds ${UNKNOWN_MACRO}, a macro whose value it does not know" \
+					"its path '${value}' holds ${UNKNOWN_MACRO}, a macro whose value it does not know"; then
 					return 0
 				fi
-				advise "cluster ${name} is left out of the storage path check: its path '${value}' holds ${UNKNOWN_MACRO}, a macro whose value it does not know"
 				continue 2
 			fi
 		done
@@ -2781,22 +2798,6 @@ plan_overwrite() {
 	refuse_database_drops "" "${initiator}"
 }
 
-source_template() {
-	local rest=$1 out= macro name
-	while [[ ${rest} =~ \{([^{}]*)\} ]]; do
-		macro=${BASH_REMATCH[0]}
-		name=${BASH_REMATCH[1]}
-		out+=${rest%%"${macro}"*}
-		rest=${rest#*"${macro}"}
-		case ${name} in
-		installation) out+=${2:-${macro}} ;;
-		namespace) out+=${3:-${macro}} ;;
-		*) out+=${macro} ;;
-		esac
-	done
-	REPLY=${out}${rest}
-}
-
 source_paths() {
 	local installation= namespace= path object value
 	if [[ -n ${SOURCE_INSTALLATION:-} && ${SOURCE_INSTALLATION} != "${PATH_INSTALLATION:-}" ]]; then
@@ -2814,9 +2815,9 @@ source_paths() {
 	if [[ -z ${SELF_STORAGE_PREFIX} ]]; then
 		die "a restore from another installation needs the storage paths of the sidecars, which it reads the backup at with the {installation} and {namespace} of that installation, and the storage path check cannot tell them: ${SELF_PATHS_UNKNOWN}"
 	fi
-	source_template "${SELF_PATH}" "${installation}" "${namespace}"
+	substitute_macros "${SELF_PATH}" "" "${installation}" "${namespace}"
 	path=${REPLY}
-	source_template "${SELF_OBJECT_DISK_PATH}" "${installation}" "${namespace}"
+	substitute_macros "${SELF_OBJECT_DISK_PATH}" "" "${installation}" "${namespace}"
 	object=${REPLY}
 	if [[ ${path} == "${SELF_PATH}" && ${object} == "${SELF_OBJECT_DISK_PATH}" ]]; then
 		advise "the storage paths of cluster ${SELF_CLUSTER_NAME} hold no {installation} or {namespace} that tells the installation restore ${BACKUP_NAME} names apart from this one, so it reads them as they are: '${SELF_PATH}'${SELF_OBJECT_DISK_PATH:+ and the object disk path '${SELF_OBJECT_DISK_PATH}'}"
