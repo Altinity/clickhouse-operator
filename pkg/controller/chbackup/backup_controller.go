@@ -391,9 +391,9 @@ func (c *BackupController) run(chb *api.ClickHouseBackup, cluster *api.Operation
 	out.add(func() { metrics.BackupStarted(context.Background(), namespace, chiName, clusterName) })
 }
 
-// complete records the completion of the backup Job of a cluster, announcing it once. A backup that
-// holds no data there, as its Job tells, completed all the same, which is warned about: it restores no
-// data on the cluster.
+// complete records the completion of the backup Job of a cluster, announcing it once, with the hosts the backup was
+// made on when its Job tells others than it names. A backup that holds no data there, as its Job tells, completed all
+// the same, which is warned about: it restores no data on the cluster.
 func (c *BackupController) complete(
 	ctx context.Context,
 	chb *api.ClickHouseBackup,
@@ -402,9 +402,20 @@ func (c *BackupController) complete(
 	out *announcements,
 ) error {
 	withoutData, err := c.backupHoldsNoData(ctx, job)
-	switch {
-	case err != nil:
+	if err != nil {
 		return err
+	}
+	// A preferred replica that did not answer left the backup of its shard to another one, which the status records
+	if cluster.CompletionTime == nil {
+		hosts, err := c.backupHostsUsed(ctx, job)
+		if err != nil {
+			return err
+		}
+		if len(hosts) > 0 {
+			cluster.Hosts = hosts
+		}
+	}
+	switch {
 	case withoutData:
 		noData := noDataCause(job)
 		if completeOn(cluster, job, api.BackupReasonCompletedWithoutData,

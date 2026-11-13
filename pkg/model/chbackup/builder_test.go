@@ -954,12 +954,38 @@ func TestJobBackupHoldsNoData(t *testing.T) {
 		"succeeded with data":    {status: core.ContainerStatus{Name: jobContainerName, State: exited(0, "")}},
 		"failed":                 {status: core.ContainerStatus{Name: jobContainerName, State: exited(1, declared)}},
 		"another message":        {status: core.ContainerStatus{Name: jobContainerName, State: exited(0, "retention failed: "+declared)}},
+		"among other lines":      {status: core.ContainerStatus{Name: jobContainerName, State: exited(0, declared+"\n"+HostsUsedMessage+" a1 b0\n")}, noData: true},
 		"running":                {status: core.ContainerStatus{Name: jobContainerName, State: core.ContainerState{Running: &core.ContainerStateRunning{}}}},
 		"an injected sidecar":    {status: core.ContainerStatus{Name: "istio-proxy", State: exited(0, declared)}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			pod := &core.Pod{Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{tc.status}}}
 			require.Equal(t, tc.noData, JobBackupHoldsNoData(pod))
+		})
+	}
+}
+
+// The Job script tells the hosts a backup was made on, when a preferred replica fell back to another one, by a line
+// of the termination message its environment names, which only a Job that succeeded tells.
+func TestJobHostsUsed(t *testing.T) {
+	exited := func(code int32, message string) core.ContainerState {
+		return core.ContainerState{Terminated: &core.ContainerStateTerminated{ExitCode: code, Message: message}}
+	}
+	declared := jobEnv(BuildBackupJob(testBackup("b1"), testInstallation(), testTopology(), testOrchestrator()), envHostsUsedMessage)
+	require.Equal(t, HostsUsedMessage, declared)
+	for name, tc := range map[string]struct {
+		state core.ContainerState
+		hosts []string
+	}{
+		"fell back":       {state: exited(0, NoDataMessage+"\n"+declared+" a1 b0\n"), hosts: []string{"a1", "b0"}},
+		"no fallback":     {state: exited(0, "")},
+		"without data":    {state: exited(0, NoDataMessage)},
+		"failed":          {state: exited(1, declared+" a1 b0")},
+		"another message": {state: exited(0, "x "+declared+" a1 b0")},
+	} {
+		t.Run(name, func(t *testing.T) {
+			pod := &core.Pod{Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{{Name: jobContainerName, State: tc.state}}}}
+			require.Equal(t, tc.hosts, JobHostsUsed(pod))
 		})
 	}
 }

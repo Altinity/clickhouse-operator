@@ -1344,7 +1344,9 @@ restore, are:
   the sidecar when the Job starts; the Job tells it in a warning and an `OrchestratorReplicaFallback`
   event. Every replica of a shard keeps a `FirstPerShard` backup at the same storage path, without
   `{replica}`, so the choice changes neither where the backup is nor what restores it.
-  `status.clusters[].hosts` records the preferred replicas.
+  `status.clusters[].hosts` records the preferred replicas while the Job runs, and once it has
+  completed the replicas the backup was actually made on: a replica it fell back to takes the place
+  of the preferred one, as the Job tells in its termination message.
 * **Retention:** one host per shard of the cluster the backup ran on - the first replica, which
   lists the same backups as the preferred one -, or every replica with `AllReplicas`, which the
   schedule lists in `status.clusters[].retentionHosts`.

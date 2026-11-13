@@ -152,6 +152,13 @@ termination_message() {
 		{ printf '%s\n' "$*" >"${TERMINATION_MESSAGE_PATH}"; } 2>/dev/null || true
 	fi
 }
+# report_message LINE adds LINE to the termination message of a Job that succeeds, which the operator reads line by
+# line: each line tells one thing of what the Job did
+report_message() {
+	if [[ -n ${TERMINATION_MESSAGE_PATH:-} ]]; then
+		{ printf '%s\n' "$*" >>"${TERMINATION_MESSAGE_PATH}"; } 2>/dev/null || true
+	fi
+}
 die() {
 	log "ERROR: $*" >&2
 	termination_message "$*"
@@ -1257,7 +1264,7 @@ report_data() {
 	warn "${BACKUP_NAME} holds no data"
 	event Warning OrchestratorNoData "${BACKUP_NAME} holds no data"
 	if [[ -n ${NO_DATA_MESSAGE:-} ]]; then
-		termination_message "${NO_DATA_MESSAGE}"
+		report_message "${NO_DATA_MESSAGE}"
 	fi
 }
 
@@ -1953,6 +1960,7 @@ clickhouse_answers() {
 fall_back_hosts() {
 	local i
 	local -a preferred=("${HOSTS[@]}") fallback
+	PREFERRED_HOSTS=("${HOSTS[@]}")
 	parse_hosts BACKUP_FALLBACK_HOSTS optional
 	fallback=("${HOSTS[@]}")
 	HOSTS=("${preferred[@]}")
@@ -2120,6 +2128,10 @@ do_backup() {
 		fail_all "backup ${BACKUP_NAME}"
 	fi
 	log "backup ${BACKUP_NAME} completed on ${#backup_hosts[@]} host(s)"
+	# The operator records the replicas the backup was made on when one fell back to another
+	if [[ ${backup_hosts[*]} != "${PREFERRED_HOSTS[*]}" && -n ${HOSTS_USED_MESSAGE:-} ]]; then
+		report_message "${HOSTS_USED_MESSAGE} ${backup_hosts[*]}"
+	fi
 	# A schema-only backup never holds data, which needs no telling
 	if ! is_true SCHEMA_ONLY; then
 		report_data "${backup_hosts[@]}"
@@ -3170,7 +3182,7 @@ report_rbac() {
 	warn "${BACKUP_NAME} holds access entities - users, roles, grants - which this restore did not restore"
 	event Warning OrchestratorRBACNotRestored "${LAST_WARNING}"
 	if [[ -n ${RBAC_NOT_RESTORED_MESSAGE:-} ]]; then
-		termination_message "${RBAC_NOT_RESTORED_MESSAGE}"
+		report_message "${RBAC_NOT_RESTORED_MESSAGE}"
 	fi
 }
 
@@ -3184,6 +3196,8 @@ declare -A COMPLETE=() WITH_DATA=() EMPTY=() SIZED=() BROKEN=() ALL_NAMES=()
 # The database mapping of a restore: the database of the backup restored into each target, and the target of each
 declare -A DB_SOURCE=() DB_TARGET=()
 FAILED_HOSTS=()
+# The hosts BACKUP_HOSTS names, before fall_back_hosts puts another replica in place of one that does not answer
+PREFERRED_HOSTS=()
 FAILURES=()
 STEP_FAILED_HOSTS=()
 # The arguments of the step of a host, as restore_command makes them; how the restore steps run, RESTORE_KIND op or

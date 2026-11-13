@@ -307,6 +307,23 @@ func TestBackupReportsABackupWithoutData(t *testing.T) {
 	})
 }
 
+// A preferred replica that did not answer left the backup of its shard to another replica, which the Job tells in its
+// termination message: the status records the hosts the backup was made on in place of those the Job names.
+func TestBackupRecordsTheReplicasItFellBackTo(t *testing.T) {
+	f := newBackupFixture(t, newFakeCR(readyInstallation(t)), nil, newBackupCR("b1"))
+	f.reconcile("b1")
+	named := f.backup("b1").Status.Clusters[0].Hosts
+	require.NotEmpty(t, named)
+	used := append([]string{"fallback-replica"}, named[1:]...)
+	succeedPodOfJob(t, f.client, "b1-main-backup", model.HostsUsedMessage+" "+strings.Join(used, " ")+"\n")
+	finishJob(t, f.client, "b1-main-backup", batch.JobComplete, "")
+
+	f.reconcile("b1")
+	got := f.backup("b1")
+	require.Equal(t, api.BackupReasonCompleted, condition(t, got.Status.Conditions, api.BackupConditionReady).Reason)
+	require.Equal(t, used, got.Status.Clusters[0].Hosts)
+}
+
 func TestBackupFailureReasons(t *testing.T) {
 	for jobReason, expected := range map[string]string{
 		batch.JobReasonDeadlineExceeded:     api.BackupReasonDeadlineExceeded,

@@ -36,10 +36,11 @@ const (
 	envAPIPassword = config.ClickHouseBackupSecretKeyAPIPassword
 	// envPollInterval is the number of seconds between status polls, 5 when empty
 	envPollInterval = "POLL_INTERVAL"
-	// envTerminationMessagePath is the file the script writes why it failed to, or envNoDataMessage
-	// when it succeeded with a backup that holds no data, or envRBACNotRestoredMessage when it succeeded
-	// with a restore that left out the access entities of its backup: the termination message path of
-	// its container
+	// envTerminationMessagePath is the file the script writes why it failed to, or, when it succeeded, a
+	// line of each thing it tells of what it did: envNoDataMessage for a backup that holds no data,
+	// envHostsUsedMessage and the hosts a backup was made on when they are not those the Job names,
+	// envRBACNotRestoredMessage for a restore that left out the access entities of its backup: the
+	// termination message path of its container
 	envTerminationMessagePath = "TERMINATION_MESSAGE_PATH"
 	// envUnchangedExitCode is the exit code the script fails with when it has changed nothing
 	envUnchangedExitCode = "UNCHANGED_EXIT_CODE"
@@ -90,6 +91,10 @@ const (
 	// envNoDataMessage is the termination message the script leaves when the backup it made holds no
 	// data on any host
 	envNoDataMessage = "NO_DATA_MESSAGE"
+	// envHostsUsedMessage starts the line of the termination message the script adds, followed by the
+	// space-separated hosts, when it made the backup on other hosts than envBackupHosts names: a preferred replica
+	// that did not answer left the backup of its shard to the host envBackupFallbackHosts names
+	envHostsUsedMessage = "HOSTS_USED_MESSAGE"
 
 	// envVerifyHosts lists the space-separated hosts a backup is downloaded to for verification
 	envVerifyHosts = "VERIFY_HOSTS"
@@ -218,6 +223,10 @@ const UnchangedExitCode = 3
 // NoDataMessage is the value of envNoDataMessage: the termination message of a Job container that
 // succeeded and made a backup that holds no data on any host.
 const NoDataMessage = "the backup holds no data"
+
+// HostsUsedMessage is the value of envHostsUsedMessage: it starts the line of the termination message of a Job
+// container that succeeded making a backup on other hosts than the Job names, followed by those hosts.
+const HostsUsedMessage = "backup made on hosts:"
 
 // RBACNotRestoredMessage is the value of envRBACNotRestoredMessage: the termination message of a Job
 // container that succeeded and restored a backup without the access entities - users, roles, grants -

@@ -743,6 +743,7 @@ func backupOptionsEnv(options *api.BackupOptions, topology *Topology, orchestrat
 		envVar(envTables, options.Tables),
 		envVar(envPartitions, strings.Join(options.Partitions, partitionListSeparator)),
 		envVar(envNoDataMessage, NoDataMessage),
+		envVar(envHostsUsedMessage, HostsUsedMessage),
 	}
 	return append(env, pathCheckEnv(topology, options.GetReplicaSelection())...)
 }
@@ -1010,11 +1011,38 @@ func JobTerminationMessage(pod *core.Pod) string {
 	return ""
 }
 
-// JobBackupHoldsNoData reports whether the Job container of a pod succeeded and made a backup that
-// holds no data on any host, which the Job script tells by its termination message.
-func JobBackupHoldsNoData(pod *core.Pod) bool {
+// jobReport returns the lines of the termination message of the Job container of a pod that succeeded, each of
+// which the Job script writes to tell something of what it did, none for a container that did not succeed.
+func jobReport(pod *core.Pod) []string {
 	terminated := jobContainerTermination(pod)
-	return (terminated != nil) && (terminated.ExitCode == 0) && (strings.TrimSpace(terminated.Message) == NoDataMessage)
+	if (terminated == nil) || (terminated.ExitCode != 0) {
+		return nil
+	}
+	var lines []string
+	for _, line := range strings.Split(terminated.Message, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			lines = append(lines, line)
+		}
+	}
+	return lines
+}
+
+// JobBackupHoldsNoData reports whether the Job container of a pod succeeded and made a backup that
+// holds no data on any host, which the Job script tells by a line of its termination message.
+func JobBackupHoldsNoData(pod *core.Pod) bool {
+	return slices.Contains(jobReport(pod), NoDataMessage)
+}
+
+// JobHostsUsed returns the hosts the Job container of a pod that succeeded made its backup on, when they are not
+// all those the Job names, which the Job script tells by a line of its termination message: a preferred replica
+// that did not answer left the backup of its shard to another replica. None when the Job tells none.
+func JobHostsUsed(pod *core.Pod) []string {
+	for _, line := range jobReport(pod) {
+		if hosts, found := strings.CutPrefix(line, HostsUsedMessage+" "); found {
+			return strings.Fields(hosts)
+		}
+	}
+	return nil
 }
 
 // JobRBACNotRestored reports whether the Job container of a pod succeeded restoring a backup that holds

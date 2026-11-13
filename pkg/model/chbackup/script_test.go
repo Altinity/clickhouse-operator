@@ -1053,16 +1053,34 @@ func TestJobScriptBackup(t *testing.T) {
 // backup of its shard to the first replica, whose storage path is the shard's too.
 func TestJobScriptBacksUpThePreferredReplica(t *testing.T) {
 	s := newSidecarStub(t, map[string]*stubHost{"a1": {}, "b1": {status: http.StatusInternalServerError}, "a0": {}, "b0": {}})
+	termination := filepath.Join(t.TempDir(), "termination-log")
 	code, out := s.run(map[string]string{envOperation: operationBackup, envBackupName: "bk-1",
-		envBackupHosts: "a1 b1", envBackupFallbackHosts: "a0 b0"})
+		envBackupHosts: "a1 b1", envBackupFallbackHosts: "a0 b0", envTerminationMessagePath: termination,
+		envHostsUsedMessage: HostsUsedMessage})
 	require.Zero(t, code, out)
 	require.Contains(t, out, "WARNING: b1: the preferred replica does not answer (curl exit 0, HTTP 500), backing up b0 instead")
+	// The operator records the replicas the backup was made on, as the termination message tells them
+	message, err := os.ReadFile(termination)
+	require.NoError(t, err)
+	pod := &core.Pod{Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{{Name: jobContainerName,
+		State: core.ContainerState{Terminated: &core.ContainerStateTerminated{Message: string(message)}}}}}}
+	require.Equal(t, []string{"a1", "b0"}, JobHostsUsed(pod), string(message))
+	require.False(t, JobBackupHoldsNoData(pod))
 	require.Equal(t, []string{"bk-1"}, s.remoteNames("a1"))
 	require.Equal(t, []string{"bk-1"}, s.remoteNames("b0"))
 	require.Empty(t, s.remoteNames("a0"))
 	for _, c := range s.matching(http.MethodGet, "/backup/tables") {
 		require.Equal(t, url.Values{"table": {"system.one"}}, c.query)
 	}
+
+	// Every preferred replica answers: the termination message tells nothing
+	s = newSidecarStub(t, map[string]*stubHost{"a1": {}, "b1": {}, "a0": {}, "b0": {}})
+	termination = filepath.Join(t.TempDir(), "termination-log")
+	code, out = s.run(map[string]string{envOperation: operationBackup, envBackupName: "bk-1",
+		envBackupHosts: "a1 b1", envBackupFallbackHosts: "a0 b0", envTerminationMessagePath: termination,
+		envHostsUsedMessage: HostsUsedMessage})
+	require.Zero(t, code, out)
+	require.NoFileExists(t, termination)
 
 	// Fallback hosts of another count are refused
 	s = newSidecarStub(t, map[string]*stubHost{"a1": {}})
