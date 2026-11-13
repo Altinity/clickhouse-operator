@@ -125,6 +125,12 @@ func TestJobScriptRetentionHoldsWhatAChangeKept(t *testing.T) {
 			names: append(dailyBackups(12, "020000"), "d-20261113030000"),
 			held:  []string{"d-20261112020000", "d-20261111020000", "d-20261110020000"},
 		},
+		"the zone changed back, from a zone of its own": {
+			// A record of a zone other than UTC keeps the time of its change
+			before: "period=daily time=03:00 keep=3", zone: "Europe/Berlin", after: "period=daily time=04:00 keep=3", afterZone: "UTC",
+			names: append(dailyBackups(12, "030000"), "d-20261113040000"),
+			held:  []string{"d-20261112030000", "d-20261111030000", "d-20261110030000"},
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			env := map[string]string{envSchedules: tc.after, envScheduleTimezone: tc.afterZone}

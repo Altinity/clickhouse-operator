@@ -10306,7 +10306,7 @@ data:
     }
     
     held_keys() {
-    	local record change entries name
+    	local record change entries epoch name
     	# parse_schedules fills these locals with the entries of every record
     	local -a records subset SCHED_PERIOD SCHED_HOUR SCHED_MINUTE SCHED_DAY SCHED_KEEP SCHED_INCREMENTAL SCHED_ENV
     	declare -gA HELD_KEYS=()
@@ -10319,10 +10319,10 @@ data:
     		if [[ ! ${record} =~ ^([0-9]{1,12})\|([^|]*)\|([^|]+)$ ]]; then
     			die "PREVIOUS_SCHEDULES must list <epoch>|<time zone>|<entries> records separated by #"
     		fi
-    		entries=${BASH_REMATCH[3]}
+    		epoch=${BASH_REMATCH[1]} entries=${BASH_REMATCH[3]}
     		local SCHEDULE_TIMEZONE=${BASH_REMATCH[2]} SCHEDULES=${entries}
     		check_timezone
-    		slot_tag "${BASH_REMATCH[1]}"
+    		slot_tag "${epoch}"
     		change=${REPLY}
     		subset=()
     		for name in "$@"; do
