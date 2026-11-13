@@ -805,6 +805,12 @@ spec:
                       description: |
                         Path to the folder of the backup orchestrator script, backup-orchestrator.sh, which the backup, verify
                         and restore Jobs run. Relative to the folder of the operator configuration unless absolute. Default: backup
+                    pythonPath:
+                      type: string
+                      description: |
+                        Path to the folder of the Python orchestrator script, backup-orchestrator.py, which the Jobs of a cluster
+                        with backup.orchestrator python run. Relative to the folder of the operator configuration unless absolute.
+                        Default: backup-python
                 logger:
                   type: object
                   description: "allow setup clickhouse-operator logger behavior"

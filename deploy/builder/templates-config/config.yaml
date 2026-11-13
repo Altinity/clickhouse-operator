@@ -693,6 +693,10 @@ backup:
   # restore Jobs run. Relative to the folder of this file unless absolute, as template.chi.path.
   # See docs/backup.md#the-orchestrator-script.
   path: backup
+  # Path to the folder of the Python orchestrator script, backup-orchestrator.py, which the Jobs of a cluster with
+  # backup.orchestrator python run. Relative to the folder of this file unless absolute.
+  # See docs/backup.md#python-orchestrator.
+  pythonPath: backup-python
 
 ################################################
 ##
