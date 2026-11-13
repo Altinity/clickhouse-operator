@@ -3,6 +3,7 @@
 # Every input arrives through the environment (see script.go), never spliced into this text; values reach curl as
 # URL-encoded parameters, or commands of the actions endpoint as tokens validated against the *_RE regexes.
 # Sourced, it runs nothing and leaves its functions to the tests. See docs/backup.md for what it does and why.
+# shellcheck disable=SC2034 # arrays that merge_keys and json_row fill through namerefs
 set -euo pipefail
 
 NAME_RE='^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'
@@ -249,10 +250,15 @@ json_get() {
 	fi
 }
 
-# json_field FIELD JSON prints what json_get finds of FIELD in JSON
-json_field() {
-	json_get "$1" "$2"
-	printf '%s' "${REPLY}"
+# json_row JSON FIELD=ARRAY... appends to every ARRAY what json_get finds of its FIELD in JSON
+json_row() {
+	local _json=$1 _pair
+	shift
+	for _pair in "$@"; do
+		local -n _array=${_pair#*=}
+		json_get "${_pair%%=*}" "${_json}"
+		_array+=("${REPLY}")
+	done
 }
 
 # is_true VAR_NAME reports whether the boolean env var VAR_NAME is set to true
@@ -382,10 +388,13 @@ call() {
 	done
 }
 
-# error_of prints the sidecar error carried by the last response
+# error_of prints the sidecar error carried by the last response; run as $(error_of), it drops trailing newlines
 error_of() {
 	local err
-	err=$(json_field error "${HTTP_BODY}")
+	err=$(
+		json_get error "${HTTP_BODY}"
+		printf '%s' "${REPLY}"
+	)
 	printf '%s' "${err:-${HTTP_BODY}}"
 }
 
@@ -501,7 +510,8 @@ sidecar_kept() {
 		if ! get_ok "${host}" "read the status of the last step" /backup/status -G --data-urlencode "operationid=${LAST_OP[${host}]}"; then
 			return 1
 		fi
-		if [[ $(json_field status "${HTTP_BODY}") == success ]]; then
+		json_get status "${HTTP_BODY}"
+		if [[ ${REPLY} == success ]]; then
 			return 0
 		fi
 	elif [[ -n ${LAST_ACTION_COMMAND[${host}]:-} ]]; then
@@ -534,12 +544,7 @@ action_rows() {
 		if [[ -n ${3:-} && ${REPLY} != "$2 "*"--resumable=1 $3" || -z ${3:-} && ${REPLY} != "$2" ]]; then
 			continue
 		fi
-		json_get start "${line}"
-		ACTION_STARTS+=("${REPLY}")
-		json_get status "${line}"
-		ACTION_STATUSES+=("${REPLY}")
-		json_get error "${line}"
-		ACTION_ERRORS+=("${REPLY}")
+		json_row "${line}" start=ACTION_STARTS status=ACTION_STATUSES error=ACTION_ERRORS
 	done <<<"${HTTP_BODY}"
 }
 
@@ -590,7 +595,8 @@ action_start() {
 	if ! submit "${host}" "${what}" /backup/actions --data-binary "${body}"; then
 		return 1
 	fi
-	if [[ $(json_field status "${HTTP_BODY}") != acknowledged ]]; then
+	json_get status "${HTTP_BODY}"
+	if [[ ${REPLY} != acknowledged ]]; then
 		warn "${host}: ${what} was not acknowledged: ${HTTP_BODY}"
 		return 1
 	fi
@@ -648,11 +654,13 @@ op_start() {
 	if ! submit "${host}" "${what}" "$@"; then
 		return 1
 	fi
-	if [[ $(json_field backup_name "${HTTP_BODY}") != "${name}" ]]; then
+	json_get backup_name "${HTTP_BODY}"
+	if [[ ${REPLY} != "${name}" ]]; then
 		warn "${host}: ${what} acknowledged a different backup: ${HTTP_BODY}"
 		return 1
 	fi
-	id=$(json_field operation_id "${HTTP_BODY}")
+	json_get operation_id "${HTTP_BODY}"
+	id=${REPLY}
 	if [[ -z ${id} ]]; then
 		warn "${host}: ${what} returned no operation id: ${HTTP_BODY}"
 		return 1
@@ -666,7 +674,8 @@ op_poll() {
 	if ! get_ok "${host}" "read status of ${what}" /backup/status -G --data-urlencode "operationid=${id}"; then
 		return 1
 	fi
-	status=$(json_field status "${HTTP_BODY}")
+	json_get status "${HTTP_BODY}"
+	status=${REPLY}
 	if [[ -n ${status} && ${status} != "in progress" ]]; then
 		finished_event "${host}" "${what} ${name}" "${id}" "${status}"
 	fi
@@ -791,34 +800,14 @@ lost_op() {
 
 list_backups() {
 	local host=$1 where=$2 line
-	LIST_NAMES=()
-	LIST_REQUIRED=()
-	LIST_DESC=()
-	LIST_DATA_SIZE=()
-	LIST_OBJECT_DISK_SIZE=()
-	LIST_METADATA_SIZE=()
-	LIST_RBAC_SIZE=()
-	call GET "${host}" "/backup/list/${where}"
-	if [[ ${HTTP_CODE} != 200 ]]; then
-		warn "${host}: cannot list ${where} backups (HTTP ${HTTP_CODE}): $(error_of)"
+	LIST_NAMES=() LIST_REQUIRED=() LIST_DESC=() LIST_DATA_SIZE=() LIST_OBJECT_DISK_SIZE=() LIST_METADATA_SIZE=() LIST_RBAC_SIZE=()
+	if ! get_ok "${host}" "list ${where} backups" "/backup/list/${where}"; then
 		return 1
 	fi
 	while IFS= read -r line; do
 		if [[ -n ${line} ]]; then
-			json_get name "${line}"
-			LIST_NAMES+=("${REPLY}")
-			json_get required "${line}"
-			LIST_REQUIRED+=("${REPLY}")
-			json_get desc "${line}"
-			LIST_DESC+=("${REPLY}")
-			json_get data_size "${line}"
-			LIST_DATA_SIZE+=("${REPLY}")
-			json_get object_disk_size "${line}"
-			LIST_OBJECT_DISK_SIZE+=("${REPLY}")
-			json_get metadata_size "${line}"
-			LIST_METADATA_SIZE+=("${REPLY}")
-			json_get rbac_size "${line}"
-			LIST_RBAC_SIZE+=("${REPLY}")
+			json_row "${line}" name=LIST_NAMES required=LIST_REQUIRED desc=LIST_DESC data_size=LIST_DATA_SIZE \
+				object_disk_size=LIST_OBJECT_DISK_SIZE metadata_size=LIST_METADATA_SIZE rbac_size=LIST_RBAC_SIZE
 		fi
 	done <<<"${HTTP_BODY}"
 }
@@ -848,13 +837,20 @@ delete_local() {
 	log "$1: local copy of $2 deleted"
 }
 
-holds_data() {
-	[[ -z ${LIST_METADATA_SIZE[$1]} ]] || [[ ${LIST_DATA_SIZE[$1]:-0} != 0 ]] || [[ ${LIST_OBJECT_DISK_SIZE[$1]:-0} != 0 ]]
+# merge_keys INTO FROM sets to 1 every key of the associative array FROM in the associative array INTO
+merge_keys() {
+	local -n _into=$1 _from=$2
+	local _key
+	for _key in "${!_from[@]}"; do
+		_into["${_key}"]=1
+	done
 }
 
+# list_all FILTER HOST... lists the remote backups of every HOST, which FILTER HOST NAME keys (REPLY) or leaves out,
+# into sets of keys: ALL_NAMES, COMPLETE on every host listed, SIZED, BROKEN, EMPTY and WITH_DATA; UNLISTED
 list_all() {
-	local filter=$1 host first=1 i name key
-	local -A listed both
+	local filter=$1 host first=1 i name key size
+	local -A listed
 	declare -gA COMPLETE=() WITH_DATA=() EMPTY=() SIZED=() BROKEN=() ALL_NAMES=()
 	UNLISTED=()
 	shift
@@ -873,34 +869,36 @@ list_all() {
 			fi
 			key=${REPLY}
 			ALL_NAMES[${key}]=1
-			if [[ -n ${LIST_METADATA_SIZE[i]} ]] && [[ ${LIST_DATA_SIZE[i]:-0} != 0 || ${LIST_OBJECT_DISK_SIZE[i]:-0} != 0 ||
-				${LIST_METADATA_SIZE[i]} != 0 || ${LIST_RBAC_SIZE[i]:-0} != 0 ]]; then
-				SIZED[${key}]=1
+			size=unknown
+			if [[ -n ${LIST_METADATA_SIZE[i]} ]]; then
+				size=empty
+				if [[ ${LIST_DATA_SIZE[i]:-0} != 0 || ${LIST_OBJECT_DISK_SIZE[i]:-0} != 0 || ${LIST_METADATA_SIZE[i]} != 0 ||
+					${LIST_RBAC_SIZE[i]:-0} != 0 ]]; then
+					size=sized
+					SIZED[${key}]=1
+				fi
 			fi
 			if [[ ${LIST_DESC[i]} == broken* ]]; then
 				BROKEN[${key}]=1
 				continue
 			fi
 			listed[${key}]=1
-			if holds_data "${i}"; then
+			if [[ ${size} == unknown || ${LIST_DATA_SIZE[i]:-0} != 0 || ${LIST_OBJECT_DISK_SIZE[i]:-0} != 0 ]]; then
 				WITH_DATA[${key}]=1
 			fi
-			if [[ -n ${LIST_METADATA_SIZE[i]} && ${LIST_DATA_SIZE[i]:-0} == 0 && ${LIST_OBJECT_DISK_SIZE[i]:-0} == 0 &&
-				${LIST_METADATA_SIZE[i]} == 0 && ${LIST_RBAC_SIZE[i]:-0} == 0 ]]; then
+			if [[ ${size} == empty ]]; then
 				EMPTY[${key}]=1
 			fi
 		done
-		both=()
-		for name in "${!listed[@]}"; do
-			if [[ -n ${first} || -n ${COMPLETE[${name}]:-} ]]; then
-				both[${name}]=1
+		if [[ -n ${first} ]]; then
+			merge_keys COMPLETE listed
+			first=
+		fi
+		for name in "${!COMPLETE[@]}"; do
+			if [[ -z ${listed[${name}]:-} ]]; then
+				unset 'COMPLETE[${name}]'
 			fi
 		done
-		COMPLETE=()
-		for name in "${!both[@]}"; do
-			COMPLETE[${name}]=1
-		done
-		first=
 	done
 }
 
@@ -933,18 +931,14 @@ retention_plan() {
 		newest=${ordered[0]%% *}
 	fi
 	rules_keep ${ordered[@]+"${ordered[@]}"}
-	for name in "${!RULES_KEEP[@]}"; do
-		KEEP[${name}]=1
-	done
+	merge_keys KEEP RULES_KEEP
 	for tag in ${ordered[@]+"${ordered[@]}"}; do
 		if [[ ${tag#* } == "${made}" ]]; then
 			KEEP[${made}]=1
 		fi
 	done
 	pinned_keys
-	for name in "${!PINNED[@]}"; do
-		KEEP[${name}]=1
-	done
+	merge_keys KEEP PINNED
 	held_keys ${ordered[@]+"${ordered[@]}"}
 	for tag in ${ordered[@]+"${ordered[@]}"}; do
 		if [[ -n ${KEEP[${tag#* }]:-} ]]; then
@@ -1028,8 +1022,8 @@ pinned_keys() {
 
 held_keys() {
 	local record change entries name
-	local -a records subset period=("${SCHED_PERIOD[@]}") hour=("${SCHED_HOUR[@]}") minute=("${SCHED_MINUTE[@]}")
-	local -a day=("${SCHED_DAY[@]}") keep=("${SCHED_KEEP[@]}") incremental=("${SCHED_INCREMENTAL[@]}") env=("${SCHED_ENV[@]}")
+	# the entries of every record replace those of SCHEDULES for the call alone
+	local -a records subset SCHED_PERIOD SCHED_HOUR SCHED_MINUTE SCHED_DAY SCHED_KEEP SCHED_INCREMENTAL SCHED_ENV
 	declare -gA HELD_KEYS=()
 	if [[ -z ${PREVIOUS_SCHEDULES:-} ]]; then
 		return 0
@@ -1061,13 +1055,8 @@ held_keys() {
 		fi
 		parse_schedules
 		rules_keep ${subset[@]+"${subset[@]}"}
-		for name in "${!RULES_KEEP[@]}"; do
-			HELD_KEYS[${name}]=1
-		done
+		merge_keys HELD_KEYS RULES_KEEP
 	done
-	SCHED_PERIOD=(${period[@]+"${period[@]}"}) SCHED_HOUR=(${hour[@]+"${hour[@]}"}) SCHED_MINUTE=(${minute[@]+"${minute[@]}"})
-	SCHED_DAY=(${day[@]+"${day[@]}"}) SCHED_KEEP=(${keep[@]+"${keep[@]}"}) SCHED_INCREMENTAL=(${incremental[@]+"${incremental[@]}"})
-	SCHED_ENV=(${env[@]+"${env[@]}"})
 }
 
 # retention_on_host HOST deletes on HOST the backups of OBSOLETE it lists, newest first
@@ -2462,17 +2451,11 @@ backup_tables() {
 	SHARD_TABLES_DIFFER=()
 	for host in "$@"; do
 		list_backup_tables "${host}"
-		for name in "${!HOST_TABLES[@]}"; do
-			BACKUP_TABLES[${name}]=1
-		done
-		for name in "${!HOST_DBS[@]}"; do
-			BACKUP_DBS[${name}]=1
-		done
+		merge_keys BACKUP_TABLES HOST_TABLES
+		merge_keys BACKUP_DBS HOST_DBS
 		if [[ -z ${first} ]]; then
 			first=${host}
-			for name in "${!HOST_TABLES[@]}"; do
-				first_tables[${name}]=1
-			done
+			merge_keys first_tables HOST_TABLES
 			continue
 		fi
 		for name in "${!HOST_TABLES[@]}"; do
@@ -2503,8 +2486,7 @@ live_tables() {
 			fi
 			if [[ ! ${row} =~ ${TABLE_ROW_RE} ]]; then
 				LIVE_UNREADABLE+=("${host}")
-				json_get TotalBytes "${row}"
-				LIVE_UNREADABLE_SIZES+=("${REPLY}")
+				json_row "${row}" TotalBytes=LIVE_UNREADABLE_SIZES
 				continue
 			fi
 			db=${BASH_REMATCH[1]} table=${BASH_REMATCH[2]}
@@ -2514,12 +2496,7 @@ live_tables() {
 			LIVE_HOSTS+=("${host}")
 			LIVE_DBS+=("${db}")
 			LIVE_TABLES+=("${table}")
-			json_get Engine "${row}"
-			LIVE_ENGINES+=("${REPLY}")
-			json_get UUID "${row}"
-			LIVE_UUIDS+=("${REPLY}")
-			json_get TotalBytes "${row}"
-			LIVE_SIZES+=("${REPLY}")
+			json_row "${row}" Engine=LIVE_ENGINES UUID=LIVE_UUIDS TotalBytes=LIVE_SIZES
 		done <<<"${HTTP_BODY}"
 	done
 }
