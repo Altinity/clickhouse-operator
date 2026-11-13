@@ -5595,3 +5595,18 @@ func TestJobScriptFitsTheLinuxArgumentLimit(t *testing.T) {
 		require.Less(t, len(script)+2*lines, 120000, "%s as the data of its ConfigMap, indented by YAML", path)
 	}
 }
+
+// The Helm chart renders the data of every ConfigMap of the operator through tpl, which reads "{{" as the start of a
+// template action: an orchestrator script holding it breaks the chart
+func TestJobScriptHoldsNoHelmTemplateAction(t *testing.T) {
+	for _, path := range []string{
+		filepath.Join(orchestratorScriptDir(), OrchestratorScriptFile),
+		filepath.Join(pythonOrchestratorScriptDir(), OrchestratorPythonScriptFile),
+	} {
+		script, err := readScript(path)
+		require.NoError(t, err)
+		for i, line := range strings.Split(script, "\n") {
+			require.NotContains(t, line, "{{", "%s:%d holds {{, which tpl of the Helm chart reads as a template action", path, i+1)
+		}
+	}
+}

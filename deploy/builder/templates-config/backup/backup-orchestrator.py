@@ -20,6 +20,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
+LB = '{'  # a literal brace: the Helm chart renders this file as a template, which reads two as an action
 NAME_RE = r'^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'
 HOST_RE = r'^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$'
 NUMBER_RE = r'^[0-9]+$'
@@ -465,7 +466,7 @@ def action_start(host, what, name, command):
 	log(f'{host}: {what} {name}')
 	if not sidecar_kept(host):
 		return False
-	body = f'{{"command":{json_string(command)}}}'
+	body = '{"command":' + json_string(command) + '}'
 	rows = action_rows(host, command)
 	if rows is None:
 		return False
@@ -979,14 +980,14 @@ def check_storage_paths():
 		if index == this:
 			S.self_path = template
 			if operation == 'backup' and selection == 'AllReplicas' and '{replica}' not in template:
-				die(f'the storage path \'{template}\' of cluster {name} lacks {{replica}}: a backup of every '
+				die(f'the storage path \'{template}\' of cluster {name} lacks {LB}replica}}: a backup of every '
 				    'replica would keep those of all replicas of a shard at one path')
 			if operation == 'backup' and selection != 'AllReplicas' and '{replica}' in template:
-				die(f'the storage path \'{template}\' of cluster {name} holds {{replica}}: a backup of the first '
+				die(f'the storage path \'{template}\' of cluster {name} holds {LB}replica}}: a backup of the first '
 				    'replica of each shard would not be at the path every other replica restores its schema '
 				    'from')
 			if operation == 'restore' and '{replica}' in template and not is_true('VALIDATE_TOPOLOGY'):
-				advise(f'the storage path \'{template}\' of cluster {name} holds {{replica}}: every replica '
+				advise(f'the storage path \'{template}\' of cluster {name} holds {LB}replica}}: every replica '
 				       'restores its schema from its own path, which holds the backup only if it is one of '
 				       'every replica')
 		unknown = None
@@ -1075,7 +1076,7 @@ def naming_init():
 		while tokens:
 			token = next((t for t in ('YYYY', 'MM', 'DD', 'HH', 'II', 'SS') if tokens.startswith(t)), None)
 			if token is None:
-				die(f'BACKUP_NAMING holds {{{name}}}, which is no placeholder')
+				die(f'BACKUP_NAMING holds {LB}{name}}}, which is no placeholder')
 			S.naming_parts.append(('t', token))
 			seen[token] = seen.get(token, 0) + 1
 			tokens = tokens[len(token):]
@@ -1084,7 +1085,7 @@ def naming_init():
 			die('BACKUP_NAMING must hold {shard} and every token of the time, YYYY, MM, DD, HH, II and SS, once')
 	for name in ('cluster', 'chi', 'namespace', 'prefix'):
 		if seen.get(name, 0) > 1:
-			die(f'BACKUP_NAMING holds {{{name}}} twice')
+			die(f'BACKUP_NAMING holds {LB}{name}}} twice')
 	for pair in env('SHARD_NUMBERS').split():
 		if not rx(r'^[^=]+=[1-9][0-9]{0,4}$', pair) or not rx(HOST_RE, pair.split('=', 1)[0]):
 			die('SHARD_NUMBERS must list host=number pairs')
@@ -1926,8 +1927,8 @@ def source_paths():
 	if path == S.self_path:
 		S.source_own_path = True
 	elif obj and obj == S.self_object_disk_path:
-		die(f'the object disk path \'{S.self_object_disk_path}\' of cluster {S.self_cluster_name} holds no {{installation}} '
-		    f'or {{namespace}} that tells the installation restore {name} names apart from this one, while the '
+		die(f'the object disk path \'{S.self_object_disk_path}\' of cluster {S.self_cluster_name} holds no {LB}installation}} '
+		    f'or {LB}namespace}} that tells the installation restore {name} names apart from this one, while the '
 		    'storage path does: deleting the copy the restore downloads would delete the object disk data of '
 		    'the backup; give the object disk path the macros of the storage path')
 	for value in [path] + ([obj] if obj else []):
@@ -2175,7 +2176,7 @@ def do_restore():
 				if not row:
 					if '{replica}' in S.self_path:
 						die(f'preflight failed: backup {backup} is missing in the storage of {host}: the storage '
-						    f'path \'{S.self_path}\' holds {{replica}}, which gives every replica a path of '
+						    f'path \'{S.self_path}\' holds {LB}replica}}, which gives every replica a path of '
 						    f'its own, and the backup was made on the first replica of each shard only{hint}')
 					die(f'preflight failed: backup {backup} is missing in the storage of {host}{hint}')
 			if row['desc'].startswith('broken'):
