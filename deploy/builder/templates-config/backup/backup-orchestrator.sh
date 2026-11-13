@@ -285,6 +285,14 @@ check_cluster() {
 	fi
 }
 
+# check_filter VAR_NAME REGEX MAX_LENGTH WHAT fails unless VAR_NAME is empty, or matches REGEX in MAX_LENGTH characters
+check_filter() {
+	local value=${!1:-}
+	if [[ -n ${value} ]] && [[ ! ${value} =~ $2 ]] || ((${#value} > $3)); then
+		die "$1 is not a valid $4"
+	fi
+}
+
 listed() {
 	local value=$1 item
 	shift
@@ -294,6 +302,21 @@ listed() {
 		fi
 	done
 	return 1
+}
+
+# unique_into ARRAY ITEM... sets ARRAY to the ITEMs but the empty ones, each once, in their order
+unique_into() {
+	local -n _unique=$1
+	local _item
+	local -A _seen=()
+	shift
+	_unique=()
+	for _item in "$@"; do
+		if [[ -n ${_item} && -z ${_seen[${_item}]:-} ]]; then
+			_seen[${_item}]=1
+			_unique+=("${_item}")
+		fi
+	done
 }
 
 # json_string VALUE sets REPLY to VALUE as a JSON string
@@ -835,6 +858,13 @@ delete_local() {
 		return 1
 	fi
 	log "$1: local copy of $2 deleted"
+}
+
+# drop_local HOST NAME drops the local copy of NAME that HOST lists, failing only when it cannot
+drop_local() {
+	if list_backups "$1" local && find_backup "$2"; then
+		delete_local "$1" "$2"
+	fi
 }
 
 # merge_keys INTO FROM sets to 1 every key of the associative array FROM in the associative array INTO
@@ -2385,10 +2415,8 @@ do_verify() {
 	for host in "${verify_hosts[@]}"; do
 		name=${HOST_BACKUP[${host}]}
 		log "${host}: verifying ${name}"
-		if list_backups "${host}" local && find_backup "${name}"; then
-			if ! delete_local "${host}" "${name}"; then
-				fail "verify failed on ${host}: cannot drop the local copy of ${name}"
-			fi
+		if ! drop_local "${host}" "${name}"; then
+			fail "verify failed on ${host}: cannot drop the local copy of ${name}"
 		fi
 		if ! run_step op "${host}" download "${name}" "/backup/download/${name}"; then
 			fail "verify failed on ${host}: ${name} cannot be downloaded"
@@ -2548,8 +2576,7 @@ dropped_tables() {
 guard_tables() {
 	local host i
 	local -a sources found=()
-	declare -gA BACKUP_TABLES=() BACKUP_DBS=()
-	BACKUP_TABLES_UNREADABLE=
+	reset_backup_tables
 	read -r -a sources <<<"$1"
 	shift
 	live_tables "$@"
@@ -2583,6 +2610,24 @@ join_items() {
 	done
 }
 
+# oversize SIZE sets REPLY to how a table of SIZE bytes, empty when unknown, is not one max_table_size_to_drop lets
+# ClickHouse drop, or fails
+oversize() {
+	if [[ -z $1 ]]; then
+		REPLY="of unknown size"
+	elif greater "$1" "${MAX_TABLE_SIZE_TO_DROP}"; then
+		REPLY="$1 bytes"
+	else
+		return 1
+	fi
+}
+
+# reset_backup_tables empties what backup_tables found
+reset_backup_tables() {
+	declare -gA BACKUP_TABLES=() BACKUP_DBS=()
+	BACKUP_TABLES_UNREADABLE=
+}
+
 # greater SIZE LIMIT reports whether the number SIZE is greater than the number LIMIT
 greater() {
 	local size=${1#"${1%%[!0]*}"} limit=${2#"${2%%[!0]*}"}
@@ -2610,13 +2655,10 @@ refuse_database_drops() {
 	shift
 	for i in "${!LIVE_UNREADABLE[@]}"; do
 		host=${LIVE_UNREADABLE[i]}
-		if [[ -z ${LIVE_UNREADABLE_SIZES[i]} ]]; then
-			what="of unknown size"
-		elif greater "${LIVE_UNREADABLE_SIZES[i]}" "${MAX_TABLE_SIZE_TO_DROP}"; then
-			what="${LIVE_UNREADABLE_SIZES[i]} bytes"
-		else
+		if ! oversize "${LIVE_UNREADABLE_SIZES[i]}"; then
 			continue
 		fi
+		what=${REPLY}
 		n=${unreadable[${host}]:-0}
 		unreadable[${host}]=$((n + 1))
 		unreadable_rows[${host}]+="${unreadable_rows[${host}]:+, }${host}:? (a table whose name cannot be read, ${what})"
@@ -2632,13 +2674,12 @@ refuse_database_drops() {
 			larger[${key}]=${unreadable_rows[${host}]:-}
 			uncertain[${key}]=${unreadable_rows[${host}]:+1}
 		fi
-		if [[ -z ${LIVE_SIZES[i]} ]]; then
-			larger[${key}]+="${larger[${key}]:+, }${host}:${LIVE_DBS[i]}.${LIVE_TABLES[i]} (of unknown size)"
-			uncertain[${key}]=1
-		elif greater "${LIVE_SIZES[i]}" "${MAX_TABLE_SIZE_TO_DROP}"; then
-			larger[${key}]+="${larger[${key}]:+, }${host}:${LIVE_DBS[i]}.${LIVE_TABLES[i]} (${LIVE_SIZES[i]} bytes)"
-		else
+		if ! oversize "${LIVE_SIZES[i]}"; then
 			continue
+		fi
+		larger[${key}]+="${larger[${key}]:+, }${host}:${LIVE_DBS[i]}.${LIVE_TABLES[i]} (${REPLY})"
+		if [[ -z ${LIVE_SIZES[i]} ]]; then
+			uncertain[${key}]=1
 		fi
 		n=${count[${key}]}
 		count[${key}]=$((n + 1))
@@ -2675,8 +2716,7 @@ plan_overwrite() {
 	read -r -a shards <<<"$1"
 	initiator=${shards[0]}
 	shift
-	declare -gA BACKUP_TABLES=() BACKUP_DBS=()
-	BACKUP_TABLES_UNREADABLE=
+	reset_backup_tables
 	backup_tables "${shards[@]}"
 	live_tables "$@"
 	dropped_tables
@@ -2730,10 +2770,8 @@ plan_overwrite() {
 		if [[ -z ${LIVE_DROPPED[i]} || ${LIVE_HOSTS[i]} == "${initiator}" ]]; then
 			continue
 		fi
-		if [[ -z ${LIVE_SIZES[i]} ]]; then
-			oversized+=("${LIVE_HOSTS[i]}:${LIVE_DBS[i]}.${LIVE_TABLES[i]} (of unknown size)")
-		elif greater "${LIVE_SIZES[i]}" "${MAX_TABLE_SIZE_TO_DROP}"; then
-			oversized+=("${LIVE_HOSTS[i]}:${LIVE_DBS[i]}.${LIVE_TABLES[i]} (${LIVE_SIZES[i]} bytes)")
+		if oversize "${LIVE_SIZES[i]}"; then
+			oversized+=("${LIVE_HOSTS[i]}:${LIVE_DBS[i]}.${LIVE_TABLES[i]} (${REPLY})")
 		fi
 	done
 	if ((${#oversized[@]} > 0)); then
@@ -2741,16 +2779,6 @@ plan_overwrite() {
 		die "refusing to overwrite: the drop ON CLUSTER from ${initiator} would stop at tables larger than max_table_size_to_drop (${MAX_TABLE_SIZE_TO_DROP} bytes) of cluster ${CLUSTER} on other hosts (${REPLY}), as clickhouse-backup forces the drop of such a table on ${initiator} alone; ${SIZE_LIMIT_ADVICE}"
 	fi
 	refuse_database_drops "" "${initiator}"
-}
-
-check_source_name() {
-	local value=${!1:-}
-	if [[ -z ${value} ]]; then
-		return 0
-	fi
-	if [[ ! ${value} =~ ${SOURCE_NAME_RE} ]] || ((${#value} > $2)); then
-		die "$1 is not a valid $3"
-	fi
 }
 
 source_template() {
@@ -2855,27 +2883,33 @@ source_copy() {
 	fi
 }
 
+# drop_source_copies deletes, as it can, the copies source_copy downloaded: the restore failed
 drop_source_copies() {
-	local host strict=${1:-} READ_ONLY=1 BEST_EFFORT=${BEST_EFFORT:-}
-	local -a hosts=("${SOURCE_COPIES[@]}")
-	if [[ -z ${strict} ]]; then
-		BEST_EFFORT=1
-		SOURCE_COPIES=()
-	fi
-	for host in "${hosts[@]}"; do
-		if [[ -n ${strict} ]]; then
-			if ! delete_local "${host}" "${HOST_BACKUP[${host}]}"; then
-				fail "${host}: cannot delete the copy of ${HOST_BACKUP[${host}]} the preflight downloaded, which the restore would take for its own"
-			fi
-			SOURCE_COPIES=("${SOURCE_COPIES[@]:1}")
-		elif list_backups "${host}" local && ! find_backup "${HOST_BACKUP[${host}]}"; then
+	local host READ_ONLY=1 BEST_EFFORT=1
+	local -a copies=("${SOURCE_COPIES[@]}")
+	SOURCE_COPIES=()
+	for host in "${copies[@]}"; do
+		if list_backups "${host}" local && ! find_backup "${HOST_BACKUP[${host}]}"; then
 			continue
-		elif ! delete_local "${host}" "${HOST_BACKUP[${host}]}"; then
+		fi
+		if ! delete_local "${host}" "${HOST_BACKUP[${host}]}"; then
 			advise "${host}: the copy of ${HOST_BACKUP[${host}]} the restore downloaded is left on local disk, which refuses a restore of ${HOST_BACKUP[${host}]} from another installation until it is deleted"
 		fi
 	done
 }
 
+# delete_source_copies deletes the copies source_copy downloaded before the restore downloads its own
+delete_source_copies() {
+	local host READ_ONLY=1
+	for host in "${SOURCE_COPIES[@]}"; do
+		if ! delete_local "${host}" "${HOST_BACKUP[${host}]}"; then
+			fail "${host}: cannot delete the copy of ${HOST_BACKUP[${host}]} the preflight downloaded, which the restore would take for its own"
+		fi
+		SOURCE_COPIES=("${SOURCE_COPIES[@]:1}")
+	done
+}
+
+# restore_command STEP HOST sets STEP_KIND and STEP_ARGS to the step STEP of the restore on HOST
 restore_command() {
 	local endpoint=restore command
 	local -a params=() flags=()
@@ -2916,7 +2950,11 @@ restore_command() {
 		params+=("restore_database_mapping=${DATABASE_MAPPING}")
 		flags+=("--restore-database-mapping=${DATABASE_MAPPING}")
 	fi
-	if [[ ${RESTORE_KIND} == action || $1 == schema_on_cluster ]]; then
+	STEP_KIND=${RESTORE_KIND}
+	if [[ $1 == schema_on_cluster ]]; then
+		STEP_KIND=action
+	fi
+	if [[ ${STEP_KIND} == action ]]; then
 		command="${flags[*]}${ACTION_ENV:+ ${ACTION_ENV}} ${HOST_BACKUP[$2]}"
 		STEP_ARGS=("${command}")
 		return 0
@@ -2929,19 +2967,8 @@ restore_command() {
 
 # restore_step HOST WHAT STEP runs the step STEP of the restore, as restore_command makes it, on HOST
 restore_step() {
-	local kind=${RESTORE_KIND}
 	restore_command "$3" "$1"
-	if [[ $3 == schema_on_cluster ]]; then
-		kind=action
-	fi
-	run_step "${kind}" "$1" "$2" "${HOST_BACKUP[$1]}" "${STEP_ARGS[@]}"
-}
-
-check_filter() {
-	local value=${!1:-}
-	if [[ -n ${value} ]] && [[ ! ${value} =~ $2 ]] || ((${#value} > $3)); then
-		die "$1 is not a valid $4"
-	fi
+	run_step "${STEP_KIND}" "$1" "$2" "${HOST_BACKUP[$1]}" "${STEP_ARGS[@]}"
 }
 
 check_restore_filters() {
@@ -2998,7 +3025,7 @@ data_args() {
 drop_downloads() {
 	local host BEST_EFFORT=1 READ_ONLY=1
 	for host in "$@"; do
-		if list_backups "${host}" local && find_backup "${HOST_BACKUP[${host}]}" && ! delete_local "${host}" "${HOST_BACKUP[${host}]}"; then
+		if ! drop_local "${host}" "${HOST_BACKUP[${host}]}"; then
 			advise "${host}: the copy of ${HOST_BACKUP[${host}]} the restore downloaded is left on local disk"
 		fi
 	done
@@ -3022,252 +3049,264 @@ other_installation_hint() {
 	fi
 }
 
-do_restore() {
-	local host restore_data=1 restore_schema=1 overwrite= validate= restore_rbac= holds_rbac= replicas= hint where base READ_ONLY=
-	local -a schema_hosts data_hosts targets guarded used shards had_local=() resumed=() downloads drop
+# restore_settings validates the settings of a restore and sets the hosts it runs on: SCHEMA_TARGETS restore the schema,
+# DATA_TARGETS the data, USED_HOSTS download the backup, TARGETS are all of them, and GUARDED those the guard reads
+restore_settings() {
+	local host
 	check_name BACKUP_NAME
 	parse_hosts SCHEMA_HOSTS
-	schema_hosts=("${HOSTS[@]}")
+	SCHEMA_TARGETS=("${HOSTS[@]}")
+	RESTORE_DATA=1 RESTORE_SCHEMA=1 RESTORE_OVERWRITE= RESTORE_VALIDATE= RESTORE_RBAC_WITH_SCHEMA= SCHEMA_REPLICAS=
 	if is_true SCHEMA_ONLY; then
-		restore_data=
+		RESTORE_DATA=
 		parse_hosts DATA_HOSTS optional
 	else
 		parse_hosts DATA_HOSTS
 	fi
-	data_hosts=("${HOSTS[@]}")
+	DATA_TARGETS=("${HOSTS[@]}")
 	if is_true OVERWRITE; then
-		overwrite=1
+		RESTORE_OVERWRITE=1
 	fi
 	if is_true VALIDATE_TOPOLOGY; then
-		validate=1
+		RESTORE_VALIDATE=1
 	fi
 	if is_true RESTORE_RBAC; then
-		restore_rbac=1
+		RESTORE_RBAC_WITH_SCHEMA=1
 	fi
-	if [[ -n ${CLUSTER:-} || -n ${overwrite} ]]; then
+	if [[ -n ${CLUSTER:-} || -n ${RESTORE_OVERWRITE} ]]; then
 		check_cluster
 	fi
-	check_source_name SOURCE_INSTALLATION "${SOURCE_INSTALLATION_MAX_LENGTH}" "installation name"
-	check_source_name SOURCE_NAMESPACE "${SOURCE_NAMESPACE_MAX_LENGTH}" namespace
+	check_filter SOURCE_INSTALLATION "${SOURCE_NAME_RE}" "${SOURCE_INSTALLATION_MAX_LENGTH}" "installation name"
+	check_filter SOURCE_NAMESPACE "${SOURCE_NAME_RE}" "${SOURCE_NAMESPACE_MAX_LENGTH}" namespace
 	naming_init
 	naming_key BACKUP_NAME
 	BACKUP_KEY=${REPLY}
-	if [[ -n ${TABLES:-} ]]; then
-		if [[ ! ${TABLES} =~ ${TABLES_RE} ]] || ((${#TABLES} > TABLES_MAX_LENGTH)); then
-			die "TABLES is not a valid table pattern"
-		fi
-	fi
+	check_filter TABLES "${TABLES_RE}" "${TABLES_MAX_LENGTH}" "table pattern"
 	check_restore_filters
 	if [[ -n ${PARTITIONS:-} ]]; then
-		if [[ -z ${restore_data} ]]; then
+		if [[ -z ${RESTORE_DATA} ]]; then
 			die "PARTITIONS restore data, which SCHEMA_ONLY leaves out"
 		fi
-		if [[ -n ${restore_rbac} ]]; then
+		if [[ -n ${RESTORE_RBAC_WITH_SCHEMA} ]]; then
 			die "PARTITIONS restore no schema, which RESTORE_RBAC restores the access entities with"
 		fi
-		restore_schema=
-		overwrite=
-		schema_hosts=()
+		RESTORE_SCHEMA= RESTORE_OVERWRITE=
+		SCHEMA_TARGETS=()
 	fi
-	if [[ -n ${overwrite} ]]; then
+	if [[ -n ${RESTORE_OVERWRITE} ]]; then
 		if [[ ! ${MAX_TABLE_SIZE_TO_DROP:-} =~ ${NUMBER_RE} ]]; then
 			die "MAX_TABLE_SIZE_TO_DROP must be a number of bytes"
 		fi
-		for host in "${schema_hosts[@]}"; do
-			if ! listed "${host}" "${data_hosts[@]}"; then
-				replicas=1
+		for host in "${SCHEMA_TARGETS[@]}"; do
+			if ! listed "${host}" "${DATA_TARGETS[@]}"; then
+				SCHEMA_REPLICAS=1
 			fi
 		done
 	fi
-	if [[ -n ${replicas} ]]; then
+	if [[ -n ${SCHEMA_REPLICAS} ]]; then
 		no_zookeeper || :
 	fi
-	used=(${schema_hosts[@]+"${schema_hosts[@]}"})
-	if [[ -n ${restore_data} ]]; then
-		used+=("${data_hosts[@]}")
+	USED_HOSTS=(${SCHEMA_TARGETS[@]+"${SCHEMA_TARGETS[@]}"})
+	if [[ -n ${RESTORE_DATA} ]]; then
+		USED_HOSTS+=("${DATA_TARGETS[@]}")
 	fi
-	mapfile -t used < <(printf '%s\n' "${used[@]}" | awk '!seen[$0]++')
-	targets=(${schema_hosts[@]+"${schema_hosts[@]}"} "${data_hosts[@]}")
-	mapfile -t targets < <(printf '%s\n' "${targets[@]}" | awk 'NF && !seen[$0]++')
-	resolve_names HOST_BACKUP "${BACKUP_KEY}" "${targets[@]}"
+	unique_into USED_HOSTS "${USED_HOSTS[@]}"
+	unique_into TARGETS ${SCHEMA_TARGETS[@]+"${SCHEMA_TARGETS[@]}"} "${DATA_TARGETS[@]}"
+	resolve_names HOST_BACKUP "${BACKUP_KEY}" "${TARGETS[@]}"
 	parse_hosts GUARD_HOSTS optional
-	if [[ -z ${restore_schema} ]]; then
+	if [[ -z ${RESTORE_SCHEMA} ]]; then
 		HOSTS=()
 	fi
-	guarded=("${targets[@]}" ${HOSTS[@]+"${HOSTS[@]}"})
-	mapfile -t guarded < <(printf '%s\n' "${guarded[@]}" | awk 'NF && !seen[$0]++')
-	check_storage_paths
-	source_paths
-	wait_for_apis "${guarded[@]}"
+	unique_into GUARDED "${TARGETS[@]}" ${HOSTS[@]+"${HOSTS[@]}"}
+}
 
-	event Normal OrchestratorRestoreStarted "restore ${BACKUP_NAME} on ${#targets[@]} host(s)"
-	if [[ -n ${overwrite} ]]; then
-		log "restore ${BACKUP_NAME}: preflight on ${#targets[@]} host(s)"
-	else
-		log "restore ${BACKUP_NAME}: preflight on ${#targets[@]} host(s), overwrite guard on ${#guarded[@]}"
-	fi
-	for host in "${targets[@]}"; do
+# restore_preflight checks that every target answers; it refuses a restore from another installation that a local copy,
+# or a backup of the same name, would mix up; with VALIDATE_TOPOLOGY, it checks that every host holds the backup and sets
+# HOLDS_RBAC when it holds access entities
+restore_preflight() {
+	local host where base hint
+	for host in "${TARGETS[@]}"; do
 		call GET "${host}" /backup/version
 		if [[ ${HTTP_CODE} != 200 ]]; then
 			die "preflight failed: sidecar of ${host} answered HTTP ${HTTP_CODE}: $(error_of)"
 		fi
 	done
 	if [[ -n ${SOURCE_ENV} ]]; then
-		for host in "${used[@]}"; do
+		for host in "${USED_HOSTS[@]}"; do
 			refuse_local_copy "${host}"
 			if [[ -z ${SOURCE_OWN_PATH} ]]; then
 				refuse_own_backup "${host}"
 			fi
 		done
 	fi
-	if [[ -n ${validate} ]]; then
-		other_installation_hint
-		hint=${REPLY}
-		for host in "${used[@]}"; do
-			where="the storage of ${host}"
-			if [[ -n ${SOURCE_ENV} ]]; then
-				where="the storage path '${SOURCE_PATH_SHOWN}' of ${host}"
-				source_copy "${host}"
-				if ! list_backups "${host}" local; then
-					fail "preflight failed on ${host}"
-				fi
-				if ! find_backup "${HOST_BACKUP[${host}]}"; then
-					die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in ${where}: its download left no local copy"
-				fi
-				base=${LIST_REQUIRED[FOUND]}
-				if [[ -n ${base} && ${OWN_BACKUPS[${host}]:-} == *" ${base} "* ]]; then
-					die "preflight failed: backup ${HOST_BACKUP[${host}]} is incremental from ${base}, and ${host} holds a backup ${base} at its own storage path too, which clickhouse-backup would take for the one at the storage path '${SOURCE_PATH_SHOWN}', as it tells the backups of every path apart by name alone: delete that one first"
-				fi
-			else
-				if ! list_backups "${host}" remote; then
-					fail "preflight failed on ${host}"
-				fi
-				if ! find_backup "${HOST_BACKUP[${host}]}"; then
-					if [[ ${SELF_PATH} == *"{replica}"* ]]; then
-						die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in the storage of ${host}: the storage path '${SELF_PATH}' holds {replica}, which gives every replica a path of its own, and the backup was made on the first replica of each shard only${hint}"
-					fi
-					die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in the storage of ${host}${hint}"
-				fi
-			fi
-			if [[ ${LIST_DESC[FOUND]} == broken* ]]; then
-				die "preflight failed: backup ${HOST_BACKUP[${host}]} is ${LIST_DESC[FOUND]} in ${where}"
-			fi
-			if [[ ${LIST_RBAC_SIZE[FOUND]:-0} != 0 ]]; then
-				holds_rbac=1
-			fi
-		done
+	if [[ -z ${RESTORE_VALIDATE} ]]; then
+		return 0
 	fi
-	if [[ -z ${restore_schema} ]]; then
+	other_installation_hint
+	hint=${REPLY}
+	for host in "${USED_HOSTS[@]}"; do
+		where="the storage of ${host}"
+		if [[ -n ${SOURCE_ENV} ]]; then
+			where="the storage path '${SOURCE_PATH_SHOWN}' of ${host}"
+			source_copy "${host}"
+			if ! list_backups "${host}" local; then
+				fail "preflight failed on ${host}"
+			fi
+			if ! find_backup "${HOST_BACKUP[${host}]}"; then
+				die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in ${where}: its download left no local copy"
+			fi
+			base=${LIST_REQUIRED[FOUND]}
+			if [[ -n ${base} && ${OWN_BACKUPS[${host}]:-} == *" ${base} "* ]]; then
+				die "preflight failed: backup ${HOST_BACKUP[${host}]} is incremental from ${base}, and ${host} holds a backup ${base} at its own storage path too, which clickhouse-backup would take for the one at the storage path '${SOURCE_PATH_SHOWN}', as it tells the backups of every path apart by name alone: delete that one first"
+			fi
+		else
+			if ! list_backups "${host}" remote; then
+				fail "preflight failed on ${host}"
+			fi
+			if ! find_backup "${HOST_BACKUP[${host}]}"; then
+				if [[ ${SELF_PATH} == *"{replica}"* ]]; then
+					die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in the storage of ${host}: the storage path '${SELF_PATH}' holds {replica}, which gives every replica a path of its own, and the backup was made on the first replica of each shard only${hint}"
+				fi
+				die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in the storage of ${host}${hint}"
+			fi
+		fi
+		if [[ ${LIST_DESC[FOUND]} == broken* ]]; then
+			die "preflight failed: backup ${HOST_BACKUP[${host}]} is ${LIST_DESC[FOUND]} in ${where}"
+		fi
+		if [[ ${LIST_RBAC_SIZE[FOUND]:-0} != 0 ]]; then
+			HOLDS_RBAC=1
+		fi
+	done
+}
+
+# restore_guard refuses, without OVERWRITE, a restore over tables that exist; with it, it plans the drops: ON_CLUSTER
+restore_guard() {
+	local -a shards
+	if [[ -z ${RESTORE_SCHEMA} ]]; then
 		log "restore ${BACKUP_NAME}: restores the partitions ${PARTITIONS} into the tables as they are, without the schema, as the Altinity Cloud Manager does: each of them is dropped first where a table holds it"
-	elif [[ -z ${overwrite} ]]; then
-		guard_tables "${used[*]}" "${guarded[@]}"
-	elif [[ -n ${replicas} ]]; then
-		shards=("${schema_hosts[0]}" "${data_hosts[@]}")
-		mapfile -t shards < <(printf '%s\n' "${shards[@]}" | awk '!seen[$0]++')
-		plan_overwrite "${shards[*]}" "${guarded[@]}"
+	elif [[ -z ${RESTORE_OVERWRITE} ]]; then
+		guard_tables "${USED_HOSTS[*]}" "${GUARDED[@]}"
+	elif [[ -n ${SCHEMA_REPLICAS} ]]; then
+		unique_into shards "${SCHEMA_TARGETS[0]}" "${DATA_TARGETS[@]}"
+		plan_overwrite "${shards[*]}" "${GUARDED[@]}"
 	else
 		log "restore ${BACKUP_NAME}: every shard of cluster ${CLUSTER} has one replica, which drops the tables of the backup on its own"
 		if drop_size_limited; then
-			declare -gA BACKUP_TABLES=() BACKUP_DBS=()
-			BACKUP_TABLES_UNREADABLE=
-			live_tables "${schema_hosts[@]}"
-			refuse_database_drops "${schema_hosts[*]}" "${schema_hosts[@]}"
+			reset_backup_tables
+			live_tables "${SCHEMA_TARGETS[@]}"
+			refuse_database_drops "${SCHEMA_TARGETS[*]}" "${SCHEMA_TARGETS[@]}"
 		fi
 	fi
-	if [[ -z ${SOURCE_ENV} ]]; then
-		for host in "${used[@]}"; do
-			if ! list_backups "${host}" local || ! find_backup "${HOST_BACKUP[${host}]}"; then
-				continue
-			fi
-			if [[ ${LIST_DESC[FOUND]} == broken* ]]; then
-				log "${host}: holds an incomplete local copy of ${HOST_BACKUP[${host}]}, whose download the restore resumes"
-				resumed+=("${host}")
-			else
-				had_local+=("${host}")
-			fi
-		done
-	else
-		drop_source_copies strict
-		SOURCE_COPIES=("${used[@]}")
+}
+
+# restore_local_copies sets HAD_LOCAL to the hosts that hold a copy of the backup, which the restore keeps, and
+# RESUMED_LOCAL to those whose incomplete copy it resumes; a restore from another installation drops those of its
+# preflight instead, which it downloads anew
+restore_local_copies() {
+	local host
+	HAD_LOCAL=() RESUMED_LOCAL=()
+	if [[ -n ${SOURCE_ENV} ]]; then
+		delete_source_copies
+		SOURCE_COPIES=("${USED_HOSTS[@]}")
+		return 0
 	fi
+	for host in "${USED_HOSTS[@]}"; do
+		if ! list_backups "${host}" local || ! find_backup "${HOST_BACKUP[${host}]}"; then
+			continue
+		fi
+		if [[ ${LIST_DESC[FOUND]} == broken* ]]; then
+			log "${host}: holds an incomplete local copy of ${HOST_BACKUP[${host}]}, whose download the restore resumes"
+			RESUMED_LOCAL+=("${host}")
+		else
+			HAD_LOCAL+=("${host}")
+		fi
+	done
+}
+
+# restore_downloads downloads the backup on every host of USED_HOSTS but those of HAD_LOCAL
+restore_downloads() {
+	local host
+	local -a downloads=() drop=()
+	for host in "${USED_HOSTS[@]}"; do
+		if ! listed "${host}" ${HAD_LOCAL[@]+"${HAD_LOCAL[@]}"}; then
+			downloads+=("${host}")
+		fi
+	done
+	DATA_DOWNLOADS=
+	if [[ -n ${RESTORE_DATA} ]]; then
+		DATA_DOWNLOADS=${DATA_TARGETS[*]}
+	fi
+	if ((${#downloads[@]} == 0)); then
+		return 0
+	fi
+	READ_ONLY=1
+	if ! run_all "${RESTORE_KIND}" download_args download "${BACKUP_NAME}" "${downloads[@]}"; then
+		READ_ONLY=
+		if [[ -z ${SOURCE_ENV} ]]; then
+			for host in "${downloads[@]}"; do
+				if ! listed "${host}" ${RESUMED_LOCAL[@]+"${RESUMED_LOCAL[@]}"}; then
+					drop+=("${host}")
+				fi
+			done
+			drop_downloads ${drop[@]+"${drop[@]}"}
+		fi
+		fail_all "download of ${BACKUP_NAME}"
+	fi
+	READ_ONLY=
+}
+
+do_restore() {
+	local host
+	restore_settings
+	check_storage_paths
+	source_paths
+	wait_for_apis "${GUARDED[@]}"
+
+	event Normal OrchestratorRestoreStarted "restore ${BACKUP_NAME} on ${#TARGETS[@]} host(s)"
+	if [[ -n ${RESTORE_OVERWRITE} ]]; then
+		log "restore ${BACKUP_NAME}: preflight on ${#TARGETS[@]} host(s)"
+	else
+		log "restore ${BACKUP_NAME}: preflight on ${#TARGETS[@]} host(s), overwrite guard on ${#GUARDED[@]}"
+	fi
+	restore_preflight
+	restore_guard
+	restore_local_copies
 	restore_env
 	RESTORE_KIND=op
 	if [[ -n ${ACTION_ENV} ]]; then
 		RESTORE_KIND=action
 	fi
+	restore_downloads
 
-	downloads=()
-	for host in "${used[@]}"; do
-		if ! listed "${host}" ${had_local[@]+"${had_local[@]}"}; then
-			downloads+=("${host}")
-		fi
-	done
-	DATA_DOWNLOADS=
-	if [[ -n ${restore_data} ]]; then
-		DATA_DOWNLOADS=${data_hosts[*]}
+	if [[ -n ${ON_CLUSTER} ]] && ! restore_step "${SCHEMA_TARGETS[0]}" "restore schema on cluster ${CLUSTER}" schema_on_cluster; then
+		fail "schema restore of ${BACKUP_NAME} on cluster ${CLUSTER} failed on ${SCHEMA_TARGETS[0]}"
 	fi
-	if ((${#downloads[@]} > 0)); then
-		READ_ONLY=1
-		if ! run_all "${RESTORE_KIND}" download_args download "${BACKUP_NAME}" "${downloads[@]}"; then
-			READ_ONLY=
-			if [[ -z ${SOURCE_ENV} ]]; then
-				drop=()
-				for host in "${downloads[@]}"; do
-					if ! listed "${host}" ${resumed[@]+"${resumed[@]}"}; then
-						drop+=("${host}")
-					fi
-				done
-				drop_downloads ${drop[@]+"${drop[@]}"}
-			fi
-			fail_all "download of ${BACKUP_NAME}"
-		fi
-		READ_ONLY=
-	fi
-
-	if [[ -n ${ON_CLUSTER} ]]; then
-		if ! restore_step "${schema_hosts[0]}" "restore schema on cluster ${CLUSTER}" schema_on_cluster; then
-			fail "schema restore of ${BACKUP_NAME} on cluster ${CLUSTER} failed on ${schema_hosts[0]}"
-		fi
-	fi
-	RESTORE_RBAC_WITH_SCHEMA=${restore_rbac}
-	for host in ${schema_hosts[@]+"${schema_hosts[@]}"}; do
+	for host in ${SCHEMA_TARGETS[@]+"${SCHEMA_TARGETS[@]}"}; do
 		if ! restore_step "${host}" "restore schema" schema; then
 			fail "schema restore of ${BACKUP_NAME} failed on ${host}"
 		fi
 	done
-	if [[ -n ${restore_data} ]]; then
-		if ! run_all "${RESTORE_KIND}" data_args "restore data" "${BACKUP_NAME}" "${data_hosts[@]}"; then
-			fail_all "data restore of ${BACKUP_NAME}"
-		fi
+	if [[ -n ${RESTORE_DATA} ]] && ! run_all "${RESTORE_KIND}" data_args "restore data" "${BACKUP_NAME}" "${DATA_TARGETS[@]}"; then
+		fail_all "data restore of ${BACKUP_NAME}"
 	fi
-	for host in "${used[@]}"; do
-		if [[ " ${had_local[*]} " == *" ${host} "* ]]; then
-			continue
-		fi
-		if list_backups "${host}" local && find_backup "${HOST_BACKUP[${host}]}" && ! delete_local "${host}" "${HOST_BACKUP[${host}]}"; then
+	for host in "${USED_HOSTS[@]}"; do
+		if ! listed "${host}" ${HAD_LOCAL[@]+"${HAD_LOCAL[@]}"} && ! drop_local "${host}" "${HOST_BACKUP[${host}]}"; then
 			warn "${host}: the downloaded copy of ${HOST_BACKUP[${host}]} is left on local disk"
 		fi
 	done
 	log "restore ${BACKUP_NAME} completed"
 	event Normal OrchestratorRestoreCompleted "restore ${BACKUP_NAME} completed"
-	report_rbac "${restore_rbac}" "${holds_rbac}" "${validate}"
-}
-
-report_rbac() {
-	if [[ -n $1 ]]; then
+	if [[ -n ${RESTORE_RBAC_WITH_SCHEMA} ]]; then
 		return 0
 	fi
-	if [[ -z $3 ]]; then
+	if [[ -z ${RESTORE_VALIDATE} ]]; then
 		log "whether ${BACKUP_NAME} holds access entities is unknown: its copies in the storage were not listed"
-		return 0
-	fi
-	if [[ -z $2 ]]; then
-		return 0
-	fi
-	warn "${BACKUP_NAME} holds access entities - users, roles, grants - which this restore did not restore"
-	event Warning OrchestratorRBACNotRestored "${LAST_WARNING}"
-	if [[ -n ${RBAC_NOT_RESTORED_MESSAGE:-} ]]; then
-		report_message "${RBAC_NOT_RESTORED_MESSAGE}"
+	elif [[ -n ${HOLDS_RBAC} ]]; then
+		warn "${BACKUP_NAME} holds access entities - users, roles, grants - which this restore did not restore"
+		event Warning OrchestratorRBACNotRestored "${LAST_WARNING}"
+		if [[ -n ${RBAC_NOT_RESTORED_MESSAGE:-} ]]; then
+			report_message "${RBAC_NOT_RESTORED_MESSAGE}"
+		fi
 	fi
 }
 
@@ -3288,6 +3327,8 @@ CREATE_FLAGS=
 CREATE_ENV=
 INCREMENTAL_KEEP=
 RESTORE_RBAC_WITH_SCHEMA=
+HOLDS_RBAC=
+STEP_KIND=op
 
 main() {
 	if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); then
