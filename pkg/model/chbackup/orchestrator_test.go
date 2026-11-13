@@ -15,6 +15,8 @@
 package chbackup
 
 import (
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -214,4 +216,25 @@ func TestJobsOfThePythonOrchestrator(t *testing.T) {
 	}
 	configMap := BuildOrchestratorConfigMap(testInstallation(), "main", api.BackupOrchestratorPython, "print()")
 	require.Equal(t, map[string]string{api.BackupOrchestratorPythonScriptKey: "print()"}, configMap.Data)
+}
+
+// The operator reads each script from the folder of the scripts, or from its subfolder python, where the install
+// manifests mount the ConfigMap of the Python script; the one in the folder itself wins.
+func TestReadOrchestratorScriptOfTheSubfolder(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, OrchestratorScriptFile), []byte("echo bash\n"), 0o600))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, OrchestratorPythonSubfolder), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, OrchestratorPythonSubfolder, OrchestratorPythonScriptFile), []byte("print()\n"), 0o600))
+	script, err := ReadOrchestratorScriptOf(dir, api.BackupOrchestratorPython)
+	require.NoError(t, err)
+	require.Equal(t, "print()\n", script)
+	script, err = ReadOrchestratorScriptOf(dir, api.BackupOrchestratorBash)
+	require.NoError(t, err)
+	require.Equal(t, "echo bash\n", script)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, OrchestratorPythonScriptFile), []byte("print(1)\n"), 0o600))
+	script, err = ReadOrchestratorScriptOf(dir, api.BackupOrchestratorPython)
+	require.NoError(t, err)
+	require.Equal(t, "print(1)\n", script)
+	_, err = ReadOrchestratorScriptOf(t.TempDir(), api.BackupOrchestratorPython)
+	require.ErrorContains(t, err, OrchestratorPythonScriptFile)
 }

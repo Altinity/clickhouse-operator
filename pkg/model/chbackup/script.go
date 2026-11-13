@@ -15,7 +15,9 @@
 package chbackup
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -295,10 +297,16 @@ const OrchestratorScriptFile = "backup-orchestrator.sh"
 
 // OrchestratorPythonScriptFile is the file name of the Python orchestrator script, backup-orchestrator.py, the twin of
 // OrchestratorScriptFile, which a backup Job of a cluster whose backup.orchestrator is python runs as "python3 <file>".
-// It is an operator configuration file in the folder backup.pythonPath of the operator configuration (config/backup-python
-// in the repository, generated from deploy/builder/templates-config/backup-python), shipped in the ConfigMap
-// etc-clickhouse-operator-backup-python-files.
+// It is an operator configuration file next to it, in the folder backup.path (config/backup in the repository,
+// generated from deploy/builder/templates-config/backup), shipped in the ConfigMap
+// etc-clickhouse-operator-backup-python-files, which the install manifests mount in the subfolder
+// OrchestratorPythonSubfolder of that folder: a ConfigMap of each script, as one of both would not fit the single
+// argument dev/generate_helm_chart.sh passes the data of a ConfigMap in.
 const OrchestratorPythonScriptFile = "backup-orchestrator.py"
+
+// OrchestratorPythonSubfolder is the subfolder of the folder of the orchestrator scripts a script not found in the
+// folder itself is read from: the install manifests mount the ConfigMap of the Python script there.
+const OrchestratorPythonSubfolder = "python"
 
 // ReadOrchestratorScript returns the orchestrator script, the OrchestratorScriptFile of dir.
 func ReadOrchestratorScript(dir string) (string, error) {
@@ -314,10 +322,16 @@ func OrchestratorScriptFileOf(orchestrator string) string {
 	return OrchestratorScriptFile
 }
 
-// ReadOrchestratorScriptOf returns the script of the orchestrator, its OrchestratorScriptFileOf in dir.
+// ReadOrchestratorScriptOf returns the script of the orchestrator, its OrchestratorScriptFileOf in dir, or, when dir
+// has no such file, in its subfolder OrchestratorPythonSubfolder.
 func ReadOrchestratorScriptOf(dir, orchestrator string) (string, error) {
 	path := filepath.Join(dir, OrchestratorScriptFileOf(orchestrator))
 	raw, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		if mounted, err2 := os.ReadFile(filepath.Join(dir, OrchestratorPythonSubfolder, OrchestratorScriptFileOf(orchestrator))); err2 == nil {
+			raw, err, path = mounted, nil, filepath.Join(dir, OrchestratorPythonSubfolder, OrchestratorScriptFileOf(orchestrator))
+		}
+	}
 	if err != nil {
 		return "", fmt.Errorf("cannot read the backup orchestrator script: %w", err)
 	}

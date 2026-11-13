@@ -8674,7 +8674,7 @@ backup_orchestrator_script_path = f"../../config/backup/{backup_orchestrator_scr
 backup_orchestrators = {
     "bash": {"script": backup_orchestrator_script, "path": backup_orchestrator_script_path, "image": backup_image,
              "interpreter": "bash"},
-    "python": {"script": "backup-orchestrator.py", "path": "../../config/backup-python/backup-orchestrator.py",
+    "python": {"script": "backup-orchestrator.py", "path": "../../config/backup/backup-orchestrator.py",
                "image": "python:3.14-slim", "interpreter": "python3"},
 }
 # The backup Pods of the shards of a pod-mode cluster, mirrored from pkg/model/chbackup/shard_pod.go.

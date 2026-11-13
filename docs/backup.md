@@ -1530,7 +1530,8 @@ makes a single attempt, bounded by `activeDeadlineSeconds`.
 
 ### The orchestrator script
 
-What a Job does is the script `backup-orchestrator.sh`, an operator configuration file in a folder of
+What a Job does is the script `backup-orchestrator.sh` - or its Python twin `backup-orchestrator.py`, see
+[Python orchestrator](#python-orchestrator) - an operator configuration file in a folder of
 its own, `backup.path` of the operator configuration - `backup`, next to `config.yaml`, by default, a path
 relative to the folder of `config.yaml` unless absolute, as `template.chi.path`. The install bundles and the
 Helm chart ship it in the ConfigMap `etc-clickhouse-operator-backup-files` (Helm value
@@ -1622,14 +1623,17 @@ spec:
     orchestrator: python
 ```
 
-The script is an operator configuration file of its own folder, `backup.pythonPath` (`backup-python` by
-default), shipped in the ConfigMap `etc-clickhouse-operator-backup-python-files` (Helm value
-`configs.backupPythonFiles`) mounted at `/etc/clickhouse-operator/backup-python`; in the repository it is
-`deploy/builder/templates-config/backup-python/backup-orchestrator.py`. It is a ConfigMap apart from the bash
-script's, as each script alone fills much of what one ConfigMap's data may take in the Helm chart generation.
-The operator copies it to the ConfigMap `<chi>-<cluster>-backup-orchestrator` under the key
-`backup-orchestrator.py`; switching `orchestrator` replaces the key there. A ConfigMap of your own that
-`orchestratorConfigMapRef` names has to hold the script of the cluster's orchestrator under its key -
+The script lies next to the bash one, `backup-orchestrator.py` in the folder `backup.path` - in the repository
+`deploy/builder/templates-config/backup/backup-orchestrator.py`, generated to `config/backup`. The install
+bundles and the Helm chart ship it in a ConfigMap of its own, `etc-clickhouse-operator-backup-python-files`
+(Helm value `configs.backupPythonFiles`), mounted in the subfolder `python` of the bash script's mount, at
+`/etc/clickhouse-operator/backup/python`: each script alone fills much of what the data of one ConfigMap may
+take in the Helm chart generation, so the files of the folder are split by type, `*.sh` in
+`etc-clickhouse-operator-backup-files` and `*.py` in this one. The operator reads each script from `backup.path`,
+or, when it is not there, from its subfolder `python`, so one setting covers both, and an edit of either
+ConfigMap reaches the Jobs as before. The operator copies it to the ConfigMap `<chi>-<cluster>-backup-orchestrator`
+under the key `backup-orchestrator.py`; switching `orchestrator` replaces the key there. A ConfigMap of your own
+that `orchestratorConfigMapRef` names has to hold the script of the cluster's orchestrator under its key -
 `backup-orchestrator.sh` for `bash`, `backup-orchestrator.py` for `python`, or both: one that holds only the
 other one aborts the operation, and holds the schedule, with the reason `OrchestratorScriptMismatch`.
 

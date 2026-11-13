@@ -4745,14 +4745,10 @@ spec:
                     path:
                       type: string
                       description: |
-                        Path to the folder of the backup orchestrator script, backup-orchestrator.sh, which the backup, verify
-                        and restore Jobs run. Relative to the folder of the operator configuration unless absolute. Default: backup
-                    pythonPath:
-                      type: string
-                      description: |
-                        Path to the folder of the Python orchestrator script, backup-orchestrator.py, which the Jobs of a cluster
-                        with backup.orchestrator python run. Relative to the folder of the operator configuration unless absolute.
-                        Default: backup-python
+                        Path to the folder of the backup orchestrator scripts, backup-orchestrator.sh and backup-orchestrator.py, which
+                        the backup, verify and restore Jobs run. Relative to the folder of the operator configuration unless absolute.
+                        A script not found there is read from its subfolder python, where the install manifests mount the ConfigMap of
+                        the Python script. Default: backup
                 logger:
                   type: object
                   description: "allow setup clickhouse-operator logger behavior"
@@ -8061,14 +8057,11 @@ data:
       # See docs/backup.md#storage-paths.
       storagePath: "backup/{namespace}/{installation}/{cluster}/{shard}"
       storageObjectDiskPath: "object_disks/{namespace}/{installation}/{cluster}/{shard}"
-      # Path to the folder of the backup orchestrator script, backup-orchestrator.sh, which the backup, verify and
-      # restore Jobs run. Relative to the folder of this file unless absolute, as template.chi.path.
-      # See docs/backup.md#the-orchestrator-script.
+      # Path to the folder of the backup orchestrator scripts, backup-orchestrator.sh and backup-orchestrator.py, which
+      # the backup, verify and restore Jobs run. Relative to the folder of this file unless absolute, as
+      # template.chi.path. A script not found there is read from its subfolder python, where the install manifests mount
+      # the ConfigMap of the Python script. See docs/backup.md#the-orchestrator-script.
       path: backup
-      # Path to the folder of the Python orchestrator script, backup-orchestrator.py, which the Jobs of a cluster with
-      # backup.orchestrator python run. Relative to the folder of this file unless absolute.
-      # See docs/backup.md#python-orchestrator.
-      pythonPath: backup-python
     
     ################################################
     ##
@@ -8664,7 +8657,7 @@ spec:
             - name: etc-clickhouse-operator-backup-folder
               mountPath: /etc/clickhouse-operator/backup
             - name: etc-clickhouse-operator-backup-python-folder
-              mountPath: /etc/clickhouse-operator/backup-python
+              mountPath: /etc/clickhouse-operator/backup/python
             - name: etc-keeper-operator-confd-folder
               mountPath: /etc/clickhouse-operator/chk/conf.d
             - name: etc-keeper-operator-configd-folder

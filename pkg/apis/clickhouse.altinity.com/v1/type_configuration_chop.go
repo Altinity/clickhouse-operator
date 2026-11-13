@@ -922,12 +922,11 @@ type OperatorConfigBackup struct {
 	// the old paths where they are.
 	StoragePath           string `json:"storagePath"           yaml:"storagePath"`
 	StorageObjectDiskPath string `json:"storageObjectDiskPath" yaml:"storageObjectDiskPath"`
-	// Path is the folder the operator reads the backup orchestrator script, backup-orchestrator.sh, from, relative to
-	// the folder of the operator configuration unless absolute, as template.chi.path. Default: BackupDir.
+	// Path is the folder the operator reads the backup orchestrator scripts, backup-orchestrator.sh and
+	// backup-orchestrator.py, from, relative to the folder of the operator configuration unless absolute, as
+	// template.chi.path. A script it does not find there it reads from the subfolder python, where the install
+	// manifests mount the ConfigMap of the Python script. Default: BackupDir.
 	Path string `json:"path" yaml:"path"`
-	// PythonPath is the folder the operator reads the Python backup orchestrator script, backup-orchestrator.py, from,
-	// as Path. Default: BackupPythonDir.
-	PythonPath string `json:"pythonPath" yaml:"pythonPath"`
 }
 
 // OperatorConfig specifies operator config
@@ -1473,7 +1472,6 @@ func (c *OperatorConfig) normalizeSectionPod() {
 func (c *OperatorConfig) normalizeSectionBackup() {
 	// The folder of the backup orchestrator script
 	util.PreparePath(&c.Backup.Path, c.Runtime.ConfigFolderPath, BackupDir)
-	util.PreparePath(&c.Backup.PythonPath, c.Runtime.ConfigFolderPath, BackupPythonDir)
 	if c.Backup.StoragePath == "" {
 		c.Backup.StoragePath = defaultBackupStoragePath
 	}

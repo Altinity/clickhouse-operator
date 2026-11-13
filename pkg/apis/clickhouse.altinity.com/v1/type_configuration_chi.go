@@ -28,9 +28,6 @@ const (
 	TemplatesDirClickHouse = "templates.d"
 	// BackupDir specifies the folder, in the folder of the operator configuration, of the backup orchestrator script
 	BackupDir = "backup"
-	// BackupPythonDir specifies the folder, in the folder of the operator configuration, of the Python backup
-	// orchestrator script
-	BackupPythonDir = "backup-python"
 )
 
 const (

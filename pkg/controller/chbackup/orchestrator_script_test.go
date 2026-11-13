@@ -34,26 +34,15 @@ import (
 // tests read it from, as the operator reads it from its configuration.
 const repositoryScriptDir = "../../../config/backup"
 
-// repositoryPythonScriptDir is the folder of the Python orchestrator script of the repository.
-const repositoryPythonScriptDir = "../../../config/backup-python"
-
-// repositoryScriptDirOf returns the folder of the script of the orchestrator of the repository.
-func repositoryScriptDirOf(orchestrator string) string {
-	if orchestrator == api.BackupOrchestratorPython {
-		return repositoryPythonScriptDir
-	}
-	return repositoryScriptDir
-}
-
 func init() {
-	orchestratorScriptDir = repositoryScriptDirOf
+	orchestratorScriptDir = func() string { return repositoryScriptDir }
 }
 
 // withScriptDir makes the controllers read the orchestrator script from dir for the duration of the test.
 func withScriptDir(t *testing.T, dir string) {
 	t.Helper()
-	orchestratorScriptDir = func(string) string { return dir }
-	t.Cleanup(func() { orchestratorScriptDir = repositoryScriptDirOf })
+	orchestratorScriptDir = func() string { return dir }
+	t.Cleanup(func() { orchestratorScriptDir = func() string { return repositoryScriptDir } })
 }
 
 // testOrchestrator is how the Jobs the tests build themselves run the orchestrator script.
@@ -193,7 +182,7 @@ func TestOrchestratorOfThePythonOrchestrator(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, missing)
 	require.True(t, orchestrator.IsPython())
-	script, err := model.ReadOrchestratorScriptOf(repositoryPythonScriptDir, api.BackupOrchestratorPython)
+	script, err := model.ReadOrchestratorScriptOf(repositoryScriptDir, api.BackupOrchestratorPython)
 	require.NoError(t, err)
 	require.Equal(t, model.ScriptSHA256(script), orchestrator.ScriptSHA256)
 	configMap := &core.ConfigMap{}

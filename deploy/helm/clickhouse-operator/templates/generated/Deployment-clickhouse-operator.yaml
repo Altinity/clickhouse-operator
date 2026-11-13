@@ -98,7 +98,7 @@ spec:
             - name: etc-clickhouse-operator-backup-folder
               mountPath: /etc/clickhouse-operator/backup
             - name: etc-clickhouse-operator-backup-python-folder
-              mountPath: /etc/clickhouse-operator/backup-python
+              mountPath: /etc/clickhouse-operator/backup/python
             - name: etc-keeper-operator-confd-folder
               mountPath: /etc/clickhouse-operator/chk/conf.d
             - name: etc-keeper-operator-configd-folder

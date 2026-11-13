@@ -23,7 +23,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -43,11 +42,10 @@ const (
 
 var testedOrchestrator = cmp.Or(os.Getenv(testedOrchestratorEnv), orchestratorBash)
 
-// pythonOrchestratorScriptDir returns the directory of the Python orchestrator script in the repository, generated from
-// deploy/builder/templates-config/backup-python
+// pythonOrchestratorScriptDir returns the directory of the Python orchestrator script in the repository, that of the
+// bash one, generated from deploy/builder/templates-config/backup
 func pythonOrchestratorScriptDir() string {
-	_, file, _, _ := runtime.Caller(0)
-	return filepath.Join(filepath.Dir(file), "..", "..", "..", "config", "backup-python")
+	return orchestratorScriptDir()
 }
 
 // readScript returns the text of a script file.

@@ -34,10 +34,7 @@ import (
 
 // orchestratorScriptDir returns the directory the operator reads the orchestrator script from: backup.path of the
 // operator configuration, "" when that folder does not exist. A variable for the tests.
-var orchestratorScriptDir = func(orchestrator string) string {
-	if orchestrator == api.BackupOrchestratorPython {
-		return chop.Config().Backup.PythonPath
-	}
+var orchestratorScriptDir = func() string {
 	return chop.Config().Backup.Path
 }
 
@@ -102,14 +99,10 @@ func (r *reconciler) orchestrator(
 		orchestrator.ConfigMap = name
 		orchestrator.ScriptSHA256 = model.ScriptSHA256(script)
 	} else {
-		dir := orchestratorScriptDir(orchestrator.Language)
+		dir := orchestratorScriptDir()
 		if dir == "" {
-			folder := "backup.path"
-			if orchestrator.IsPython() {
-				folder = "backup.pythonPath"
-			}
-			return orchestrator, orchestratorScriptMissing(fmt.Sprintf("no backup orchestrator script %s: the folder %s "+
-				"of the operator configuration does not exist", key, folder)), nil
+			return orchestrator, orchestratorScriptMissing(fmt.Sprintf("no backup orchestrator script %s: the folder backup.path "+
+				"of the operator configuration does not exist", key)), nil
 		}
 		script, err := model.ReadOrchestratorScriptOf(dir, orchestrator.Language)
 		if err != nil {
