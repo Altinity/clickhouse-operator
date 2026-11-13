@@ -217,6 +217,97 @@ type ClickHouseBackupScheduleSpec struct {
 	// OrchestratorConfigMapRef names a ConfigMap in the namespace of the schedule whose key backup-orchestrator.sh the
 	// runs of its CronJobs run instead of the operator's orchestrator script.
 	OrchestratorConfigMapRef *core.LocalObjectReference `json:"orchestratorConfigMapRef,omitempty" yaml:"orchestratorConfigMapRef,omitempty"`
+
+	// Retention tells what retention keeps beyond the entries: backups pinned by name, and the backups the schedule
+	// kept before a change of its entries or time zone, held until released.
+	Retention *BackupRetention `json:"retention,omitempty" yaml:"retention,omitempty"`
+}
+
+// What retention does with the backups the entries kept before a change of a schedule.
+const (
+	// RetentionHold, the default, keeps every backup the schedule kept before a change of its entries or time zone
+	// until the change is released: retention deletes none of them, and tells which of them the schedule as it is
+	// would delete.
+	RetentionHold = "Hold"
+	// RetentionPrune applies a change at once: retention keeps what the schedule as it is keeps, as the Altinity
+	// Cloud Manager does without the backups its dialog of a change pins.
+	RetentionPrune = "Prune"
+	// BackupRetentionKeepBackupsMaxItems bounds keepBackups. Mirrored by the CRD schema maxItems.
+	BackupRetentionKeepBackupsMaxItems = 512
+	// ScheduleRetentionPreviousMaxItems bounds status.retention.previous: the oldest two changes beyond it are
+	// merged into one that holds every backup made before the newer of them.
+	ScheduleRetentionPreviousMaxItems = 16
+)
+
+// BackupRetention is what retention keeps beyond the entries of a schedule.
+type BackupRetention struct {
+	// OnScheduleChange is what retention does with the backups the entries kept before a change of the entries or
+	// of the time zone: Hold (default) keeps them all until the change is released by ReleaseHeld, Prune applies the
+	// change at once.
+	OnScheduleChange string `json:"onScheduleChange,omitempty" yaml:"onScheduleChange,omitempty"`
+	// KeepBackups are backups retention never deletes, as the Altinity Cloud Manager keeps the backups its dialog of a
+	// schedule change pins and those made by hand: their names, or with a naming template the name of the backup
+	// of any shard, or the time alone when the template holds no {prefix}.
+	KeepBackups []string `json:"keepBackups,omitempty" yaml:"keepBackups,omitempty"`
+	// ReleaseHeld, set to the changeID of status.retention.previous, releases the backups held for that change and
+	// for every earlier one: the next run deletes those neither the entries nor KeepBackups keep. A later change is
+	// never released by it.
+	ReleaseHeld string `json:"releaseHeld,omitempty" yaml:"releaseHeld,omitempty"`
+}
+
+// GetOnScheduleChange returns what retention does on a change of the schedule, RetentionHold when unset, nil-safe.
+func (r *BackupRetention) GetOnScheduleChange() string {
+	if (r == nil) || (r.OnScheduleChange == "") {
+		return RetentionHold
+	}
+	return r.OnScheduleChange
+}
+
+// GetKeepBackups returns the pinned backups, nil-safe.
+func (r *BackupRetention) GetKeepBackups() []string {
+	if r == nil {
+		return nil
+	}
+	return r.KeepBackups
+}
+
+// GetReleaseHeld returns the change released, "" for none, nil-safe.
+func (r *BackupRetention) GetReleaseHeld() string {
+	if r == nil {
+		return ""
+	}
+	return r.ReleaseHeld
+}
+
+// Validate checks the retention of a schedule, nil-safe.
+func (r *BackupRetention) Validate() error {
+	if r == nil {
+		return nil
+	}
+	switch r.OnScheduleChange {
+	case "", RetentionHold, RetentionPrune:
+	default:
+		return fmt.Errorf("%w: retention.onScheduleChange %q is not one of %s, %s", ErrInvalidBackupSpec, r.OnScheduleChange,
+			RetentionHold, RetentionPrune)
+	}
+	if len(r.KeepBackups) > BackupRetentionKeepBackupsMaxItems {
+		return fmt.Errorf("%w: retention.keepBackups holds more than %d backups", ErrInvalidBackupSpec, BackupRetentionKeepBackupsMaxItems)
+	}
+	for _, name := range r.KeepBackups {
+		if name == "" {
+			return fmt.Errorf("%w: retention.keepBackups holds an empty name", ErrInvalidBackupSpec)
+		}
+		if err := validateBackupName("retention.keepBackups", name, BackupNameMaxLength); err != nil {
+			return err
+		}
+	}
+	if r.ReleaseHeld != "" {
+		if _, err := time.Parse(time.RFC3339, r.ReleaseHeld); err != nil {
+			return fmt.Errorf("%w: retention.releaseHeld %q is no changeID of status.retention.previous, a time as RFC 3339",
+				ErrInvalidBackupSpec, r.ReleaseHeld)
+		}
+	}
+	return nil
 }
 
 // GetOrchestratorConfigMapName returns the ConfigMap of the orchestrator script of the schedule, "" for the operator's
@@ -397,6 +488,9 @@ func (spec *ClickHouseBackupScheduleSpec) Validate() error {
 	if err := validateBackupName("backupNamePrefix", spec.BackupNamePrefix, BackupNamePrefixMaxLength); err != nil {
 		return err
 	}
+	if err := spec.Retention.Validate(); err != nil {
+		return err
+	}
 	return spec.BackupOptions.Validate()
 }
 
@@ -446,8 +540,44 @@ type ClickHouseBackupScheduleStatus struct {
 	LastFailureTime *meta.Time `json:"lastFailureTime,omitempty" yaml:"lastFailureTime,omitempty"`
 	// LastFailureMessage tells why the last failed scheduled backup failed.
 	LastFailureMessage string `json:"lastFailureMessage,omitempty" yaml:"lastFailureMessage,omitempty"`
+	// Retention records the entries and time zone the CronJobs apply, and the changes whose backups retention holds.
+	Retention *ScheduleRetentionStatus `json:"retention,omitempty" yaml:"retention,omitempty"`
 	// Conditions represent the latest available observations of the schedule state.
 	Conditions []meta.Condition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+}
+
+// ScheduleRetentionStatus records the entries and time zone the CronJobs of a schedule apply, and the changes of them
+// whose backups retention holds.
+type ScheduleRetentionStatus struct {
+	// AppliedSchedules and AppliedTimeZone are the entries and the time zone of the schedule the CronJobs apply.
+	AppliedSchedules []BackupScheduleEntry `json:"appliedSchedules,omitempty" yaml:"appliedSchedules,omitempty"`
+	AppliedTimeZone  string                `json:"appliedTimeZone,omitempty" yaml:"appliedTimeZone,omitempty"`
+	// Previous are the entries and time zones the schedule had before each change not released yet, oldest first:
+	// retention keeps every backup they kept when the change was made.
+	Previous []RetiredScheduleRules `json:"previous,omitempty" yaml:"previous,omitempty"`
+	// ChangeID is that of the newest change of Previous, which spec.retention.releaseHeld releases with every earlier
+	// one; empty with none.
+	ChangeID string `json:"changeID,omitempty" yaml:"changeID,omitempty"`
+}
+
+// GetPrevious returns the changes whose backups retention holds, nil-safe.
+func (status *ScheduleRetentionStatus) GetPrevious() []RetiredScheduleRules {
+	if status == nil {
+		return nil
+	}
+	return status.Previous
+}
+
+// RetiredScheduleRules are the entries and the time zone a schedule had before a change.
+type RetiredScheduleRules struct {
+	// ChangeID is when the change was made, as RFC 3339 in UTC, which identifies it.
+	ChangeID string `json:"changeID" yaml:"changeID"`
+	// Schedules and TimeZone are the entries and the time zone before the change.
+	Schedules []BackupScheduleEntry `json:"schedules,omitempty" yaml:"schedules,omitempty"`
+	TimeZone  string                `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
+	// KeepAll holds every backup made before the change, whatever the entries: the oldest changes merged into one
+	// beyond ScheduleRetentionPreviousMaxItems.
+	KeepAll bool `json:"keepAll,omitempty" yaml:"keepAll,omitempty"`
 }
 
 // ScheduleEntryStatus is the observed state of the runs of one entry of a schedule.
@@ -501,6 +631,10 @@ type ScheduleClusterStatus struct {
 	// them any more, so retention no longer prunes the backups they made, which stay until
 	// deleted by hand. A host that rejoins RetentionHosts is dropped from it.
 	UnprunedHosts []string `json:"unprunedHosts,omitempty" yaml:"unprunedHosts,omitempty"`
+	// HeldBackups lists the backups the last successful scheduled run of the cluster found held for a change of the
+	// schedule, status.retention.previous, which the schedule as it is would delete: add those to keep to
+	// spec.retention.keepBackups, then release the change with spec.retention.releaseHeld.
+	HeldBackups []string `json:"heldBackups,omitempty" yaml:"heldBackups,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

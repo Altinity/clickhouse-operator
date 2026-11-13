@@ -255,6 +255,13 @@ func (c *ScheduleController) reconcile(ctx context.Context, chbs *api.ClickHouse
 		return c.hold(ctx, chbs, nil, owned, runs, outcomes, &pending{reason: api.BackupReasonInvalidSpec, message: err.Error()},
 			heldWithoutStorage(chbs, chi), out)
 	}
+	// The CronJobs built from here on apply the spec: a change of what retention keeps by is held, as the spec asks
+	if changeID := model.TrackScheduleRetention(chbs, c.clock.Now()); changeID != "" {
+		out.add(c.warning(chbs, a.EventActionReconcile, api.BackupReasonRetentionHeld,
+			"the entries or the time zone of the schedule changed: retention keeps every backup the schedule kept before, "+
+				"as status.retention.previous records it, and lists in status.clusters[].heldBackups those it would delete now; "+
+				"keep those to keep in spec.retention.keepBackups and release the change with spec.retention.releaseHeld: %s", changeID))
+	}
 
 	chi, wait, err := c.readInstallation(ctx, chbs.GetNamespace(), chbs.Spec.ClickHouseInstallation, true)
 	if err != nil {
@@ -1452,6 +1459,10 @@ func (c *ScheduleController) observeScheduledJob(
 	switch phase {
 	case api.OperationPhaseCompleted:
 		if withoutData, err = c.backupHoldsNoData(ctx, job); err != nil {
+			return err
+		}
+		// The backups retention held, which the last run tells, replace those an earlier one told
+		if cluster.HeldBackups, err = c.backupHeld(ctx, job); err != nil {
 			return err
 		}
 		completed = c.recordCompletion(chbs, cluster, job, withoutData, outcomes)

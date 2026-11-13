@@ -11160,6 +11160,49 @@ spec:
                     timeZone:
                       type: string
                       description: "The schedule's timeZone"
+                    keepBackups:
+                      type: array
+                      nullable: true
+                      description: "The schedule's retention.keepBackups, which the retention after the backup never deletes"
+                      items:
+                        type: string
+                    previousSchedules:
+                      type: array
+                      nullable: true
+                      description: "The schedule's status.retention.previous, whose backups the retention after the backup holds"
+                      items:
+                        type: object
+                        required:
+                          - changeID
+                        properties:
+                          changeID:
+                            type: string
+                            description: "When the change was made, RFC 3339 in UTC, which identifies it"
+                          schedules:
+                            type: array
+                            nullable: true
+                            description: "The entries before the change"
+                            items:
+                              type: object
+                              properties:
+                                period:
+                                  type: string
+                                time:
+                                  type: string
+                                day:
+                                  type: integer
+                                  format: int32
+                                keep:
+                                  type: integer
+                                  format: int32
+                                incremental:
+                                  type: string
+                          timeZone:
+                            type: string
+                            description: "The time zone before the change"
+                          keepAll:
+                            type: boolean
+                            description: "Holds every backup made before the change, whatever the entries: the oldest changes merged into one"
                     schemaOnly:
                       type: string
                       description: "The schedule's schemaOnly"
@@ -11525,6 +11568,40 @@ spec:
                     schedule that has not run yet, such as one held for a recovery
                   maxLength: 112
                   pattern: '^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$'
+                retention:
+                  type: object
+                  description: |
+                    What retention keeps beyond the entries: backups pinned by name, and the backups the schedule kept
+                    before a change of its entries or time zone, held until released
+                  properties:
+                    onScheduleChange:
+                      type: string
+                      description: |
+                        What retention does with the backups the entries kept before a change of the entries or of the
+                        time zone: Hold (default) keeps them all until releaseHeld releases the change, and lists in
+                        status.clusters[].heldBackups those the schedule as it is would delete; Prune applies the change at once
+                      enum:
+                        - ""
+                        - Hold
+                        - Prune
+                    keepBackups:
+                      type: array
+                      nullable: true
+                      maxItems: 512
+                      description: |
+                        Backups retention never deletes, as the Altinity Cloud Manager keeps the backups its dialog of a schedule
+                        change pins: their names, or with a naming template the name of the backup of any shard, or the time alone
+                        when the template holds no {prefix}
+                      items:
+                        type: string
+                        maxLength: 128
+                        pattern: '^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$'
+                    releaseHeld:
+                      type: string
+                      description: |
+                        The changeID of status.retention.previous whose held backups, and those of every earlier change, are
+                        released: the next run deletes those neither the entries nor keepBackups keep. A later change is never
+                        released by it
             status:
               type: object
               properties:
@@ -11628,6 +11705,15 @@ spec:
                           rejoins retentionHosts is dropped from it.
                         items:
                           type: string
+                      heldBackups:
+                        type: array
+                        nullable: true
+                        description: |
+                          Backups the last successful scheduled run of the cluster found held for a change of the schedule,
+                          status.retention.previous, which the schedule as it is would delete: add those to keep to
+                          spec.retention.keepBackups, then release the change with spec.retention.releaseHeld
+                        items:
+                          type: string
                 lastScheduleTime:
                   type: string
                   format: date-time
@@ -11649,6 +11735,72 @@ spec:
                 lastFailureMessage:
                   type: string
                   description: "Why the last failed scheduled backup Job failed"
+                retention:
+                  type: object
+                  description: "The entries and time zone the CronJobs apply, and the changes of them whose backups retention holds"
+                  properties:
+                    appliedSchedules:
+                      type: array
+                      nullable: true
+                      description: "The entries the CronJobs apply"
+                      items:
+                        type: object
+                        properties:
+                          period:
+                            type: string
+                          time:
+                            type: string
+                          day:
+                            type: integer
+                            format: int32
+                          keep:
+                            type: integer
+                            format: int32
+                          incremental:
+                            type: string
+                    appliedTimeZone:
+                      type: string
+                      description: "The time zone the CronJobs apply"
+                    previous:
+                      type: array
+                      nullable: true
+                      description: "The entries and time zones before each change not released yet, oldest first: retention keeps every backup they kept when the change was made"
+                      items:
+                        type: object
+                        required:
+                          - changeID
+                        properties:
+                          changeID:
+                            type: string
+                            description: "When the change was made, RFC 3339 in UTC, which identifies it"
+                          schedules:
+                            type: array
+                            nullable: true
+                            description: "The entries before the change"
+                            items:
+                              type: object
+                              properties:
+                                period:
+                                  type: string
+                                time:
+                                  type: string
+                                day:
+                                  type: integer
+                                  format: int32
+                                keep:
+                                  type: integer
+                                  format: int32
+                                incremental:
+                                  type: string
+                          timeZone:
+                            type: string
+                            description: "The time zone before the change"
+                          keepAll:
+                            type: boolean
+                            description: "Holds every backup made before the change, whatever the entries: the oldest changes merged into one"
+                    changeID:
+                      type: string
+                      description: "The changeID of the newest change of previous, which spec.retention.releaseHeld releases with every earlier one"
                 conditions:
                   type: array
                   nullable: true

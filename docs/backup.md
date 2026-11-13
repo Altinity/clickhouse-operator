@@ -817,7 +817,10 @@ retention no longer finds them, and restores name them by the names they have.
 4. Create a `ClickHouseBackupSchedule` with ACM's entries, the same `time`s, and `timeZone` set to the
    zone of the ACM backend, as its tags are wall times there. Keep the `keep`s: retention then counts
    the backups ACM made, with the 30-minute tolerance, as ACM would have.
-5. Check with `kubectl get chbs` and `clickhouse-backup list remote` on a sidecar that the first runs
+5. Copy the backups ACM keeps by hand - its "manual" backups and those pinned in its dialog of a
+   schedule change - into `spec.retention.keepBackups` of the schedule, by their time: the operator's
+   retention does not know ACM's records of them, nor did ACM's schedule hold any change.
+6. Check with `kubectl get chbs` and `clickhouse-backup list remote` on a sidecar that the first runs
    keep what you expect; restore an ACM backup by its time (`backupName: "20261112021503"`).
 
 ### Secret changes
@@ -1081,6 +1084,9 @@ spec:
 | `schemaOnly`, `replicaSelection`, `tables`, `partitions`, `activeDeadlineSeconds` |                                       | As in [`ClickHouseBackup`](#clickhousebackup); `activeDeadlineSeconds` bounds each Job of a run.                                                                                                                              |
 | `backupNamePrefix`                                                                | `<namespace>-<chi>-<schedule>`        | Backup names are `<prefix>-<YYYYMMDDHHMMSS>`, the time the run was due in `timeZone`, e.g. `default-backup-demo-nightly-20261003023000`. Also scopes [retention](#retention). Can be set once and is immutable after.         |
 | `orchestratorConfigMapRef` | the operator's | ConfigMap in the namespace of the resource whose key `backup-orchestrator.sh` the runs of its CronJobs run instead of the operator's script, see [The orchestrator script](#the-orchestrator-script). A backup that runs the schedule takes it too. |
+| `retention.onScheduleChange` | `Hold` | What [retention](#schedule-changes) does with the backups the schedule kept before a change of its entries or `timeZone`: `Hold` keeps them all until the change is released, `Prune` applies the change at once. |
+| `retention.keepBackups` | none | Backups retention never deletes, at most 512: names, or with a [naming template](#backup-naming) the name of the backup of any shard or its time alone. |
+| `retention.releaseHeld` | none | The `changeID` of `status.retention.previous` whose held backups, and those of every earlier change, are released. |
 
 **One CronJob per cluster, on the finest entry.** A schedule runs one CronJob for each cluster it
 backs up, named `<schedule>-<cluster>-backup`, with the cron schedule of its finest entry - every hour
@@ -1642,6 +1648,45 @@ schedule's backups on the cluster it ran on, newest first, as the cleanup of ACM
   backup - and on those only, see [Hosts that leave a schedule](#hosts-that-leave-a-schedule).
   Retention is skipped while a restore of the cluster has not finished (`RESTORE_IN_PROGRESS`), and a
   failed retention warns: it never fails the backup.
+
+### Schedule changes
+
+Retention keeps what the entries keep, so a change of the entries or of `timeZone` would make the next
+run delete what the schedule kept until then: a shifted `time` matches no slot of the backups made
+before, a removed weekly entry leaves its backups to the daily one, a lowered `keep` drops the
+excess. ACM asks first, in a dialog that lists what the change would delete and lets you check what to
+keep. A schedule does the same declaratively, with `spec.retention`:
+
+* **`onScheduleChange: Hold`, the default.** The operator records the entries and the zone before
+  every change in `status.retention.previous`, under a `changeID` - the time of the change - and warns
+  (`RetentionHeld` event). Every run then keeps, of the backups made before each change, all those the
+  schedule before it kept - the newest, the newest `keep` of every entry, the run-now backups in their
+  window - whatever the entries are now. The backups the schedule as it is would delete are listed in
+  `status.clusters[].heldBackups` by the runs of each cluster (and an `OrchestratorRetentionHeld`
+  event): that is ACM's dialog. Backups made after the change follow the entries as they are.
+* **`keepBackups`** pins backups retention never deletes, as the boxes checked in that dialog, and
+  ACM's manual backups, do.
+* **`releaseHeld: <changeID>`** releases that change and every earlier one: the next run deletes the
+  backups none of the remaining changes, the entries and `keepBackups` keep. A later change is never
+  released by an earlier `changeID`, so the field can stay in a manifest under GitOps.
+* **`onScheduleChange: Prune`** holds nothing: the next run applies the change at once, as before.
+
+```yaml
+spec:
+  schedules:
+    - {period: daily, time: "03:00", keep: 7}   # was 02:00
+  retention:
+    keepBackups: [default-backup-demo-nightly-20261001020000]
+    # After reading status.clusters[].heldBackups, release the change:
+    releaseHeld: "2026-11-12T12:00:00Z"
+```
+
+A change is a change of the period, the time, the day or the `keep` of an entry, of the entries, or
+of `timeZone`; `incremental` is none. Up to 16 changes are kept; beyond that the oldest two are merged
+into one that holds every backup made before the newer of them. The operator starts recording on the
+first reconcile of a schedule, an upgraded one included: a change made before then is not held. A
+backup [run now](#run-a-schedule-now) from the schedule takes the pins and the held changes along, as
+its retention is that of a run of the schedule.
 
 ### Hosts that leave a schedule
 

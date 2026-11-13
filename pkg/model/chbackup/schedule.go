@@ -16,6 +16,7 @@ package chbackup
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -329,4 +330,84 @@ func NextScheduleTime(entries []api.BackupScheduleEntry, tz *time.Location, now 
 		}
 	}
 	return next
+}
+
+// retentionRules formats what of the entries and the time zone of a schedule decides which backups retention keeps:
+// the period, the time, the day and the keep of every entry, and the zone the slots are read in.
+func retentionRules(entries []api.BackupScheduleEntry, timeZone string) string {
+	var formatted []string
+	for _, entry := range api.ResolveScheduleTimes(entries) {
+		formatted = append(formatted, fmt.Sprintf("%s %s %d %d", entry.Period, entry.Time, entry.GetDay(), entry.Keep))
+	}
+	slices.Sort(formatted)
+	return strings.Join(formatted, ";") + "|" + timeZone
+}
+
+// TrackScheduleRetention records in the status of a schedule whose spec is valid the entries and the time zone its
+// CronJobs apply, and, when a change of them is held, spec.retention.onScheduleChange Hold, the entries and the time
+// zone before the change, whose backups retention keeps until spec.retention.releaseHeld releases it. It drops the
+// changes releaseHeld releases, and merges the oldest two changes beyond ScheduleRetentionPreviousMaxItems into one
+// that holds every backup made before the newer of them. It returns the changeID of a change it has just held, "" for
+// none: a schedule seen for the first time, as after an upgrade, holds nothing.
+func TrackScheduleRetention(chbs *api.ClickHouseBackupSchedule, now time.Time) string {
+	status := chbs.Status.Retention
+	if status == nil {
+		status = &api.ScheduleRetentionStatus{}
+		chbs.Status.Retention = status
+	}
+	held := ""
+	spec := retentionRules(chbs.Spec.Schedules, chbs.Spec.TimeZone)
+	switch {
+	case len(status.AppliedSchedules) == 0:
+	case retentionRules(status.AppliedSchedules, status.AppliedTimeZone) == spec:
+	case chbs.Spec.Retention.GetOnScheduleChange() == api.RetentionHold:
+		// A changeID is a time, later than that of any change before, which a release of an earlier one never releases
+		changed := now.UTC().Truncate(time.Second)
+		if latest, err := time.Parse(time.RFC3339, status.ChangeID); (err == nil) && !changed.After(latest) {
+			changed = latest.Add(time.Second)
+		}
+		held = changed.Format(time.RFC3339)
+		status.Previous = append(status.Previous, api.RetiredScheduleRules{
+			ChangeID: held, Schedules: status.AppliedSchedules, TimeZone: status.AppliedTimeZone,
+		})
+	}
+	status.AppliedSchedules = slices.Clone(chbs.Spec.DeepCopy().Schedules)
+	status.AppliedTimeZone = chbs.Spec.TimeZone
+	if release, err := time.Parse(time.RFC3339, chbs.Spec.Retention.GetReleaseHeld()); err == nil {
+		status.Previous = slices.DeleteFunc(status.Previous, func(previous api.RetiredScheduleRules) bool {
+			changed, err := time.Parse(time.RFC3339, previous.ChangeID)
+			return (err == nil) && !changed.After(release)
+		})
+	}
+	for len(status.Previous) > api.ScheduleRetentionPreviousMaxItems {
+		merged := api.RetiredScheduleRules{ChangeID: status.Previous[1].ChangeID, TimeZone: status.Previous[1].TimeZone, KeepAll: true}
+		status.Previous = append([]api.RetiredScheduleRules{merged}, status.Previous[2:]...)
+	}
+	status.ChangeID = ""
+	if len(status.Previous) > 0 {
+		status.ChangeID = status.Previous[len(status.Previous)-1].ChangeID
+	}
+	if len(status.Previous) == 0 {
+		status.Previous = nil
+	}
+	return held
+}
+
+// PreviousSchedulesEnv formats the changes of a schedule whose backups retention holds for the orchestrator script:
+// changes joined by "#", each "<unix seconds of the change>|<time zone>|<entries as EntriesEnv formats them>", the
+// entries "*" for a change that holds every backup made before it. A change whose changeID is no time is left out.
+func PreviousSchedulesEnv(previous []api.RetiredScheduleRules) string {
+	var formatted []string
+	for _, rules := range previous {
+		changed, err := time.Parse(time.RFC3339, rules.ChangeID)
+		if err != nil {
+			continue
+		}
+		entries := EntriesEnv(rules.Schedules)
+		if rules.KeepAll || (entries == "") {
+			entries = "*"
+		}
+		formatted = append(formatted, fmt.Sprintf("%d|%s|%s", changed.Unix(), rules.TimeZone, entries))
+	}
+	return strings.Join(formatted, "#")
 }

@@ -5898,6 +5898,49 @@ spec:
                     timeZone:
                       type: string
                       description: "The schedule's timeZone"
+                    keepBackups:
+                      type: array
+                      nullable: true
+                      description: "The schedule's retention.keepBackups, which the retention after the backup never deletes"
+                      items:
+                        type: string
+                    previousSchedules:
+                      type: array
+                      nullable: true
+                      description: "The schedule's status.retention.previous, whose backups the retention after the backup holds"
+                      items:
+                        type: object
+                        required:
+                          - changeID
+                        properties:
+                          changeID:
+                            type: string
+                            description: "When the change was made, RFC 3339 in UTC, which identifies it"
+                          schedules:
+                            type: array
+                            nullable: true
+                            description: "The entries before the change"
+                            items:
+                              type: object
+                              properties:
+                                period:
+                                  type: string
+                                time:
+                                  type: string
+                                day:
+                                  type: integer
+                                  format: int32
+                                keep:
+                                  type: integer
+                                  format: int32
+                                incremental:
+                                  type: string
+                          timeZone:
+                            type: string
+                            description: "The time zone before the change"
+                          keepAll:
+                            type: boolean
+                            description: "Holds every backup made before the change, whatever the entries: the oldest changes merged into one"
                     schemaOnly:
                       type: string
                       description: "The schedule's schemaOnly"
@@ -6253,6 +6296,40 @@ spec:
                     schedule that has not run yet, such as one held for a recovery
                   maxLength: 112
                   pattern: '^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$'
+                retention:
+                  type: object
+                  description: |
+                    What retention keeps beyond the entries: backups pinned by name, and the backups the schedule kept
+                    before a change of its entries or time zone, held until released
+                  properties:
+                    onScheduleChange:
+                      type: string
+                      description: |
+                        What retention does with the backups the entries kept before a change of the entries or of the
+                        time zone: Hold (default) keeps them all until releaseHeld releases the change, and lists in
+                        status.clusters[].heldBackups those the schedule as it is would delete; Prune applies the change at once
+                      enum:
+                        - ""
+                        - Hold
+                        - Prune
+                    keepBackups:
+                      type: array
+                      nullable: true
+                      maxItems: 512
+                      description: |
+                        Backups retention never deletes, as the Altinity Cloud Manager keeps the backups its dialog of a schedule
+                        change pins: their names, or with a naming template the name of the backup of any shard, or the time alone
+                        when the template holds no {prefix}
+                      items:
+                        type: string
+                        maxLength: 128
+                        pattern: '^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$'
+                    releaseHeld:
+                      type: string
+                      description: |
+                        The changeID of status.retention.previous whose held backups, and those of every earlier change, are
+                        released: the next run deletes those neither the entries nor keepBackups keep. A later change is never
+                        released by it
             status:
               type: object
               properties:
@@ -6356,6 +6433,15 @@ spec:
                           rejoins retentionHosts is dropped from it.
                         items:
                           type: string
+                      heldBackups:
+                        type: array
+                        nullable: true
+                        description: |
+                          Backups the last successful scheduled run of the cluster found held for a change of the schedule,
+                          status.retention.previous, which the schedule as it is would delete: add those to keep to
+                          spec.retention.keepBackups, then release the change with spec.retention.releaseHeld
+                        items:
+                          type: string
                 lastScheduleTime:
                   type: string
                   format: date-time
@@ -6377,6 +6463,72 @@ spec:
                 lastFailureMessage:
                   type: string
                   description: "Why the last failed scheduled backup Job failed"
+                retention:
+                  type: object
+                  description: "The entries and time zone the CronJobs apply, and the changes of them whose backups retention holds"
+                  properties:
+                    appliedSchedules:
+                      type: array
+                      nullable: true
+                      description: "The entries the CronJobs apply"
+                      items:
+                        type: object
+                        properties:
+                          period:
+                            type: string
+                          time:
+                            type: string
+                          day:
+                            type: integer
+                            format: int32
+                          keep:
+                            type: integer
+                            format: int32
+                          incremental:
+                            type: string
+                    appliedTimeZone:
+                      type: string
+                      description: "The time zone the CronJobs apply"
+                    previous:
+                      type: array
+                      nullable: true
+                      description: "The entries and time zones before each change not released yet, oldest first: retention keeps every backup they kept when the change was made"
+                      items:
+                        type: object
+                        required:
+                          - changeID
+                        properties:
+                          changeID:
+                            type: string
+                            description: "When the change was made, RFC 3339 in UTC, which identifies it"
+                          schedules:
+                            type: array
+                            nullable: true
+                            description: "The entries before the change"
+                            items:
+                              type: object
+                              properties:
+                                period:
+                                  type: string
+                                time:
+                                  type: string
+                                day:
+                                  type: integer
+                                  format: int32
+                                keep:
+                                  type: integer
+                                  format: int32
+                                incremental:
+                                  type: string
+                          timeZone:
+                            type: string
+                            description: "The time zone before the change"
+                          keepAll:
+                            type: boolean
+                            description: "Holds every backup made before the change, whatever the entries: the oldest changes merged into one"
+                    changeID:
+                      type: string
+                      description: "The changeID of the newest change of previous, which spec.retention.releaseHeld releases with every earlier one"
                 conditions:
                   type: array
                   nullable: true
@@ -8446,6 +8598,8 @@ data:
     	FTP_ADDRESS FTP_PATH FTP_OBJECT_DISK_PATH
     	SFTP_ADDRESS SFTP_PORT SFTP_PATH SFTP_OBJECT_DISK_PATH
     )
+    # The most backups held for a change of the schedule the termination message names
+    HELD_REPORT_MAX=24
     REQUEST_TIMEOUT=600
     DELETE_TIMEOUT=3600
     UNREACHABLE_TIMEOUT=600
@@ -9492,14 +9646,18 @@ data:
     #    weekly one counts for the daily entry too;
     #  - a backup made at once from the schedule, "<prefix>-<YYYYMMDD>T<HHMMSS>", is kept while it is no older than the
     #    oldest scheduled backup an entry keeps;
+    #  - a backup KEEP_BACKUPS pins is kept;
+    #  - a backup the schedule kept before a change of it that is not released, PREVIOUS_SCHEDULES, is held: never
+    #    deleted, and listed in HELD_OBSOLETE when nothing else keeps it, as the schedule as it is would delete it;
     #  - anything else is obsolete. Incremental chains are not protected: deleted newest first, a dependent goes before its
     #    base, and clickhouse-backup rebases the dependents of a base it deletes (rebase_during_delete), so the kept
     #    incremental backups stay restorable
     retention_plan() {
-    	local name tag key i oldest= first=1 newest= made=${BACKUP_KEY:-${BACKUP_NAME:-}}
-    	local -a ordered=() manual=() counts=() incomplete=() obsolete=()
+    	local name tag key newest= made=${BACKUP_KEY:-${BACKUP_NAME:-}}
+    	local -a ordered=() incomplete=() obsolete=() held=()
     	declare -gA KEEP=()
     	OBSOLETE=()
+    	HELD_OBSOLETE=()
     	for name in ${NAMES[@]+"${NAMES[@]}"}; do
     		key_time "${name}"
     		key=${REPLY}
@@ -9518,44 +9676,33 @@ data:
     		mapfile -t ordered < <(printf '%s\n' "${ordered[@]}" | sort -r)
     		newest=${ordered[0]%% *}
     	fi
-    	for i in "${!SCHED_PERIOD[@]}"; do
-    		counts[i]=0
+    	rules_keep ${ordered[@]+"${ordered[@]}"}
+    	for name in "${!RULES_KEEP[@]}"; do
+    		KEEP[${name}]=1
     	done
-    	for tag in "${ordered[@]}"; do
-    		key=${tag%% *}
-    		name=${tag#* }
-    		if [[ -n ${first} || ${name} == "${made}" ]]; then
-    			KEEP[${name}]=1
-    			first=
+    	# The backup just made, unless incomplete
+    	for tag in ${ordered[@]+"${ordered[@]}"}; do
+    		if [[ ${tag#* } == "${made}" ]]; then
+    			KEEP[${made}]=1
     		fi
-    		key_time "${name}"
-    		if [[ -n ${KEY_AT_ONCE} ]]; then
-    			manual+=("${tag}")
+    	done
+    	pinned_keys
+    	for name in "${!PINNED[@]}"; do
+    		KEEP[${name}]=1
+    	done
+    	held_keys ${ordered[@]+"${ordered[@]}"}
+    	for tag in ${ordered[@]+"${ordered[@]}"}; do
+    		if [[ -n ${KEEP[${tag#* }]:-} ]]; then
     			continue
     		fi
-    		for i in "${!SCHED_PERIOD[@]}"; do
-    			if slot_matches "${i}" "${key}"; then
-    				counts[i]=$((counts[i] + 1))
-    				if ((counts[i] <= SCHED_KEEP[i])); then
-    					KEEP[${name}]=1
-    					# The backups come newest first
-    					oldest=${key}
-    				fi
-    			fi
-    		done
-    	done
-    	for tag in "${manual[@]}"; do
-    		key=${tag%% *}
-    		if [[ -z ${oldest} || ! ${key} < ${oldest} ]]; then
-    			KEEP[${tag#* }]=1
-    		fi
-    	done
-    	for tag in "${ordered[@]}"; do
-    		if [[ -z ${KEEP[${tag#* }]:-} ]]; then
+    		if [[ -n ${HELD_KEYS[${tag#* }]:-} ]]; then
+    			held+=("${tag#* }")
+    		else
     			obsolete+=("${tag}")
     		fi
     	done
-    	for tag in "${incomplete[@]}"; do
+    	HELD_OBSOLETE=(${held[@]+"${held[@]}"})
+    	for tag in ${incomplete[@]+"${incomplete[@]}"}; do
     		if [[ -n ${newest} && ${tag%% *} < ${newest} ]]; then
     			obsolete+=("${tag}")
     		fi
@@ -9567,6 +9714,114 @@ data:
     			OBSOLETE+=("${tag#* }")
     		done
     	fi
+    }
+    
+    # rules_keep "<time> <key>"... sets RULES_KEEP to the keys of the backups, given newest first, that the entries of the
+    # schedule the SCHED_* arrays hold keep: the newest backup, the newest keep backups of the slots of every entry, a
+    # backup kept by several, and the backups made at once no older than the oldest of those
+    rules_keep() {
+    	local tag key name i oldest= first=1
+    	local -a manual=() counts=()
+    	declare -gA RULES_KEEP=()
+    	for i in "${!SCHED_PERIOD[@]}"; do
+    		counts[i]=0
+    	done
+    	for tag in "$@"; do
+    		key=${tag%% *}
+    		name=${tag#* }
+    		if [[ -n ${first} ]]; then
+    			RULES_KEEP[${name}]=1
+    			first=
+    		fi
+    		key_time "${name}"
+    		if [[ -n ${KEY_AT_ONCE} ]]; then
+    			manual+=("${tag}")
+    			continue
+    		fi
+    		for i in "${!SCHED_PERIOD[@]}"; do
+    			if slot_matches "${i}" "${key}"; then
+    				counts[i]=$((counts[i] + 1))
+    				if ((counts[i] <= SCHED_KEEP[i])); then
+    					RULES_KEEP[${name}]=1
+    					# The backups come newest first
+    					oldest=${key}
+    				fi
+    			fi
+    		done
+    	done
+    	for tag in ${manual[@]+"${manual[@]}"}; do
+    		key=${tag%% *}
+    		if [[ -z ${oldest} || ! ${key} < ${oldest} ]]; then
+    			RULES_KEEP[${tag#* }]=1
+    		fi
+    	done
+    }
+    
+    # pinned_keys sets PINNED to the keys of the backups KEEP_BACKUPS pins, which retention never deletes: names, or with a
+    # naming template the name of the backup of any shard, or the time alone
+    pinned_keys() {
+    	local value prefix=
+    	declare -gA PINNED=()
+    	if [[ ${KEEP_BACKUPS:-} == *[[:cntrl:]]* ]]; then
+    		die "KEEP_BACKUPS must be one line"
+    	fi
+    	if naming_holds prefix; then
+    		prefix=${BACKUP_NAME_PREFIX:-}
+    	fi
+    	for value in ${KEEP_BACKUPS:-}; do
+    		if ((${#NAMING_PARTS[@]} == 0)) || [[ ${value} =~ ${NAMING_TAG_RE} ]]; then
+    			PINNED[${value}]=1
+    		elif naming_parse "${value}" "${prefix}"; then
+    			PINNED[${N_KEY}]=1
+    		fi
+    	done
+    }
+    
+    # held_keys "<time> <key>"... sets HELD_KEYS to the keys of the backups, given newest first, that retention holds for a change
+    # of the schedule, PREVIOUS_SCHEDULES: of those made before each change, every one the entries and the time zone before
+    # the change kept, or every one for a change that holds them all. The SCHED_* arrays are left as they were
+    held_keys() {
+    	local record change entries name
+    	local -a records subset period=("${SCHED_PERIOD[@]}") hour=("${SCHED_HOUR[@]}") minute=("${SCHED_MINUTE[@]}")
+    	local -a day=("${SCHED_DAY[@]}") keep=("${SCHED_KEEP[@]}") incremental=("${SCHED_INCREMENTAL[@]}")
+    	declare -gA HELD_KEYS=()
+    	if [[ -z ${PREVIOUS_SCHEDULES:-} ]]; then
+    		return 0
+    	fi
+    	if [[ ${PREVIOUS_SCHEDULES} == *[[:cntrl:]]* ]]; then
+    		die "PREVIOUS_SCHEDULES must be one line"
+    	fi
+    	IFS='#' read -r -a records <<<"${PREVIOUS_SCHEDULES}"
+    	for record in "${records[@]}"; do
+    		if [[ ! ${record} =~ ^([0-9]{1,12})\|([^|]*)\|([^|]+)$ ]]; then
+    			die "PREVIOUS_SCHEDULES must list <epoch>|<time zone>|<entries> records separated by #"
+    		fi
+    		entries=${BASH_REMATCH[3]}
+    		# The times the backups are named after are wall times in the zone of the schedule before the change
+    		local SCHEDULE_TIMEZONE=${BASH_REMATCH[2]} SCHEDULES=${entries}
+    		check_timezone
+    		slot_tag "${BASH_REMATCH[1]}"
+    		change=${REPLY}
+    		subset=()
+    		for name in "$@"; do
+    			if [[ ${name%% *} < ${change} ]]; then
+    				subset+=("${name}")
+    			fi
+    		done
+    		if [[ ${entries} == "*" ]]; then
+    			for name in ${subset[@]+"${subset[@]}"}; do
+    				HELD_KEYS[${name#* }]=1
+    			done
+    			continue
+    		fi
+    		parse_schedules
+    		rules_keep ${subset[@]+"${subset[@]}"}
+    		for name in "${!RULES_KEEP[@]}"; do
+    			HELD_KEYS[${name}]=1
+    		done
+    	done
+    	SCHED_PERIOD=(${period[@]+"${period[@]}"}) SCHED_HOUR=(${hour[@]+"${hour[@]}"}) SCHED_MINUTE=(${minute[@]+"${minute[@]}"})
+    	SCHED_DAY=(${day[@]+"${day[@]}"}) SCHED_KEEP=(${keep[@]+"${keep[@]}"}) SCHED_INCREMENTAL=(${incremental[@]+"${incremental[@]}"})
     }
     
     # retention_on_host HOST deletes on HOST the backups of OBSOLETE it lists, newest first: with a naming template, the
@@ -9630,6 +9885,7 @@ data:
     	fi
     	NAMES=("${!ALL_NAMES[@]}")
     	retention_plan
+    	report_held
     	for host in "${HOSTS[@]}"; do
     		if [[ ! ${host} =~ ${HOST_RE} ]]; then
     			warn "retention skipped an invalid host name"
@@ -9643,6 +9899,34 @@ data:
     this_backup() {
     	REPLY=${BACKUP_KEY}
     	[[ $2 == "${HOST_BACKUP[$1]:-}" ]]
+    }
+    
+    # report_held tells the backups retention holds for a change of the schedule that the schedule as it is would delete,
+    # HELD_OBSOLETE, by the names of the backups of their first shard: in a warning, an Event, and the line of the
+    # termination message HELD_BACKUPS_MESSAGE starts, which the operator records in the status of the schedule, at most
+    # HELD_REPORT_MAX of them and "+N" for the others
+    report_held() {
+    	local key
+    	local -a names=()
+    	if ((${#HELD_OBSOLETE[@]} == 0)); then
+    		return 0
+    	fi
+    	for key in "${HELD_OBSOLETE[@]}"; do
+    		REPLY=${key}
+    		if ((${#NAMING_PARTS[@]} > 0)); then
+    			naming_render 1 "${key}" "${NAMING_PREFIX}" || :
+    		fi
+    		names+=("${REPLY}")
+    	done
+    	warn "retention holds ${#names[@]} backup(s) the schedule kept before a change of it, which it would delete now: ${names[*]:0:HELD_REPORT_MAX}${names[HELD_REPORT_MAX]:+ ...}; keep those to keep in spec.retention.keepBackups and release the change with spec.retention.releaseHeld"
+    	event Warning OrchestratorRetentionHeld "${LAST_WARNING}"
+    	if [[ -n ${HELD_BACKUPS_MESSAGE:-} ]]; then
+    		if ((${#names[@]} > HELD_REPORT_MAX)); then
+    			report_message "${HELD_BACKUPS_MESSAGE} ${names[*]:0:HELD_REPORT_MAX} +$((${#names[@]} - HELD_REPORT_MAX))"
+    		else
+    			report_message "${HELD_BACKUPS_MESSAGE} ${names[*]}"
+    		fi
+    	fi
     }
     
     # report_data HOST... tells when the backup just made holds no data, of tables that match nothing or an installation

@@ -208,6 +208,10 @@ const (
 	// retention no longer prunes the backups they made. Only the event that announces it
 	// carries this reason; the schedule's status keeps the hosts.
 	BackupReasonUnprunedHosts = "UnprunedHosts"
+	// BackupReasonRetentionHeld: a change of the entries or the time zone of a schedule is held, its retention
+	// keeping every backup the schedule kept before it until spec.retention.releaseHeld releases it. Only the event
+	// that announces it carries this reason; the schedule's status keeps the change.
+	BackupReasonRetentionHeld = "RetentionHeld"
 )
 
 const (
@@ -604,6 +608,10 @@ type BackupScheduleRecord struct {
 	Schedules []BackupScheduleEntry `json:"schedules,omitempty" yaml:"schedules,omitempty"`
 	// TimeZone is the schedule's timeZone.
 	TimeZone string `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
+	// KeepBackups are the backups the schedule's retention never deletes, spec.retention.keepBackups.
+	KeepBackups []string `json:"keepBackups,omitempty" yaml:"keepBackups,omitempty"`
+	// PreviousSchedules are the changes of the schedule whose backups its retention holds, status.retention.previous.
+	PreviousSchedules []RetiredScheduleRules `json:"previousSchedules,omitempty" yaml:"previousSchedules,omitempty"`
 
 	BackupOptions `json:",inline" yaml:",inline"`
 }

@@ -74,6 +74,18 @@ const (
 	// them: the heaviest entry whose slot the run is decides whether the backup is incremental; after the
 	// backup, every entry keeps its newest keep backups of its slots, and retention deletes the rest of the
 	// series. envScheduleTimezone (schedule.go) is the zone of the slots.
+	// envKeepBackups lists, space-separated, the backups retention never deletes, spec.retention.keepBackups of the
+	// schedule: names, or with envBackupNaming the name of the backup of any shard or the time alone.
+	envKeepBackups = "KEEP_BACKUPS"
+	// envPreviousSchedules (schedule.go, PreviousSchedulesEnv) are the entries and the time zone the schedule had
+	// before each change whose backups retention holds: it keeps every backup they kept of those made before the
+	// change, and tells those of them the entries as they are would delete in the line of the termination message
+	// envHeldBackupsMessage starts
+	envPreviousSchedules = "PREVIOUS_SCHEDULES"
+	// envHeldBackupsMessage starts the line of the termination message the script adds, followed by the
+	// space-separated names, when retention holds backups for a change of the schedule that the entries as they are
+	// would delete; a last "+N" counts those left out
+	envHeldBackupsMessage = "HELD_BACKUPS_MESSAGE"
 	// envRestoreInProgress skips retention, "true" or "false": a restore of the cluster runs
 	envRestoreInProgress = "RESTORE_IN_PROGRESS"
 	// envCronJobName is the name of the CronJob of a scheduled backup, which the names of its Jobs start with
@@ -244,6 +256,11 @@ const NoDataMessage = "the backup holds no data"
 // HostsUsedMessage is the value of envHostsUsedMessage: it starts the line of the termination message of a Job
 // container that succeeded making a backup on other hosts than the Job names, followed by those hosts.
 const HostsUsedMessage = "backup made on hosts:"
+
+// HeldBackupsMessage is the value of envHeldBackupsMessage: it starts the line of the termination message of a Job
+// container that succeeded with a retention that held backups for a change of the schedule, which the entries as they
+// are would delete, followed by their names.
+const HeldBackupsMessage = "retention holds:"
 
 // RBACNotRestoredMessage is the value of envRBACNotRestoredMessage: the termination message of a Job
 // container that succeeded and restored a backup without the access entities - users, roles, grants -

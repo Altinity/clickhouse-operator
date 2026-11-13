@@ -15,6 +15,7 @@
 package chbackup
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -497,4 +498,74 @@ func periodsOfDue(due []DueEntry) []api.BackupPeriod {
 		periods = append(periods, d.Entry.Period)
 	}
 	return periods
+}
+
+// A change of the entries or the time zone of a schedule is held: the status keeps the entries and the zone before
+// it, under a changeID later than that of any change before, until releaseHeld names it or a later change; Prune
+// holds none. A schedule seen for the first time holds nothing, and a change of no rule - incremental - neither.
+func TestTrackScheduleRetention(t *testing.T) {
+	chbs := testSchedule("s1")
+	at := time.Date(2026, time.November, 12, 12, 0, 0, 0, time.UTC)
+	require.Empty(t, TrackScheduleRetention(chbs, at))
+	require.Equal(t, chbs.Spec.Schedules, chbs.Status.Retention.AppliedSchedules)
+	require.Empty(t, chbs.Status.Retention.Previous)
+
+	chbs.Spec.Schedules[0].Incremental = types.NewStringBool(true)
+	require.Empty(t, TrackScheduleRetention(chbs, at), "incremental keeps the same backups")
+
+	before := chbs.DeepCopy().Spec.Schedules
+	chbs.Spec.Schedules[0].Time = "04:00"
+	require.Equal(t, "2026-11-12T12:00:00Z", TrackScheduleRetention(chbs, at))
+	require.Equal(t, []api.RetiredScheduleRules{{ChangeID: "2026-11-12T12:00:00Z", Schedules: before}}, chbs.Status.Retention.Previous)
+	require.Equal(t, "2026-11-12T12:00:00Z", chbs.Status.Retention.ChangeID)
+	require.Empty(t, PreviousSchedulesEnv(nil))
+	require.Equal(t, fmt.Sprintf("%d||period=daily time=03:00 keep=1 incremental=true", at.Unix()),
+		PreviousSchedulesEnv(chbs.Status.Retention.Previous))
+
+	// A second change in the same second gets a later changeID, which a release of the first does not release
+	chbs.Spec.TimeZone = "Europe/Berlin"
+	require.Equal(t, "2026-11-12T12:00:01Z", TrackScheduleRetention(chbs, at))
+	chbs.Spec.Retention = &api.BackupRetention{ReleaseHeld: "2026-11-12T12:00:00Z"}
+	require.Empty(t, TrackScheduleRetention(chbs, at.Add(time.Hour)))
+	require.Len(t, chbs.Status.Retention.Previous, 1)
+	require.Equal(t, "2026-11-12T12:00:01Z", chbs.Status.Retention.ChangeID)
+	chbs.Spec.Retention.ReleaseHeld = "2026-11-12T12:00:01Z"
+	TrackScheduleRetention(chbs, at.Add(time.Hour))
+	require.Empty(t, chbs.Status.Retention.Previous)
+	require.Empty(t, chbs.Status.Retention.ChangeID)
+
+	// Prune holds nothing
+	chbs.Spec.Retention.OnScheduleChange = api.RetentionPrune
+	chbs.Spec.Schedules[0].Keep = 5
+	require.Empty(t, TrackScheduleRetention(chbs, at.Add(2*time.Hour)))
+	require.Empty(t, chbs.Status.Retention.Previous)
+	require.Equal(t, int32(5), chbs.Status.Retention.AppliedSchedules[0].Keep)
+
+	// Beyond the most changes kept, the oldest two merge into one that holds every backup made before the newer
+	chbs.Spec.Retention.OnScheduleChange = ""
+	for i := 0; i < api.ScheduleRetentionPreviousMaxItems+1; i++ {
+		chbs.Spec.Schedules[0].Keep = int32(10 + i)
+		TrackScheduleRetention(chbs, at.Add(time.Duration(3+i)*time.Hour))
+	}
+	previous := chbs.Status.Retention.Previous
+	require.Len(t, previous, api.ScheduleRetentionPreviousMaxItems)
+	require.True(t, previous[0].KeepAll)
+	require.Equal(t, at.Add(4*time.Hour).Format(time.RFC3339), previous[0].ChangeID)
+	require.Contains(t, PreviousSchedulesEnv(previous[:1]), "|*")
+}
+
+// A backup run now from a schedule runs its retention with the backups the schedule pins and holds, as recorded.
+func TestRunNowCarriesTheRetentionOfItsSchedule(t *testing.T) {
+	chb := testBackup("now")
+	chb.Spec.ScheduleRef = &api.BackupScheduleRef{Name: "s1"}
+	chb.Status.BackupName = "nightly-20260101T120000"
+	chb.Status.Schedule = &api.BackupScheduleRecord{
+		Name: "s1", BackupNamePrefix: "nightly", Schedules: testSchedule("s1").Spec.Schedules,
+		KeepBackups:       []string{"nightly-20251201000000", "nightly-20251202000000"},
+		PreviousSchedules: []api.RetiredScheduleRules{{ChangeID: "2026-01-01T00:00:00Z", Schedules: testSchedule("s1").Spec.Schedules}},
+	}
+	values := envValues(BuildBackupJob(chb, testInstallation(), testTopology(), testOrchestrator()).Spec.Template.Spec.Containers[0].Env)
+	require.Equal(t, "nightly-20251201000000 nightly-20251202000000", values[envKeepBackups])
+	require.Equal(t, "1767225600||period=daily time=03:00 keep=1", values[envPreviousSchedules])
+	require.Equal(t, HeldBackupsMessage, values[envHeldBackupsMessage])
 }

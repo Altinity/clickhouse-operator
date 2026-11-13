@@ -18,6 +18,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -261,6 +262,8 @@ func (c *BackupController) recordSchedule(ctx context.Context, chb *api.ClickHou
 		OrchestratorConfigMapRef: chbs.Spec.OrchestratorConfigMapRef.DeepCopy(),
 		Schedules:                chbs.Spec.DeepCopy().Schedules,
 		TimeZone:                 chbs.Spec.TimeZone,
+		KeepBackups:              slices.Clone(chbs.Spec.Retention.GetKeepBackups()),
+		PreviousSchedules:        chbs.Status.Retention.DeepCopy().GetPrevious(),
 		BackupOptions:            *chbs.Spec.BackupOptions.DeepCopy(),
 	}
 	return nil, nil

@@ -524,6 +524,9 @@ func BuildBackupJob(chb *api.ClickHouseBackup, chi api.ICustomResource, topology
 			envVar(envScheduleTimezone, record.TimeZone),
 			envVar(envRetentionHosts, joinHosts(orchestrator.hosts(topology.hosts(options.GetReplicaSelection())))),
 			envVar(envRestoreInProgress, strconv.FormatBool(orchestrator.RestoreInProgress)),
+			envVar(envKeepBackups, strings.Join(record.KeepBackups, hostListSeparator)),
+			envVar(envPreviousSchedules, PreviousSchedulesEnv(record.PreviousSchedules)),
+			envVar(envHeldBackupsMessage, HeldBackupsMessage),
 		)
 	}
 	labels := Labels(api.ClickHouseBackupCRDResourceKind, chb.GetName(), chb.TargetInstallation(), cluster)
@@ -755,6 +758,9 @@ func BuildBackupCronJob(
 		envVar(envScheduleTimezone, chbs.Spec.TimeZone),
 		envVar(envRetentionHosts, joinHosts(RetentionHosts(chbs, topology, orchestrator))),
 		envVar(envRestoreInProgress, strconv.FormatBool(orchestrator.RestoreInProgress)),
+		envVar(envKeepBackups, strings.Join(chbs.Spec.Retention.GetKeepBackups(), hostListSeparator)),
+		envVar(envPreviousSchedules, PreviousSchedulesEnv(chbs.Status.Retention.GetPrevious())),
+		envVar(envHeldBackupsMessage, HeldBackupsMessage),
 	)
 	env = append(env, backupOptionsEnv(options, topology, orchestrator)...)
 	env = append(env, namingEnv(topology, orchestrator)...)
@@ -1106,6 +1112,22 @@ func jobReport(pod *core.Pod) []string {
 		}
 	}
 	return lines
+}
+
+// JobHeldBackups returns the backups the Job container of a pod that succeeded found retention to hold for a change
+// of the schedule, which the entries as they are would delete, as the Job script tells them by a line of its
+// termination message, a last "+N" telling N more; none when it tells none.
+func JobHeldBackups(pod *core.Pod) []string {
+	for _, line := range jobReport(pod) {
+		if names, found := strings.CutPrefix(line, HeldBackupsMessage+" "); found {
+			held := strings.Fields(names)
+			if last := len(held) - 1; (last >= 0) && strings.HasPrefix(held[last], "+") {
+				held[last] = "and " + strings.TrimPrefix(held[last], "+") + " more"
+			}
+			return held
+		}
+	}
+	return nil
 }
 
 // JobBackupHoldsNoData reports whether the Job container of a pod succeeded and made a backup that

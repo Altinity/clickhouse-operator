@@ -976,7 +976,7 @@ func TestJobScriptReadsDeclaredEnv(t *testing.T) {
 		envPathClusters, envPathSelf, envPathInstallation, envPathNamespace, envPathReplicaSelection,
 		envDefaultPath, envDefaultObjectDiskPath, envSourceInstallation, envSourceNamespace, envSkipTables, envSkipTableEngines,
 		envDatabaseMapping, envBackupFallbackHosts, envHostsUsedMessage, envBackupNaming, envShardNumbers, envNamingInstallation,
-		envNamingNamespace,
+		envNamingNamespace, envKeepBackups, envPreviousSchedules, envHeldBackupsMessage,
 	} {
 		require.Regexp(t, regexp.MustCompile(`\$\{!?`+name+`\b|\b(parse_hosts|is_true|check_name|default_path "\$\{index\}") `+name+`\b`), orchestratorScript, name)
 	}

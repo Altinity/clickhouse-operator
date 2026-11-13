@@ -154,3 +154,32 @@ func TestOperationPhaseAbortedIsTerminal(t *testing.T) {
 	require.False(t, OperationPhaseRunning.IsTerminal())
 	require.False(t, OperationPhasePending.IsTerminal())
 }
+
+// The retention of a schedule holds a change, or prunes at once, pins backups by name, at most 512, and releases a
+// change by its changeID, a time.
+func TestValidateBackupRetention(t *testing.T) {
+	many := make([]string, BackupRetentionKeepBackupsMaxItems+1)
+	for i := range many {
+		many[i] = "b"
+	}
+	for name, tc := range map[string]struct {
+		retention *BackupRetention
+		valid     bool
+	}{
+		"none":                 {nil, true},
+		"hold":                 {&BackupRetention{OnScheduleChange: RetentionHold}, true},
+		"prune":                {&BackupRetention{OnScheduleChange: RetentionPrune}, true},
+		"another policy":       {&BackupRetention{OnScheduleChange: "Keep"}, false},
+		"pins":                 {&BackupRetention{KeepBackups: []string{"nightly-20261101020000", "20261101020000"}}, true},
+		"an empty pin":         {&BackupRetention{KeepBackups: []string{""}}, false},
+		"a pin of no name":     {&BackupRetention{KeepBackups: []string{"a b"}}, false},
+		"too many pins":        {&BackupRetention{KeepBackups: many}, false},
+		"a release":            {&BackupRetention{ReleaseHeld: "2026-11-12T12:00:00Z"}, true},
+		"a release of no time": {&BackupRetention{ReleaseHeld: "yesterday"}, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.valid, tc.retention.Validate() == nil)
+		})
+	}
+	require.Equal(t, RetentionHold, (*BackupRetention)(nil).GetOnScheduleChange())
+}

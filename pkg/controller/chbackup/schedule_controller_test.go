@@ -1884,3 +1884,52 @@ func TestScheduleResumesNoCronJobARestoreStartsOn(t *testing.T) {
 	require.Equal(t, api.OperationPhaseRunning, getRestore(t, base, "r1").Status.Phase)
 	require.NoError(t, base.Get(ctx, key("r1-main-restore"), &batch.Job{}))
 }
+
+// A change of the time of a schedule is held: the schedule records the entries before it, warns, and gives its
+// CronJobs those entries and the backups it pins, which their runs keep every backup of; a run tells the backups it
+// held that the schedule as it is would delete, which the schedule records for the cluster. A backup run now from the
+// schedule takes them along, as its retention runs as that of a scheduled run.
+func TestScheduleHoldsTheBackupsOfAChange(t *testing.T) {
+	chbs := newScheduleCR("s1")
+	chbs.Spec.Retention = &api.BackupRetention{KeepBackups: []string{"pinned-20260101000000"}}
+	f := newScheduleFixture(t, newFakeCR(readyInstallation(t)), nil, chbs)
+	f.reconcile("s1")
+	require.Empty(t, f.schedule("s1").Status.Retention.Previous)
+	require.Equal(t, "pinned-20260101000000", f.cronJobVar("s1-main-backup", "KEEP_BACKUPS"))
+
+	edited := f.schedule("s1")
+	edited.Spec.Schedules[0].Time = "04:00"
+	require.NoError(t, f.client.Update(context.Background(), edited))
+	f.reconcile("s1")
+	got := f.schedule("s1")
+	require.Len(t, got.Status.Retention.Previous, 1)
+	require.Equal(t, "03:00", got.Status.Retention.Previous[0].Schedules[0].Time)
+	require.Equal(t, got.Status.Retention.Previous[0].ChangeID, got.Status.Retention.ChangeID)
+	require.Len(t, eventMessages(t, f.client, api.BackupReasonRetentionHeld), 1)
+	require.Contains(t, f.cronJobVar("s1-main-backup", "PREVIOUS_SCHEDULES"), "|period=daily time=03:00 keep=1")
+
+	run := f.cronJobRunAt("s1-main-backup", time.Date(2026, time.January, 2, 4, 0, 0, 0, time.UTC))
+	succeedPodOfJob(t, f.client, run.Name, model.HeldBackupsMessage+" ns-demo-s1-20260101030000 +3\n")
+	finishJob(t, f.client, run.Name, batch.JobComplete, "")
+	f.reconcile("s1")
+	got = f.schedule("s1")
+	require.Equal(t, []string{"ns-demo-s1-20260101030000", "and 3 more"}, got.Status.Clusters[0].HeldBackups)
+
+	// Released, the CronJobs hold it no more
+	got.Spec.Retention.ReleaseHeld = got.Status.Retention.ChangeID
+	require.NoError(t, f.client.Update(context.Background(), got))
+	f.reconcile("s1")
+	require.Empty(t, f.schedule("s1").Status.Retention.Previous)
+	require.Empty(t, f.cronJobVar("s1-main-backup", "PREVIOUS_SCHEDULES"))
+}
+
+// cronJobVar returns the plain value of a variable of the Job container of a CronJob
+func (f *scheduleFixture) cronJobVar(name, variable string) string {
+	f.t.Helper()
+	for _, e := range f.cronJob(name).Spec.JobTemplate.Spec.Template.Spec.Containers[0].Env {
+		if e.Name == variable {
+			return e.Value
+		}
+	}
+	return ""
+}
