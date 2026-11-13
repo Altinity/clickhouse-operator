@@ -8564,58 +8564,34 @@ metadata:
     app: clickhouse-operator
 data:
   backup-orchestrator.sh: |
-    # backup-orchestrator.sh drives the clickhouse-backup REST API of one cluster of a ClickHouse installation: that of the
-    # clickhouse-backup sidecar of every ClickHouse pod (BACKUP_TRANSPORT=sidecar), or that of the backup Pod of every shard
-    # (BACKUP_TRANSPORT=pod), which the host lists then name by DNS. It makes a backup, verifies one or restores one, and
-    # prunes the backups of a schedule. It runs in the clickhouse-backup image: bash, curl, sort, awk, base64 and tzdata.
-    # Every input arrives through the environment (see script.go): no value is ever spliced into this text, and values
-    # only reach curl as URL-encoded query parameters, or as tokens validated against NAME_RE, TABLES_RE or SOURCE_PATH_RE
-    # in the commands the script runs through the actions endpoint.
-    # Every piece of logic is a function, and the script runs main only when it is run, not when it is sourced: tests source
-    # it and call the functions.
+    # backup-orchestrator.sh drives the clickhouse-backup REST API of one cluster: through the sidecar of every pod
+    # (BACKUP_TRANSPORT=sidecar) or the backup Pod of every shard (pod). It backs up, verifies, restores and prunes.
+    # Every input arrives through the environment (see script.go), never spliced into this text; values reach curl as
+    # URL-encoded parameters, or commands of the actions endpoint as tokens validated against the *_RE regexes.
+    # Sourced, it runs nothing and leaves its functions to the tests. See docs/backup.md for what it does and why.
     set -euo pipefail
     
     NAME_RE='^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'
     HOST_RE='^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$'
     NUMBER_RE='^[0-9]+$'
-    # A table pattern of a restore: that of a backup, without a leading dash, so it is a single token of a command too.
-    # Its length is checked apart: the regex library of an Alpine image refuses repetition counts above 255.
     TABLES_RE='^[A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*$'
-    # The longest table pattern the API accepts
     TABLES_MAX_LENGTH=1024
-    # The partition ids of a restore, the table engines and the database mapping, "source:target" pairs, it takes: every
-    # value a single token of a command, as the API validates them. Their lengths are checked apart, as TABLES_MAX_LENGTH
     PARTITIONS_RE='^[A-Za-z0-9_-]+(,[A-Za-z0-9_-]+)*$'
     ENGINES_RE='^[A-Za-z][A-Za-z0-9_]*(,[A-Za-z][A-Za-z0-9_]*)*$'
     DATABASE_MAPPING_RE='^[A-Za-z0-9_][A-Za-z0-9_-]*:[A-Za-z0-9_][A-Za-z0-9_-]*(,[A-Za-z0-9_][A-Za-z0-9_-]*:[A-Za-z0-9_][A-Za-z0-9_-]*)*$'
     FILTER_MAX_LENGTH=16384
-    # The tables clickhouse-backup leaves out by default, which CLICKHOUSE_SKIP_TABLES replaces: a restore that leaves out
-    # tables of its own keeps them
     DEFAULT_SKIP_TABLES='system.*,INFORMATION_SCHEMA.*,information_schema.*,_temporary_and_external_tables.*'
     
-    # The index of a cluster in the environment of the storage path check
     INDEX_RE='^(0|[1-9][0-9]{0,3})$'
-    # The name, and the namespace, of the installation a restore reads the backup of: a Kubernetes name. Its length is
-    # checked apart: SOURCE_INSTALLATION_MAX_LENGTH for the name of an object, SOURCE_NAMESPACE_MAX_LENGTH for a namespace
     SOURCE_NAME_RE='^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
     SOURCE_INSTALLATION_MAX_LENGTH=253
     SOURCE_NAMESPACE_MAX_LENGTH=63
-    # A storage path of the installation a restore reads the backup of, as a value of the --env flags of its commands: the
-    # actions endpoint splits a command as a shell does, which none of these characters takes part in
     SOURCE_PATH_RE='^[A-Za-z0-9_./{}-]+$'
-    # The time a scheduled backup is named after, "<prefix>-<YYYYMMDDHHMMSS>": the wall time of its slot in SCHEDULE_TIMEZONE
     TAG_RE='^[0-9]{14}$'
-    # A naming template, BACKUP_NAMING, as backupNamingRegexp in type_backup_naming.go bounds it, and its longest length;
-    # the time a name of a backup of a cluster with a naming template may be given by alone, with a T before the hour for a
-    # backup made at once, as BackupTagRegexp there; and the tolerance of the slots of a schedule of such a cluster, in
-    # seconds: the Altinity Cloud Manager names a scheduled backup after the time its run started, up to 30 minutes after
-    # its slot (the refresh rate of its background tasks times 1.5)
     NAMING_RE='^([A-Za-z0-9._-]|\{[A-Za-z]+\})+$'
     NAMING_MAX_LENGTH=128
     NAMING_TAG_RE='^[0-9]{8}T?[0-9]{6}$'
     NAMING_SLOT_TOLERANCE=1800
-    # The number the CronJob controller ends the name of a scheduled Job with, the minutes since the epoch of its slot,
-    # bounded as in builder.go
     SLOT_RE='^[0-9]{1,10}$'
     SCHEDULE_TIME_RE='^([01][0-9]|2[0-3]):([0-5][0-9])$'
     KEEP_RE='^[1-9][0-9]{0,5}$'
@@ -8624,16 +8600,10 @@ data:
     EXIT_CODE_RE='^[1-9][0-9]?$'
     IN_PROGRESS_RE='"status":"in progress"'
     TABLE_ROW_RE='^\{"Database":"([^"\\]*)","Name":"([^"\\]*)"'
-    # A table of a backup in the storage, as GET /backup/tables?remote_backup= lists it
     BACKUP_TABLE_ROW_RE='^\{"database":"([^"\\]*)","table":"([^"\\]*)"'
     SYSTEM_DATABASES=' system INFORMATION_SCHEMA information_schema _temporary_and_external_tables '
-    # The error of a request the sidecar refuses while it runs another operation: the actions endpoint answers it with
-    # HTTP 500, the others with 423
     LOCKED_ERROR='another operation is currently running'
-    # How to get past an overwrite refused for tables larger than max_table_size_to_drop: the operator gives the smallest
-    # non-zero limit any level of the installation sets, so lifting it takes 0 at every level that sets one
     SIZE_LIMIT_ADVICE='set max_table_size_to_drop to 0 wherever a limit is set (the smallest non-zero limit applies), or drop these tables by hand, and restore again'
-    # The settings the storage path check reads of every cluster, as PathCheckKeys in script.go lists them
     PATH_CHECK_KEYS=(
     	REMOTE_STORAGE
     	S3_BUCKET S3_ENDPOINT S3_PATH S3_OBJECT_DISK_PATH
@@ -8643,97 +8613,56 @@ data:
     	FTP_ADDRESS FTP_PATH FTP_OBJECT_DISK_PATH
     	SFTP_ADDRESS SFTP_PORT SFTP_PATH SFTP_OBJECT_DISK_PATH
     )
-    # A config override, KEY=VALUE of the env var of a clickhouse-backup setting, as backupConfigOverrideRegexp in
-    # type_backup_overrides.go bounds it: a single token of a command. The lengths of the key and the value are checked
-    # apart, as TABLES_MAX_LENGTH
     CONFIG_OVERRIDE_RE='^[A-Z][A-Z0-9_]*=[A-Za-z0-9_.,:/@+=-]+$'
     CONFIG_OVERRIDE_KEY_MAX_LENGTH=64
     CONFIG_OVERRIDE_VALUE_MAX_LENGTH=256
     CONFIG_OVERRIDES_MAX_ITEMS=16
-    # The settings a config override must not set, as BackupConfigOverrideForbidden in type_backup_overrides.go lists them
-    # but those of where the backups are, PATH_CHECK_KEYS; every key of the REST API, API_*, and every key of a secret,
-    # which holds one of CONFIG_OVERRIDE_SENSITIVE
     CONFIG_OVERRIDE_FORBIDDEN=' API_LISTEN API_SECURE API_ALLOW_PARALLEL RESTORE_SCHEMA_ON_CLUSTER CLICKHOUSE_RESTART_COMMAND RESTORE_DATABASE_MAPPING RESTORE_TABLE_MAPPING BACKUPS_TO_KEEP_REMOTE REBASE_DURING_DELETE REBASE_BEFORE_REMOVE_OLD_REMOTE API_USERNAME API_PASSWORD CLICKHOUSE_USERNAME CLICKHOUSE_PASSWORD CLICKHOUSE_BACKUP_CONFIG CLICKHOUSE_HOST CLICKHOUSE_PORT CLICKHOUSE_SECURE CLICKHOUSE_SKIP_VERIFY BACKUPS_TO_KEEP_LOCAL ALLOW_EMPTY_BACKUPS API_CREATE_INTEGRATION_TABLES '
     CONFIG_OVERRIDE_SENSITIVE=(PASSWORD SECRET ACCESS_KEY SECRET_KEY ACCOUNT_KEY SSE_KEY SSE_CUSTOMER_KEY ENCRYPTION_KEY TOKEN CREDENTIAL PRIVATE_KEY SAS CONNECTION_STRING)
-    # The most backups held for a change of the schedule the termination message names
     HELD_REPORT_MAX=24
     REQUEST_TIMEOUT=600
     DELETE_TIMEOUT=3600
     UNREACHABLE_TIMEOUT=600
     MUTATED_UNREACHABLE_TIMEOUT=3600
     RESUME_TIMEOUT=300
-    # How long the backup Pods of the pod transport are waited for to answer, unless BACKUP_POD_WAIT_SECONDS tells
     DEFAULT_BACKUP_POD_WAIT_SECONDS=600
-    # Where the service account of the pod keeps its token and the CA of the Kubernetes API, which Events are posted to
     SERVICE_ACCOUNT_DIR=/var/run/secrets/kubernetes.io/serviceaccount
     EVENT_TIMEOUT=5
-    # Events are given up after this many failures in a row: they never fail, nor hold, the operation
     EVENT_MAX_FAILURES=3
     EVENT_SOURCE_COMPONENT=clickhouse-backup-orchestrator
     EVENT_MESSAGE_MAX_LENGTH=1024
     EVENT_FAILURES=0
     EVENTS_DISABLED=
-    # The entries of SCHEDULES, as parse_schedules reads them, by index
     SCHED_PERIOD=()
     SCHED_HOUR=()
     SCHED_MINUTE=()
     SCHED_DAY=()
     SCHED_KEEP=()
     SCHED_INCREMENTAL=()
-    # The --env flags of the config overrides of every entry, each " --env=KEY=VALUE"
     SCHED_ENV=()
-    # SLOT_TAG is the wall time of the slot of the run in SCHEDULE_TIMEZONE, as YYYYMMDDHHMMSS; WINNER the index of the
-    # heaviest schedule entry whose slot it is, empty when none is
     SLOT_TAG=
     WINNER=
-    # NAMING_PARTS are the parts of the naming template BACKUP_NAMING, as naming_init reads them, none without one;
-    # SHARD_OF the number of the shard of every host; SLOT_TOLERANCE how long after its slot a backup still is one of it, in
-    # seconds. BACKUP_KEY is the key of the backup the Job works on, its name, or with a naming template the time it is
-    # named after, NAMING_PREFIX the value of {prefix} in its names, and HOST_BACKUP the name of the backup on every host
     NAMING_PARTS=()
     declare -A SHARD_OF=() HOST_BACKUP=()
     SLOT_TOLERANCE=0
     BACKUP_KEY=
     NAMING_PREFIX=
-    # BACKUP_NAME_GIVEN is set when BACKUP_NAME names the backup: a backup with schedule entries that is no scheduled run
-    # runs the schedule now
     BACKUP_NAME_GIVEN=
-    # MUTATED is set once a sidecar may have accepted a request that changes something
     MUTATED=
-    # READ_ONLY is set, as a local of a caller, while the requests it submits change nothing the Job is asked to change:
-    # they leave MUTATED alone
     READ_ONLY=
-    # NO_STEP is set, as a local of a caller, while the actions it runs are no steps of the Job: a sidecar that restarts
-    # after them has lost nothing the steps to come build on
     NO_STEP=
-    # LAST_WARNING is the last warning, which tells why the step that has just failed failed
     LAST_WARNING=
-    # SELF_PATH is the storage path template of the target cluster, once the storage path check knows it
     SELF_PATH=
-    # SELF_OBJECT_DISK_PATH, SELF_STORAGE_PREFIX and SELF_CLUSTER_NAME are the object disk path template of the target
-    # cluster, empty when it has none, the settings prefix of its storage and its name, once the storage path check
-    # knows every path of it, SELF_STORAGE_PREFIX empty until then; SELF_PATHS_UNKNOWN tells why the check does not know them
     SELF_OBJECT_DISK_PATH=
     SELF_STORAGE_PREFIX=
     SELF_CLUSTER_NAME=
     SELF_PATHS_UNKNOWN=
-    # SOURCE_ENV holds the --env flags that point a command at the storage paths of the installation a restore reads the
-    # backup of, empty for a restore from the paths of its own installation; SOURCE_PATH_SHOWN is the storage path they set,
-    # with the macros expanded that are the same on every host
     SOURCE_ENV=
     SOURCE_PATH_SHOWN=
-    # SOURCE_HINT tells why the storage paths a restore reads the backup of another installation at may hold none of it;
-    # SOURCE_OWN_PATH is set when the restore reads the backup at the own storage path, its object disk path alone
-    # being that of the other installation
     SOURCE_HINT=
     SOURCE_OWN_PATH=
-    # SOURCE_COPIES lists the hosts a restore from the paths of another installation may have downloaded a copy of the backup
-    # to, until the copy is deleted again: those its preflight downloaded the schema to, then every host the restore steps
-    # download the backup to; NO_LOCAL_COPY lists the hosts found without a local copy of the backup, and OWN_BACKUPS, once
-    # declared, the names of the backups at the own storage path of each host, between blanks
     SOURCE_COPIES=()
     NO_LOCAL_COPY=()
-    # ON_CLUSTER is set once the preflight of an overwrite found that it drops the tables of the backup ON CLUSTER
     ON_CLUSTER=
     
     log() { printf '%s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$*"; }
@@ -8741,19 +8670,14 @@ data:
     	LAST_WARNING=$*
     	log "WARNING: $*" >&2
     }
-    # advise MESSAGE logs a warning that no step fails for, such as a check that cannot tell, leaving LAST_WARNING to them
     advise() {
     	log "WARNING: $*" >&2
     }
-    # termination_message MESSAGE writes MESSAGE to the termination message of the container, which the pod keeps in its
-    # status after the Job and its log are gone. kubelet makes the file writable for any user
     termination_message() {
     	if [[ -n ${TERMINATION_MESSAGE_PATH:-} ]]; then
     		{ printf '%s\n' "$*" >"${TERMINATION_MESSAGE_PATH}"; } 2>/dev/null || true
     	fi
     }
-    # report_message LINE adds LINE to the termination message of a Job that succeeds, which the operator reads line by
-    # line: each line tells one thing of what the Job did
     report_message() {
     	if [[ -n ${TERMINATION_MESSAGE_PATH:-} ]]; then
     		{ printf '%s\n' "$*" >>"${TERMINATION_MESSAGE_PATH}"; } 2>/dev/null || true
@@ -8764,12 +8688,9 @@ data:
     	termination_message "$*"
     	operation_title
     	event Warning "Orchestrator${REPLY}Failed" "$*"
-    	# A copy of the backup a restore from another installation downloaded would refuse the next restore from the same paths
     	if ((${#SOURCE_COPIES[@]} > 0)); then
     		drop_source_copies
     	fi
-    	# The exit code tells the operator whether anything was changed: a restore that changed nothing
-    	# leaves nothing behind that scheduled backups must be held for
     	if [[ -z ${MUTATED} && ${UNCHANGED_EXIT_CODE:-} =~ ${EXIT_CODE_RE} ]]; then
     		exit "${UNCHANGED_EXIT_CODE}"
     	fi
@@ -8780,7 +8701,7 @@ data:
     	die "$*${LAST_WARNING:+: ${LAST_WARNING}}"
     }
     
-    # operation_title sets REPLY to OPERATION as it names the reasons of Events: Backup, Verify or Restore, empty for another
+    # operation_title sets REPLY to OPERATION as it names the reasons of Events
     operation_title() {
     	case ${OPERATION:-} in
     	backup) REPLY=Backup ;;
@@ -8790,8 +8711,7 @@ data:
     	esac
     }
     
-    # json_escape VALUE sets REPLY to VALUE as the content of a JSON string: a backslash, a quote and every control
-    # character escaped. Bytes of UTF-8 beyond ASCII pass as they are
+    # json_escape VALUE sets REPLY to VALUE as the content of a JSON string
     json_escape() {
     	local value=$1 out= char code
     	value=${value//\\/\\\\}
@@ -8809,8 +8729,6 @@ data:
     	REPLY=${out}${value}
     }
     
-    # truncate_bytes VALUE MAX sets REPLY to VALUE cut to at most MAX bytes, whatever the locale, without the bytes of a
-    # UTF-8 character the cut splits: what is left is valid UTF-8 when VALUE is
     truncate_bytes() {
     	local LC_ALL=C value=$1 max=$2 i n
     	if ((${#value} <= max)); then
@@ -8820,11 +8738,9 @@ data:
     	value=${value:0:max}
     	for ((i = 1; i <= 4 && i <= ${#value}; i++)); do
     		printf -v n '%d' "'${value: -i:1}"
-    		# A byte that continues a character: the character starts before it
     		if ((n >= 0x80 && n < 0xc0)); then
     			continue
     		fi
-    		# The first byte of a character of 2, 3 or 4 bytes, of which only i are left
     		if ((n >= 0xf0 && i < 4 || n >= 0xe0 && i < 3 || n >= 0xc0 && i < 2)); then
     			value=${value:0:${#value}-i}
     		fi
@@ -8833,9 +8749,7 @@ data:
     	REPLY=${value}
     }
     
-    # event_body TYPE REASON MESSAGE TIME sets REPLY to the core/v1 Event of TYPE (Normal or Warning) with REASON and MESSAGE
-    # on the object EVENT_OBJECT_* names, in POD_NAMESPACE, at TIME (RFC 3339). A MESSAGE longer than the Kubernetes API
-    # takes is cut to EVENT_MESSAGE_MAX_LENGTH bytes
+    # event_body TYPE REASON MESSAGE TIME sets REPLY to the core/v1 Event of TYPE
     event_body() {
     	local type=$1 reason=$2 message at=$4 field value body= name=${EVENT_OBJECT_NAME:-}
     	truncate_bytes "$3" "${EVENT_MESSAGE_MAX_LENGTH}"
@@ -8862,10 +8776,7 @@ data:
     	REPLY=${body}
     }
     
-    # event TYPE REASON MESSAGE posts a Kubernetes Event on the object EVENT_OBJECT_* names - the ClickHouseBackup,
-    # ClickHouseRestore or ClickHouseBackupSchedule the run works for - with the token of the service account of the pod. It
-    # does nothing unless all of them, POD_NAMESPACE and the token are there, and an Event that cannot be posted never fails
-    # the run: after EVENT_MAX_FAILURES failures in a row, none is tried any more
+    # event TYPE REASON MESSAGE posts a Kubernetes Event on the object EVENT_OBJECT_* names
     event() {
     	local type=$1 reason=$2 message=$3 host=${KUBERNETES_SERVICE_HOST:-} at code token
     	if [[ -n ${EVENTS_DISABLED} || -z ${EVENT_OBJECT_KIND:-} || -z ${EVENT_OBJECT_NAME:-} || -z ${EVENT_OBJECT_UID:-} ||
@@ -8878,7 +8789,6 @@ data:
     	TZ=UTC0 printf -v at '%(%Y-%m-%dT%H:%M:%SZ)T' -1
     	event_body "${type}" "${reason}" "${message}" "${at}"
     	token=$(<"${SERVICE_ACCOUNT_DIR}/token") || token=
-    	# The token travels on stdin so it never shows up in the process list
     	code=$(printf 'Authorization: Bearer %s\n' "${token}" |
     		curl -sS -o /dev/null -w '%{http_code}' --noproxy '*' --cacert "${SERVICE_ACCOUNT_DIR}/ca.crt" \
     			--connect-timeout "${EVENT_TIMEOUT}" --max-time "${EVENT_TIMEOUT}" -X POST -H @- \
@@ -8896,9 +8806,7 @@ data:
     	fi
     }
     
-    # json_get FIELD JSON sets REPLY to the raw (still escaped) value of the first string field FIELD of a JSON object, or
-    # to that of its first number field FIELD, empty when it has neither. Setting REPLY instead of printing spares the caller
-    # a subshell, which matters for a backup list of hundreds of rows on every host
+    # json_get FIELD JSON sets REPLY to the raw, still escaped, value of the first string or number field FIELD
     json_get() {
     	local string='"'"$1"'":"(([^"\\]|\\.)*)"' number='"'"$1"'":([0-9]+)'
     	REPLY=
@@ -8913,7 +8821,7 @@ data:
     	printf '%s' "${REPLY}"
     }
     
-    # is_true VAR_NAME reports whether the boolean env var VAR_NAME is set to true; anything but true/false is fatal
+    # is_true VAR_NAME reports whether the boolean env var VAR_NAME is set to true
     is_true() {
     	local value=${!1:-}
     	case ${value,,} in
@@ -8925,7 +8833,6 @@ data:
     
     check_name() {
     	local value=${!1:-}
-    	# The sidecar silently strips ".." from names, so such a name would not round-trip
     	if [[ ! ${value} =~ ${NAME_RE} || ${value} == *..* ]]; then
     		die "$1 is not a valid backup name"
     	fi
@@ -8938,7 +8845,6 @@ data:
     	fi
     }
     
-    # listed VALUE ITEM... reports whether VALUE is one of ITEM
     listed() {
     	local value=$1 item
     	shift
@@ -8950,8 +8856,7 @@ data:
     	return 1
     }
     
-    # json_string VALUE sets REPLY to VALUE as a JSON string. Only validated tokens reach it: a quote, a backslash or a
-    # control character, which would take escaping, is fatal
+    # json_string VALUE sets REPLY to VALUE as a JSON string
     json_string() {
     	if [[ $1 == *[\"\\[:cntrl:]]* ]]; then
     		die "a command value holds a character that JSON escapes"
@@ -8959,8 +8864,7 @@ data:
     	REPLY="\"$1\""
     }
     
-    # parse_hosts VAR_NAME [optional] fills HOSTS from the space-separated host list in VAR_NAME,
-    # an empty list is fatal unless optional
+    # parse_hosts VAR_NAME [optional] fills HOSTS from the space-separated host list in VAR_NAME
     parse_hosts() {
     	local host
     	HOSTS=()
@@ -8975,9 +8879,6 @@ data:
     	done
     }
     
-    # request METHOD HOST PATH [CURL_ARGS...] performs one API call and sets HTTP_CODE, HTTP_BODY, CURL_EXIT,
-    # CURL_CONNECTED, empty when the connection was never established, and REQUEST_URL to the URL curl requested, the query
-    # string of -G as it encoded it, without the scheme. The credentials are in a header, never in the URL
     request() {
     	local method=$1 host=$2 path=$3 out last connect code url
     	shift 3
@@ -8985,11 +8886,9 @@ data:
     	CURL_EXIT=0
     	CURL_CONNECTED=1
     	REQUEST_URL="${host}:${API_PORT}${path}"
-    	# The credentials travel on stdin so they never show up in the process list
     	out=$(printf 'Authorization: Basic %s\n' "${AUTH}" |
     		curl -sS -X "${method}" -H @- --connect-timeout 10 --max-time "${REQUEST_TIMEOUT}" \
     			-w '\n%{time_connect} %{http_code} %{url_effective}' "$@" "http://${host}:${API_PORT}${path}" 2>&1) || CURL_EXIT=$?
-    	# What -w writes is always the last line, also when curl fails
     	HTTP_BODY=${out%$'\n'*}
     	last=${out##*$'\n'}
     	read -r connect code url <<<"${last}"
@@ -9003,9 +8902,7 @@ data:
     	fi
     }
     
-    # unreachable METHOD reports whether the last request failed in a way that is safe to retry.
-    # A POST qualifies only when the connection was never established, so it cannot be submitted twice:
-    # a proxy in front of the sidecar may answer 502-504 to a request the sidecar received.
+    # unreachable METHOD reports whether the last request failed in a way that is safe to retry
     unreachable() {
     	case ${CURL_EXIT} in
     	0) [[ $1 == GET ]] && proxy_failed ;;
@@ -9014,14 +8911,11 @@ data:
     	esac
     }
     
-    # proxy_failed reports whether the last request was answered by a proxy in front of the sidecar that failed to pass
-    # it on, or failed waiting for the answer
     proxy_failed() {
     	[[ ${HTTP_CODE} == 50[234] ]]
     }
     
     # call METHOD HOST PATH [CURL_ARGS...] performs an API call, retrying while the sidecar is unreachable
-    # unless BEST_EFFORT is set
     call() {
     	local method=$1 host=$2 last= since=${SECONDS}
     	while :; do
@@ -9029,9 +8923,6 @@ data:
     		if [[ -n ${BEST_EFFORT:-} ]] || ! unreachable "${method}"; then
     			return 0
     		fi
-    		# Giving up is clean only while nothing has changed; afterwards a restarting sidecar is waited for
-    		# longer rather than leaving a partial backup or restore behind, but not for a host that is gone
-    		# for good, scaled away or stopped, which would hold every other operation until the Job deadline
     		if [[ -z ${MUTATED} ]] && ((SECONDS - since >= UNREACHABLE_TIMEOUT)); then
     			die "${host}: sidecar unreachable for $((SECONDS - since))s (curl exit ${CURL_EXIT}, HTTP ${HTTP_CODE}), nothing was changed"
     		fi
@@ -9053,7 +8944,6 @@ data:
     	printf '%s' "${err:-${HTTP_BODY}}"
     }
     
-    # wait_idle HOST waits until the sidecar runs no operation, so that a concurrent operation queues the next one
     wait_idle() {
     	local host=$1 announced=
     	while :; do
@@ -9073,18 +8963,12 @@ data:
     	done
     }
     
-    # changed records that a sidecar may have accepted a request that changes something, unless READ_ONLY tells that the
-    # requests of the caller change nothing the Job is asked to change
     changed() {
     	if [[ -z ${READ_ONLY:-} ]]; then
     		MUTATED=1
     	fi
     }
     
-    # command_event HOST WHAT NOTE [CURL_ARGS...] posts the Event OrchestratorCommand of the request the last call POSTed to
-    # HOST for WHAT: its method, and its host, port, path and query string as curl sent them, with the body of a command of
-    # the actions endpoint, and NOTE when it may have been accepted without an answer telling so. The credentials travel in
-    # a header, which no Event shows
     command_event() {
     	local host=$1 what=$2 note=$3 message body=
     	shift 3
@@ -9100,8 +8984,6 @@ data:
     	event Normal OrchestratorCommand "${message}"
     }
     
-    # finished_event HOST WHAT ID STATUS posts the Event OrchestratorCommandFinished of the operation ID that has just ended
-    # with STATUS on HOST, with the command the sidecar tells it ran, which HTTP_BODY, its status, holds
     finished_event() {
     	local command
     	json_get command "${HTTP_BODY}"
@@ -9110,9 +8992,6 @@ data:
     	event Normal OrchestratorCommandFinished "$1: $2 (operation $3) ended with status ${4:-unknown}${command:+: ${command}}"
     }
     
-    # submit HOST WHAT PATH [CURL_ARGS...] POSTs a request once the sidecar is idle, queueing while it is busy: HTTP 423, or
-    # the error the actions endpoint answers a locked sidecar's request with. Neither is accepted, so resubmitting is safe.
-    # A request the sidecar may have accepted shows in an Event, as command_event tells it
     submit() {
     	local host=$1 what=$2
     	shift 2
@@ -9122,7 +9001,6 @@ data:
     		fi
     		call POST "${host}" "$@"
     		if ((CURL_EXIT != 0)); then
-    			# A request that reached the sidecar may have been accepted, only one never sent was not
     			if ! unreachable POST; then
     				changed
     				command_event "${host}" "${what}" "sent, no answer: curl exit ${CURL_EXIT}" "$@"
@@ -9131,7 +9009,6 @@ data:
     			return 1
     		fi
     		if proxy_failed; then
-    			# The proxy may have passed the request on
     			changed
     			command_event "${host}" "${what}" "sent, a proxy answered HTTP ${HTTP_CODE}" "$@"
     			warn "${host}: ${what} failed (HTTP ${HTTP_CODE}): $(error_of)"
@@ -9156,18 +9033,14 @@ data:
     	done
     }
     
-    # remember_step HOST [OPERATION_ID [START COMMAND]] records the last step that succeeded on HOST: the operation id of a
-    # typed request, or with OPERATION_ID empty the start time and command of the row of an action, which has no operation
-    # id. HOST alone records no step, as after a restart that took every step along
+    # remember_step HOST [OPERATION_ID [START COMMAND]] records the last step that succeeded on HOST
     remember_step() {
     	LAST_OP[$1]=${2:-}
     	LAST_ACTION_START[$1]=${3:-}
     	LAST_ACTION_COMMAND[$1]=${4:-}
     }
     
-    # sidecar_kept HOST reports whether the sidecar of HOST still knows the last step this Job ran on it. One that has
-    # restarted since knows none, and may run with another environment - another storage path above all - which
-    # the steps still to come must not run with: the restore is left partially applied rather than continued
+    # sidecar_kept HOST reports whether the sidecar of HOST still knows the last step this Job ran on it
     sidecar_kept() {
     	local host=$1 i
     	if [[ -n ${LAST_OP[${host}]:-} ]]; then
@@ -9199,8 +9072,6 @@ data:
     	return 1
     }
     
-    # action_rows HOST COMMAND fills ACTION_STARTS, ACTION_STATUSES and ACTION_ERRORS from the rows of the actions log of
-    # HOST that ran COMMAND, oldest first
     action_rows() {
     	local host=$1 command=$2 line
     	ACTION_STARTS=()
@@ -9225,10 +9096,6 @@ data:
     	done <<<"${HTTP_BODY}"
     }
     
-    # run_action HOST WHAT NAME COMMAND runs COMMAND, a fixed template every value of which is a validated single token,
-    # through the actions endpoint, and polls it until it succeeds or fails. The answer names no operation: the action is
-    # the row of COMMAND in the actions log that runs, or that started at a time no such row had before. The sidecar keeps
-    # the rows of finished actions, and a restart drops them all. An action run with NO_STEP is no step of the Job
     run_action() {
     	if run_action_steps "$@"; then
     		return 0
@@ -9255,8 +9122,6 @@ data:
     	done
     }
     
-    # action_start HOST WHAT NAME COMMAND submits COMMAND to the actions endpoint of HOST, recording in ACTION_COMMAND and
-    # ACTION_BEFORE what action_poll tells its row by: the command, and the start times of the rows of it before
     action_start() {
     	local host=$1 what=$2 name=$3 command=$4 body
     	log "${host}: ${what} ${name}"
@@ -9279,8 +9144,7 @@ data:
     	fi
     }
     
-    # action_poll HOST WHAT NAME reads once the row of the action action_start submitted to HOST: it returns 0 once the
-    # action succeeded, 2 while it runs and 1 when it failed, with a warning that tells why
+    # action_poll HOST WHAT NAME reads once the row of the action action_start submitted to HOST
     action_poll() {
     	local host=$1 what=$2 name=$3 command=${ACTION_COMMAND[$1]} i start= status= error=
     	if ! action_rows "${host}" "${command}"; then
@@ -9307,8 +9171,6 @@ data:
     			warn "${host}: the sidecar restarted during ${what} ${name}"
     			return 1
     		fi
-    		# The upload of a create_remote the sidecar resumes by itself, as for a typed request, but without the --env
-    		# flags of the command, which it does not keep
     		if [[ ${what} == create_remote ]]; then
     			if ! lost_op "${host}" "${what}" "${name}"; then
     				return 1
@@ -9330,7 +9192,6 @@ data:
     }
     
     # run_op HOST WHAT NAME PATH [CURL_ARGS...] starts an asynchronous sidecar operation on backup NAME
-    # and polls it until it succeeds or fails
     run_op() {
     	if run_op_steps "$@"; then
     		return 0
@@ -9355,8 +9216,6 @@ data:
     	done
     }
     
-    # op_start HOST WHAT NAME PATH [CURL_ARGS...] submits an asynchronous sidecar operation on backup NAME to HOST, recording
-    # its operation id in OP_ID
     op_start() {
     	local host=$1 what=$2 name=$3 id
     	shift 3
@@ -9379,8 +9238,7 @@ data:
     	OP_ID[${host}]=${id}
     }
     
-    # op_poll HOST WHAT NAME reads once the status of the operation op_start submitted to HOST: it returns 0 once the
-    # operation succeeded, 2 while it runs and 1 when it failed, with a warning that tells why
+    # op_poll HOST WHAT NAME reads once the status of the operation op_start submitted to HOST
     op_poll() {
     	local host=$1 what=$2 name=$3 id=${OP_ID[$1]} status
     	call GET "${host}" /backup/status -G --data-urlencode "operationid=${id}"
@@ -9404,7 +9262,6 @@ data:
     		if ! lost_op "${host}" "${what}" "${name}"; then
     			return 1
     		fi
-    		# The restart that lost the operation took every step before it along
     		remember_step "${host}"
     		return 0
     		;;
@@ -9415,15 +9272,6 @@ data:
     	esac
     }
     
-    # run_all KIND HOSTS CHECK WHAT NAME ARGS... runs a step on every host of the space-separated HOSTS at once: an
-    # operation, KIND op, as run_op runs it with the arguments ARGS, or an action, KIND action, as run_action runs the
-    # command ARGS. It submits the step to one host after the other, each once the function CHECK, unless empty, has
-    # passed for it - CHECK may set STEP_ARGS, which hold ARGS until then, to the arguments of the host, and STEP_NAME, which
-    # holds NAME until then, to the name of the backup there -, then polls every host it was submitted to until it runs on
-    # none. A host whose CHECK or submission fails
-    # gets the step submitted to no other host after it, and those it was submitted to are waited for all the same.
-    # FAILED_HOSTS and FAILURES list the hosts that failed and the warning of each, STEP_FAILED_HOSTS those of them the step
-    # itself failed on, whose CHECK passed; it returns 1 when any did
     run_all() {
     	local kind=$1 check=$3 what=$4 name=$5 host rc
     	local -a hosts pending=() running
@@ -9470,8 +9318,6 @@ data:
     	((${#FAILED_HOSTS[@]} == 0))
     }
     
-    # step_failed KIND HOST WHAT NAME records in FAILED_HOSTS and FAILURES that the step WHAT of run_all failed on HOST, as
-    # LAST_WARNING tells, with the Event run_op or run_action posts
     step_failed() {
     	FAILED_HOSTS+=("$2")
     	FAILURES+=("${LAST_WARNING:-$2: $3 $4 failed}")
@@ -9480,7 +9326,6 @@ data:
     	fi
     }
     
-    # fail_all MESSAGE dies after run_all failed, adding to MESSAGE the hosts that failed and the warning of each
     fail_all() {
     	local hosts failure
     	join_items "${FAILED_HOSTS[@]}"
@@ -9495,8 +9340,7 @@ data:
     	die "$1 failed on ${hosts}: ${REPLY}"
     }
     
-    # resumed_action HOST COMMAND NAME sets RESUMED_STATUS and RESUMED_ERROR from the last COMMAND (upload or download)
-    # of backup NAME that the sidecar resumed after a restart, RESUMED_STATUS empty when there is none
+    # resumed_action HOST COMMAND NAME sets RESUMED_STATUS and RESUMED_ERROR from the last COMMAND
     resumed_action() {
     	local host=$1 command=$2 name=$3 line
     	RESUMED_STATUS=
@@ -9507,7 +9351,6 @@ data:
     		return 1
     	fi
     	while IFS= read -r line; do
-    		# A resumed action has no operation id and runs "<command> [options] --resumable=1 <name>"
     		if [[ $(json_field command "${line}") == "${command} "*"--resumable=1 ${name}" ]]; then
     			RESUMED_STATUS=$(json_field status "${line}")
     			RESUMED_ERROR=$(json_field error "${line}")
@@ -9515,11 +9358,7 @@ data:
     	done <<<"${HTTP_BODY}"
     }
     
-    # lost_op HOST WHAT NAME settles an operation that a restarted sidecar no longer knows. The sidecar resumes an
-    # interrupted upload or download by itself, as an action of its own, which is waited for instead; a backup that is
-    # complete where the operation puts it completed before the restart. Anything else leaves the outcome unknown.
-    # Listing backups counts as an action of the sidecar, and a sidecar that finds an action in progress resumes
-    # nothing, so the backups are listed only once the wait for a resumed action is over.
+    # lost_op HOST WHAT NAME settles an operation that a restarted sidecar no longer knows
     lost_op() {
     	local host=$1 what=$2 name=$3 resumed where outcome since=${SECONDS}
     	case ${what} in
@@ -9537,7 +9376,6 @@ data:
     		fi
     		case ${RESUMED_STATUS} in
     		"in progress")
-    			# A sidecar that restarts again resumes again: the wait starts over
     			since=${SECONDS}
     			;;
     		success)
@@ -9563,8 +9401,6 @@ data:
     	done
     }
     
-    # list_backups HOST local|remote fills LIST_NAMES, LIST_REQUIRED, LIST_DESC and the LIST_*_SIZE arrays from the sidecar
-    # backup list
     list_backups() {
     	local host=$1 where=$2 line
     	LIST_NAMES=()
@@ -9616,7 +9452,7 @@ data:
     	list_backups "$1" "$2" && find_backup "$3" && [[ ${LIST_DESC[FOUND]} != broken* ]]
     }
     
-    # delete_local HOST NAME drops the local copy of NAME; force, because other local copies may be based on it
+    # delete_local HOST NAME drops the local copy of NAME
     delete_local() {
     	if ! submit "$1" "delete local $2" "/backup/delete/local/$2" -G --data-urlencode "force=true"; then
     		return 1
@@ -9624,23 +9460,10 @@ data:
     	log "$1: local copy of $2 deleted"
     }
     
-    # holds_data INDEX reports whether backup INDEX of the last list holds data, locally or on an object disk. Every
-    # backup of a sidecar older than 2.6.6, which lists no sizes, counts: metadata_size tells it apart, as the one size
-    # always listed, while the others are left out when zero
     holds_data() {
-    	# Sizes are compared as text: a size of 2^63 or more would wrap negative in bash arithmetic
     	[[ -z ${LIST_METADATA_SIZE[$1]} ]] || [[ ${LIST_DATA_SIZE[$1]:-0} != 0 ]] || [[ ${LIST_OBJECT_DISK_SIZE[$1]:-0} != 0 ]]
     }
     
-    # list_all FILTER HOST... lists the backups of every HOST and fills the sets COMPLETE, with the keys of the backups
-    # every HOST lists complete, the function FILTER HOST NAME setting REPLY to the key of a backup NAME on HOST, or
-    # returning 1 for a backup left out - one name on every host, or the names of the shards of one backup with a naming
-    # template -, WITH_DATA, with those of the backups that hold data on any HOST,
-    # EMPTY, with those of the backups a HOST lists complete with a size of 0, nothing at all, SIZED, with those of the
-    # backups any HOST lists, broken or not, with a size above 0 of anything, BROKEN, with those any HOST lists broken, and
-    # ALL_NAMES, with those of every backup any
-    # HOST lists, broken ones too, and UNLISTED with the hosts that cannot be listed. A run that failed on one host leaves copies on the others that cannot be restored on their own, and the copies
-    # of one backup on a host whose tables hold no data are as much part of it as those that do
     list_all() {
     	local filter=$1 host first=1 i name key
     	local -A listed both
@@ -9662,7 +9485,6 @@ data:
     			fi
     			key=${REPLY}
     			ALL_NAMES[${key}]=1
-    			# Sizes are compared as text, as holds_data does; a sidecar older than 2.6.6 lists none
     			if [[ -n ${LIST_METADATA_SIZE[i]} ]] && [[ ${LIST_DATA_SIZE[i]:-0} != 0 || ${LIST_OBJECT_DISK_SIZE[i]:-0} != 0 ||
     				${LIST_METADATA_SIZE[i]} != 0 || ${LIST_RBAC_SIZE[i]:-0} != 0 ]]; then
     				SIZED[${key}]=1
@@ -9675,7 +9497,6 @@ data:
     			if holds_data "${i}"; then
     				WITH_DATA[${key}]=1
     			fi
-    			# A sidecar older than 2.6.6 lists no sizes, which leaves the size unknown rather than 0
     			if [[ -n ${LIST_METADATA_SIZE[i]} && ${LIST_DATA_SIZE[i]:-0} == 0 && ${LIST_OBJECT_DISK_SIZE[i]:-0} == 0 &&
     				${LIST_METADATA_SIZE[i]} == 0 && ${LIST_RBAC_SIZE[i]:-0} == 0 ]]; then
     				EMPTY[${key}]=1
@@ -9695,34 +9516,10 @@ data:
     	done
     }
     
-    # retention_pattern sets REPLY to the regex of the names of the series of the schedule without a naming template, which
-    # retention prunes and an incremental backup of the schedule is made from: those of the scheduled backups, and those of
-    # the backups made at once from the schedule, "<prefix>-<YYYYMMDD>T<HHMMSS>", as the Altinity Cloud Manager makes a
-    # backup from any backup of the cluster
     retention_pattern() {
     	REPLY="^${BACKUP_NAME_PREFIX//./[.]}-[0-9]{8}T?[0-9]{6}$"
     }
     
-    # retention_plan decides, as the cleanup of remote backups of the Altinity Cloud Manager does, which backups of the
-    # schedule retention keeps, KEEP, and which it deletes, OBSOLETE, newest first, of NAMES, the keys of the backups of
-    # the series any retention host lists, as series_key tells them and list_all classified them:
-    #  - a backup not every host lists complete - failed, or in progress - never counts: it is deleted, on every host that
-    #    holds it, once it is older than the newest backup every host lists complete, if a host lists a size above 0 of it,
-    #    as the Altinity Cloud Manager deletes none of size 0, or lists it broken - an upload that failed, whatever its
-    #    size; one newer is left, as it may be in progress;
-    #  - a backup a host lists complete of size 0, empty, is neither counted nor deleted, nor is one whose name tells no
-    #    valid time;
-    #  - the newest backup is always kept, as the base of the next incremental one, and so is the one just made;
-    #  - every entry of the schedule keeps the newest keep backups of its slots: a backup may be kept by several, the
-    #    weekly one counts for the daily entry too;
-    #  - a backup made at once from the schedule, "<prefix>-<YYYYMMDD>T<HHMMSS>", is kept while it is no older than the
-    #    oldest scheduled backup an entry keeps;
-    #  - a backup KEEP_BACKUPS pins is kept;
-    #  - a backup the schedule kept before a change of it that is not released, PREVIOUS_SCHEDULES, is held: never
-    #    deleted, and listed in HELD_OBSOLETE when nothing else keeps it, as the schedule as it is would delete it;
-    #  - anything else is obsolete. Incremental chains are not protected: deleted newest first, a dependent goes before its
-    #    base, and clickhouse-backup rebases the dependents of a base it deletes (rebase_during_delete), so the kept
-    #    incremental backups stay restorable
     retention_plan() {
     	local name tag key newest= made=${BACKUP_KEY:-${BACKUP_NAME:-}}
     	local -a ordered=() incomplete=() obsolete=() held=()
@@ -9751,7 +9548,6 @@ data:
     	for name in "${!RULES_KEEP[@]}"; do
     		KEEP[${name}]=1
     	done
-    	# The backup just made, unless incomplete
     	for tag in ${ordered[@]+"${ordered[@]}"}; do
     		if [[ ${tag#* } == "${made}" ]]; then
     			KEEP[${made}]=1
@@ -9778,7 +9574,6 @@ data:
     			obsolete+=("${tag}")
     		fi
     	done
-    	# Newest first, the incomplete backups among the others
     	if ((${#obsolete[@]} > 0)); then
     		mapfile -t obsolete < <(printf '%s\n' "${obsolete[@]}" | sort -r)
     		for tag in "${obsolete[@]}"; do
@@ -9787,9 +9582,6 @@ data:
     	fi
     }
     
-    # rules_keep "<time> <key>"... sets RULES_KEEP to the keys of the backups, given newest first, that the entries of the
-    # schedule the SCHED_* arrays hold keep: the newest backup, the newest keep backups of the slots of every entry, a
-    # backup kept by several, and the backups made at once no older than the oldest of those
     rules_keep() {
     	local tag key name i oldest= first=1
     	local -a manual=() counts=()
@@ -9814,7 +9606,6 @@ data:
     				counts[i]=$((counts[i] + 1))
     				if ((counts[i] <= SCHED_KEEP[i])); then
     					RULES_KEEP[${name}]=1
-    					# The backups come newest first
     					oldest=${key}
     				fi
     			fi
@@ -9828,8 +9619,7 @@ data:
     	done
     }
     
-    # pinned_keys sets PINNED to the keys of the backups KEEP_BACKUPS pins, which retention never deletes: names, or with a
-    # naming template the name of the backup of any shard, or the time alone
+    # pinned_keys sets PINNED to the keys of the backups KEEP_BACKUPS pins, which retention never deletes
     pinned_keys() {
     	local value prefix=
     	declare -gA PINNED=()
@@ -9848,9 +9638,6 @@ data:
     	done
     }
     
-    # held_keys "<time> <key>"... sets HELD_KEYS to the keys of the backups, given newest first, that retention holds for a change
-    # of the schedule, PREVIOUS_SCHEDULES: of those made before each change, every one the entries and the time zone before
-    # the change kept, or every one for a change that holds them all. The SCHED_* arrays are left as they were
     held_keys() {
     	local record change entries name
     	local -a records subset period=("${SCHED_PERIOD[@]}") hour=("${SCHED_HOUR[@]}") minute=("${SCHED_MINUTE[@]}")
@@ -9868,7 +9655,6 @@ data:
     			die "PREVIOUS_SCHEDULES must list <epoch>|<time zone>|<entries> records separated by #"
     		fi
     		entries=${BASH_REMATCH[3]}
-    		# The times the backups are named after are wall times in the zone of the schedule before the change
     		local SCHEDULE_TIMEZONE=${BASH_REMATCH[2]} SCHEDULES=${entries}
     		check_timezone
     		slot_tag "${BASH_REMATCH[1]}"
@@ -9896,8 +9682,7 @@ data:
     	SCHED_ENV=(${env[@]+"${env[@]}"})
     }
     
-    # retention_on_host HOST deletes on HOST the backups of OBSOLETE it lists, newest first: with a naming template, the
-    # names of the backups of its own shard alone, which are the only ones it lists at a storage path of its own
+    # retention_on_host HOST deletes on HOST the backups of OBSOLETE it lists, newest first
     retention_on_host() {
     	local host=$1 name key
     	local -A held=()
@@ -9924,9 +9709,6 @@ data:
     	done
     }
     
-    # retention prunes the backups of the schedule after a successful scheduled backup, as retention_plan decides, on every
-    # host of RETENTION_HOSTS: one per shard. Nothing is deleted while a restore of the cluster runs, which may read them.
-    # A failure only warns
     retention() {
     	local host
     	if ((${#SCHED_PERIOD[@]} == 0)); then
@@ -9946,10 +9728,8 @@ data:
     		return 0
     	fi
     	log "retention: keeping the newest ${BACKUP_NAME_PREFIX}-* backup, the newest backups of the slots of every schedule entry it keeps, and the backups made at once no older than the oldest of those"
-    	# An unreachable host skips retention until the next run instead of holding the Job until its deadline
     	BEST_EFFORT=1
     	list_all series_key "${HOSTS[@]}"
-    	# Every host keeps and deletes the same backups, which takes knowing what each of them holds
     	if ((${#UNLISTED[@]} > 0)); then
     		warn "retention skipped: ${UNLISTED[*]} cannot be listed, backups are left as they are"
     		event Warning OrchestratorRetentionSkipped "${LAST_WARNING}"
@@ -9967,16 +9747,11 @@ data:
     	done
     }
     
-    # this_backup HOST NAME sets REPLY to BACKUP_KEY when NAME is the name of the backup the Job works on on HOST
     this_backup() {
     	REPLY=${BACKUP_KEY}
     	[[ $2 == "${HOST_BACKUP[$1]:-}" ]]
     }
     
-    # report_held tells the backups retention holds for a change of the schedule that the schedule as it is would delete,
-    # HELD_OBSOLETE, by the names of the backups of their first shard: in a warning, an Event, and the line of the
-    # termination message HELD_BACKUPS_MESSAGE starts, which the operator records in the status of the schedule, at most
-    # HELD_REPORT_MAX of them and "+N" for the others
     report_held() {
     	local key
     	local -a names=()
@@ -10001,13 +9776,7 @@ data:
     	fi
     }
     
-    # report_data HOST... tells when the backup just made holds no data, of tables that match nothing or an installation
-    # recreated empty: it then writes NO_DATA_MESSAGE to the termination message, which the operator reports on the
-    # backup's resource after the Job and its log are gone. The backup holds data when any HOST's copy of it does; a HOST
-    # that cannot be listed leaves that unknown, and so does a sidecar older than 2.6.6, which lists no sizes, so nothing
-    # is told then
     report_data() {
-    	# The backup is made: a host that does not answer is asked once rather than waited for
     	local BEST_EFFORT=1
     	list_all this_backup "$@"
     	if ((${#UNLISTED[@]} > 0)); then
@@ -10024,8 +9793,6 @@ data:
     	fi
     }
     
-    # storage_prefix TYPE sets REPLY to the settings prefix of the storage type TYPE, as REMOTE_STORAGE names it, empty
-    # for one whose paths the storage path check does not know
     storage_prefix() {
     	case $1 in
     	s3) REPLY=S3 ;;
@@ -10038,16 +9805,12 @@ data:
     	esac
     }
     
-    # path_setting INDEX NAME sets REPLY to the path check setting NAME of the cluster at INDEX, and SETTING_SET when the
-    # Job environment sets it: kubelet leaves out an optional Secret key the Secret lacks, and sets one empty that is so
     path_setting() {
     	local name="PATH_$1_$2"
     	REPLY=${!name-}
     	SETTING_SET=${!name+1}
     }
     
-    # identity_default KEY sets REPLY to the value clickhouse-backup takes for the setting KEY of the storage path check when
-    # its environment leaves the setting unset: its default, empty for one that has none, as for a setting set empty
     identity_default() {
     	case $1 in
     	AZBLOB_ENDPOINT_SUFFIX) REPLY=core.windows.net ;;
@@ -10056,8 +9819,7 @@ data:
     	esac
     }
     
-    # trim_path STORAGE PATH sets REPLY to PATH as clickhouse-backup trims it: of blanks and slashes at both ends, or for ftp
-    # and sftp, whose paths may be absolute, of blanks at both ends and then of slashes at the end
+    # trim_path STORAGE PATH sets REPLY to PATH as clickhouse-backup trims it
     trim_path() {
     	local value=$2 both=$' \t\r\n/' trailing=
     	if [[ $1 == ftp || $1 == sftp ]]; then
@@ -10076,9 +9838,6 @@ data:
     	REPLY=${value}
     }
     
-    # clean_path PATH sets REPLY to the location PATH names as clickhouse-backup joins it with every key it keeps there, as
-    # path.Join cleans it: without empty and "." elements, each ".." taking the element before it along, and empty for the
-    # place a relative path starts from
     clean_path() {
     	local rest=$1 element rooted= IFS=/
     	local -a elements=()
@@ -10107,10 +9866,6 @@ data:
     	REPLY=${rooted}${elements[*]}
     }
     
-    # expand_macros TEMPLATE CLUSTER SHARD sets REPLY to TEMPLATE with the macros clickhouse-backup replaces from those the
-    # operator gives every host - {installation}, {namespace}, {cluster}, {shard} - replaced, and {replica} kept, as it
-    # differs on every host. Any other macro, which the check cannot know the value of, fails, leaving its name in
-    # UNKNOWN_MACRO
     expand_macros() {
     	local rest=$1 out= macro name
     	while [[ ${rest} =~ \{([^{}]*)\} ]]; do
@@ -10133,9 +9888,7 @@ data:
     	REPLY=${out}${rest}
     }
     
-    # default_path INDEX NAME sets REPLY to the default path NAME - DEFAULT_PATH or DEFAULT_OBJECT_DISK_PATH - that the
-    # sidecar of the cluster at INDEX sets when its settings leave the path unset: the cluster's own when the Job environment
-    # sets one, else that of every cluster, empty when there is none and an unset path is the root of the storage
+    # default_path INDEX NAME sets REPLY to the default path NAME
     default_path() {
     	local own="PATH_$1_$2"
     	if [[ -n ${!own+set} ]]; then
@@ -10145,11 +9898,6 @@ data:
     	fi
     }
     
-    # path_check_inconclusive COUNT NAME WHAT handles a target cluster whose storage paths the check cannot tell, for the
-    # reason WHAT, in an installation of COUNT backup-enabled clusters. Alone, it skips the check with a warning; beside
-    # other clusters it fails the Job before anything changes. Two clusters at one path would both make the backup of one
-    # run there, as the Jobs of one backup run at the same time under one name, which then lists as one backup of either;
-    # and a restore of one of them would restore what the other made there
     path_check_inconclusive() {
     	SELF_PATHS_UNKNOWN=$3
     	if (($1 > 1)); then
@@ -10158,16 +9906,7 @@ data:
     	advise "the storage path check is skipped: $3"
     }
     
-    # check_storage_paths refuses, before anything changes, a storage path the target cluster shares. Every shard of
-    # every backup-enabled cluster of the installation keeps its backups, and the object disk data of them, at a path of its
-    # own in its storage: two shards that share one find each other's backups as their own, restore the wrong data
-    # and prune it - but the shards of the target cluster with a naming template, which names the backup of each shard
-    # apart, may share one. A backup of the first replica of each shard has to be at a path without {replica}, as every
-    # replica of the shard restores its schema from its own path; one of every replica needs {replica}, which gives each a
-    # path of its own. Another cluster whose storage or path macros the check does not know - a configuration file of its
-    # sidecar other than the one the operator generates, say - is left out of it with a warning: only a path proven shared
-    # is refused.
-    # The target cluster's own unknown paths fail the Job, unless it is the only backup-enabled cluster.
+    # check_storage_paths refuses, before anything changes, a storage path the target cluster shares
     check_storage_paths() {
     	local index storage prefix identity key template object shard name what value self=${PATH_SELF:-} self_name= shared=
     	local selection=${PATH_REPLICA_SELECTION:-}
@@ -10194,14 +9933,12 @@ data:
     	"" | FirstPerShard | AllReplicas) ;;
     	*) die "PATH_REPLICA_SELECTION must be FirstPerShard or AllReplicas" ;;
     	esac
-    	# The target cluster goes first, so that a path shared with it is found whichever cluster comes later
     	for index in "${self}" "${others[@]}"; do
     		path_setting "${index}" CLUSTER
     		name=${REPLY}
     		if [[ ${index} == "${self}" ]]; then
     			self_name=${name}
     		fi
-    		# The operator tells when the settings it gives do not have to be those of the sidecar
     		path_setting "${index}" UNVERIFIABLE
     		what=${REPLY//[[:cntrl:]]/ }
     		if [[ -n ${what} ]]; then
@@ -10230,7 +9967,6 @@ data:
     			advise "cluster ${name} is left out of the storage path check: ${what}"
     			continue
     		fi
-    		# What tells one storage of its type from another, as clickhouse-backup takes it: an unset setting has its default
     		identity=${storage}
     		for key in "${PATH_CHECK_KEYS[@]}"; do
     			if [[ ${key} == "${prefix}_"* && ${key} != "${prefix}_PATH" && ${key} != "${prefix}_OBJECT_DISK_PATH" ]]; then
@@ -10242,7 +9978,6 @@ data:
     				identity+=${value}
     			fi
     		done
-    		# A path, unlike them, takes the default of the sidecar only when unset: set empty, it is the root of the storage
     		path_setting "${index}" "${prefix}_PATH"
     		if [[ -z ${SETTING_SET} ]]; then
     			default_path "${index}" DEFAULT_PATH
@@ -10256,7 +9991,6 @@ data:
     		fi
     		trim_path "${storage}" "${REPLY}"
     		object=${REPLY}
-    		# An object disk path that trims to nothing is none, unlike one that names the root of the storage
     		if [[ -n ${object} ]]; then
     			clean_path "${object}"
     			object=${REPLY:-.}
@@ -10283,7 +10017,6 @@ data:
     				continue 2
     			fi
     		done
-    		# Every path of the target cluster is known now, which a restore from another installation's paths builds on
     		if [[ ${index} == "${self}" ]]; then
     			SELF_OBJECT_DISK_PATH=${object}
     			SELF_STORAGE_PREFIX=${prefix}
@@ -10297,7 +10030,6 @@ data:
     				if [[ ${what} != "storage path" ]]; then
     					value=${object}
     				fi
-    				# A path with {replica} is a path of its own on every host; an object disk path that is unset is none
     				if [[ ${value} == *"{replica}"* ]] || [[ ${what} != "storage path" && -z ${value} ]]; then
     					continue
     				fi
@@ -10305,14 +10037,11 @@ data:
     				clean_path "${REPLY}"
     				printf -v key '%s %q %q' "${identity}" "${what}" "${REPLY}"
     				if [[ -n ${owners[${key}]:-} ]]; then
-    					# The naming template of the target cluster names the backup of each of its shards apart, which may
-    					# then share a path, as the Altinity Cloud Manager keeps them
     					if [[ ${index} == "${self}" && ${#NAMING_PARTS[@]} -gt 0 ]]; then
     						shared=1
     						continue
     					fi
     					if [[ -n ${self_owned[${key}]:-} ]]; then
-    						# The root of the storage, which clean_path makes empty, reads as path.Clean writes it
     						die "the ${what} '${REPLY:-.}' of shard ${shard} of cluster ${name} is that of ${owners[${key}]} too, in the same ${storage} storage: every shard of every cluster needs a path of its own, as {cluster} and {shard} give it"
     					fi
     					continue
@@ -10331,8 +10060,6 @@ data:
     	log "storage path check: every shard of cluster ${self_name} has a path of its own"
     }
     
-    # days_from_civil YEAR MONTH DAY sets REPLY to the number of days from 1970-01-01 to the date of the proleptic
-    # Gregorian calendar
     days_from_civil() {
     	local y=$1 m=$2 d=$3 era yoe doy doe
     	y=$((y - (m <= 2 ? 1 : 0)))
@@ -10355,7 +10082,6 @@ data:
     # weekday YEAR MONTH DAY sets REPLY to the day of the week of the date, 0 for Sunday
     weekday() {
     	days_from_civil "$1" "$2" "$3"
-    	# 1970-01-01 was a Thursday
     	REPLY=$((((REPLY % 7) + 11) % 7))
     }
     
@@ -10373,11 +10099,6 @@ data:
     	((d >= 1 && d <= REPLY && 10#${tag:8:2} < 24 && 10#${tag:10:2} < 60 && 10#${tag:12:2} < 60))
     }
     
-    # naming_init reads the naming template of the backups of the cluster, BACKUP_NAMING, into NAMING_PARTS, and the
-    # number of the shard of every host, SHARD_NUMBERS, into SHARD_OF: a template names the backup of each shard, one name
-    # per shard, which differ by {shard} alone, see type_backup_naming.go. Without a template a backup has one name on
-    # every host. A template also gives the slots of the schedule a tolerance, SLOT_TOLERANCE, as the Altinity Cloud
-    # Manager names a scheduled backup after the time its run started, up to 30 minutes after its slot
     naming_init() {
     	local rest=${BACKUP_NAMING:-} macro name tokens token pair
     	local -A seen=()
@@ -10443,8 +10164,6 @@ data:
     	unset NAMING_CACHED
     }
     
-    # naming_value PLACEHOLDER sets REPLY to the value of {cluster}, {chi} or {namespace} in the names of the backups of the
-    # cluster: those of the installation that made them, the one a restore names when it restores the backup of another
     naming_value() {
     	case $1 in
     	cluster) REPLY=${CLUSTER:-} ;;
@@ -10453,9 +10172,6 @@ data:
     	esac
     }
     
-    # naming_regex PREFIX sets REPLY to the regex of the names the naming template makes on the cluster, with PREFIX for
-    # {prefix}, or any prefix for an empty PREFIX, and NAMING_GROUP to the groups of the regex: that of {shard}, of
-    # {prefix}, of the T before the hour and of each token of the time
     naming_regex() {
     	local part group=0 regex='^'
     	declare -gA NAMING_GROUP=()
@@ -10499,17 +10215,11 @@ data:
     			;;
     		esac
     	done
-    	# Every literal and value is of letters, digits and . _ -, of which the dot alone means something in a regex, and is
-    	# escaped above
     	REPLY=${regex}'$'
     }
     
-    # naming_parse NAME [PREFIX] reports whether the naming template makes NAME on the cluster, with PREFIX for {prefix},
-    # any prefix when empty, setting N_SHARD to its shard, N_PREFIX to its prefix and N_KEY to its key: the time it is
-    # named after, YYYYMMDDHHMMSS, with a T before the hour for a backup made at once, which has to be a valid time
     naming_parse() {
     	local name=$1
-    	# The regex is the same for every name of one prefix
     	if [[ -z ${NAMING_CACHED+set} || ${NAMING_CACHED} != "p:${2:-}" ]]; then
     		naming_regex "${2:-}"
     		NAMING_CACHED_REGEX=${REPLY}
@@ -10528,8 +10238,6 @@ data:
     	tag_valid "${N_KEY/T/}"
     }
     
-    # naming_render SHARD KEY PREFIX sets REPLY to the name the naming template gives the backup KEY of the shard SHARD,
-    # with PREFIX for {prefix}, failing unless it is a valid backup name
     naming_render() {
     	local part digits=${2/T/} name=
     	for part in "${NAMING_PARTS[@]}"; do
@@ -10563,11 +10271,6 @@ data:
     	listed "p:$1" ${NAMING_PARTS[@]+"${NAMING_PARTS[@]}"}
     }
     
-    # series_key HOST NAME sets REPLY to the key of the backup NAME of the series of the schedule that HOST lists: the name
-    # itself, "<prefix>-<YYYYMMDDHHMMSS>" of a scheduled backup or "<prefix>-<YYYYMMDD>T<HHMMSS>" of one made at once from
-    # the schedule, or, with a naming template, the time it is named after, of a name of the shard of HOST with the values
-    # of the cluster and the prefix of the schedule; it returns 1 for any other name. A storage path the shards share
-    # lists the backups of every shard, of which each host takes those of its own
     series_key() {
     	local prefix=
     	if ((${#NAMING_PARTS[@]} == 0)); then
@@ -10590,8 +10293,6 @@ data:
     	REPLY=${N_KEY}
     }
     
-    # key_time KEY sets REPLY to the time the backup of the key KEY, as series_key tells it, is named after, YYYYMMDDHHMMSS,
-    # and KEY_AT_ONCE when it was made at once: its name has a T before the hour
     key_time() {
     	REPLY=$1
     	if ((${#NAMING_PARTS[@]} == 0)); then
@@ -10604,8 +10305,7 @@ data:
     	REPLY=${REPLY/T/}
     }
     
-    # host_name HOST KEY sets REPLY to the name of the backup of the key KEY on HOST: KEY itself, or, with a naming template,
-    # the name it gives the backup of the shard of HOST, with the prefix NAMING_PREFIX; it fails for a host of no shard
+    # host_name HOST KEY sets REPLY to the name of the backup of the key KEY on HOST
     host_name() {
     	if ((${#NAMING_PARTS[@]} == 0)); then
     		REPLY=$2
@@ -10619,11 +10319,6 @@ data:
     	fi
     }
     
-    # naming_key VAR_NAME [PREFIX] sets REPLY to the key of the backup the env var VAR_NAME names, of a backup of the
-    # cluster, and NAMING_PREFIX to its prefix: without a naming template, the name itself; with one, the time of a name it
-    # makes of any shard, with PREFIX for {prefix} or any prefix when empty, or that time itself, a tag YYYYMMDDHHMMSS or,
-    # of a backup made at once, YYYYMMDDTHHMMSS, unless the template holds {prefix}, which the tag does not tell. Any other
-    # value fails
     naming_key() {
     	local value=${!1}
     	NAMING_PREFIX=${2:-}
@@ -10645,7 +10340,6 @@ data:
     	REPLY=${N_KEY}
     }
     
-    # resolve_names HOST... fills HOST_BACKUP with the name of the backup BACKUP_KEY on every HOST
     resolve_names() {
     	local host
     	for host in "$@"; do
@@ -10654,9 +10348,6 @@ data:
     	done
     }
     
-    # check_override OVERRIDE reports whether OVERRIDE is a config override a backup may be made with, KEY=VALUE, setting
-    # REPLY to why not: a single token of a command, of a key that is not one CONFIG_OVERRIDE_FORBIDDEN, PATH_CHECK_KEYS or
-    # API_* lists, nor one of a secret, as the operator validates it
     check_override() {
     	local key=${1%%=*} value=${1#*=} token
     	REPLY=
@@ -10676,7 +10367,7 @@ data:
     	done
     }
     
-    # period_weight PERIOD sets REPLY to the weight of a schedule period: the longer the period, the heavier
+    # period_weight PERIOD sets REPLY to the weight of a schedule period
     period_weight() {
     	case $1 in
     	minute) REPLY=1 ;;
@@ -10689,12 +10380,7 @@ data:
     	esac
     }
     
-    # parse_schedules fills the SCHED_* arrays from SCHEDULES: entries separated by ";", each of blank-separated
-    # key=value fields "period=<minute|hour|6hours|daily|weekly|monthly> [time=HH:MM] [day=N] keep=N [incremental=true]
-    # [env=KEY=VALUE]...", an env field for each config override of the entry, which check_override checks.
-    # A minute entry is every minute, whatever its time; the time of an hour entry gives its minute, that of a 6hours entry
-    # its minute and its hour modulo 6, empty is 00:00; daily, weekly and monthly entries need it. A weekly entry needs a day from 0 (Sunday) to 6, a monthly one a day from 1 to 31,
-    # which a shorter month clamps to its last day; no other entry takes one. Anything else is fatal
+    # parse_schedules fills the SCHED_* arrays from SCHEDULES
     parse_schedules() {
     	local entry field key value index=0 period at day keep incremental overrides
     	local -a entries fields
@@ -10784,16 +10470,11 @@ data:
     	done
     }
     
-    # slot_matches INDEX TAG reports whether the wall time TAG, YYYYMMDDHHMMSS, is a slot of the schedule entry INDEX, to the
-    # minute, or, with a SLOT_TOLERANCE, at most that many seconds after one: a minute entry at every minute, an hour entry at the minute of its time, a 6hours one at that minute every 6 hours from its hour, a daily one
-    # at its time, a weekly one on its day of the week at its time, a monthly one on its day of the month, clamped to the last
-    # day of a shorter month, at its time
     slot_matches() {
     	local i=$1 tag=$2 y m d hour minute day back
     	if [[ ${SCHED_PERIOD[i]} == minute ]]; then
     		return 0
     	fi
-    	# With a tolerance, the time of a backup is that of the slot of its minute before it, within the tolerance
     	if ((SLOT_TOLERANCE > 0)); then
     		minute=$((10#${tag:10:2}))
     		back=$((((minute - SCHED_MINUTE[i] + 60) % 60) * 60 + 10#${tag:12:2}))
@@ -10833,9 +10514,6 @@ data:
     	esac
     }
     
-    # winner_entry TAG sets MATCHED to the indexes of the schedule entries whose slot TAG is, and WINNER to the heaviest of
-    # them, empty when none matches: the run of a slot of several entries is a run of each, and of the heaviest above all,
-    # which decides whether it is incremental
     winner_entry() {
     	local i weight=0
     	MATCHED=()
@@ -10852,8 +10530,6 @@ data:
     	done
     }
     
-    # incremental_entry sets WINNER to the index of the first schedule entry whose backups are incremental, empty when
-    # none is
     incremental_entry() {
     	local i
     	WINNER=
@@ -10885,10 +10561,7 @@ data:
     	TZ=${zone} printf -v REPLY '%(%Y%m%d%H%M%S)T' "$1"
     }
     
-    # slot_epoch sets REPLY to the unix seconds of the slot of the run: the CronJob controller names the Job of a scheduled
-    # run "<CRON_JOB_NAME>-<minutes since the epoch of its slot>", which the pod reads from the Job name label of its pod,
-    # JOB_NAME, so every run of one slot makes the same backup, whose name the operator derives the same way. A Job named
-    # otherwise, such as one created by hand from the CronJob, takes the current minute
+    # slot_epoch sets REPLY to the unix seconds of the slot of the run
     slot_epoch() {
     	local slot=
     	if [[ -n ${CRON_JOB_NAME:-} && ${JOB_NAME:-} == "${CRON_JOB_NAME}-"* ]]; then
@@ -10902,8 +10575,6 @@ data:
     	REPLY=$((REPLY - REPLY % 60))
     }
     
-    # schedule_slot sets SLOT_TAG to the wall time in SCHEDULE_TIMEZONE of the slot of the run, as YYYYMMDDHHMMSS. A slot past
-    # the four-digit years takes the current minute, as the operator then derives no name
     schedule_slot() {
     	slot_epoch
     	slot_tag "${REPLY}"
@@ -10914,8 +10585,6 @@ data:
     	SLOT_TAG=${REPLY}
     }
     
-    # record_series HOST adds to SERIES_REQUIRED, as "<host> <key>", the backup each complete backup of the series of
-    # the last list of HOST is incremental from, empty for a full one; the backup this run makes is none of them
     record_series() {
     	local host=$1 i
     	for i in "${!LIST_NAMES[@]}"; do
@@ -10926,11 +10595,6 @@ data:
     	done
     }
     
-    # incremental_base KEEP HOST... sets REPLY to the backup an incremental scheduled backup on every HOST is made from, as
-    # SERIES_REQUIRED holds them: the newest backup of the series every HOST holds complete, by the time it is named after
-    # - a backup made at once from the schedule as well as a scheduled one -, unless the chain of incremental backups that
-    # ends with it is KEEP long on any HOST, empty for a full backup then, as when there is none. CHAIN is the length of
-    # that chain
     incremental_base() {
     	local keep=$1 host key name newest= newest_time= count n
     	local -a names
@@ -10991,8 +10655,6 @@ data:
     	fi
     }
     
-    # backup_pod_wait_seconds sets REPLY to how long the backup Pods of the pod transport are waited for, failing for a
-    # BACKUP_POD_WAIT_SECONDS that is no number
     backup_pod_wait_seconds() {
     	REPLY=${BACKUP_POD_WAIT_SECONDS:-${DEFAULT_BACKUP_POD_WAIT_SECONDS}}
     	if [[ ! ${REPLY} =~ ${NUMBER_RE} ]]; then
@@ -11010,9 +10672,6 @@ data:
     	esac
     }
     
-    # wait_for_apis HOST... waits, with the pod transport, until the API of every HOST answers: the backup Pods of the shards
-    # start with the operation, and their DNS names resolve once they are ready. A Pod that does not answer within
-    # BACKUP_POD_WAIT_SECONDS fails the run, which has changed nothing yet
     wait_for_apis() {
     	local host since=${SECONDS} wait announced
     	if [[ ${BACKUP_TRANSPORT:-} != pod ]]; then
@@ -11043,17 +10702,12 @@ data:
     	event Normal OrchestratorBackupPodsReady "the backup Pods answer"
     }
     
-    # clickhouse_answers HOST reports whether the ClickHouse of HOST answers through its API: a listing of a table the API
-    # lists none of, which takes a query of ClickHouse all the same, asked once
+    # clickhouse_answers HOST reports whether the ClickHouse of HOST answers through its API
     clickhouse_answers() {
     	request GET "$1" /backup/tables -G --data-urlencode "table=system.one"
     	((CURL_EXIT == 0)) && [[ ${HTTP_CODE} == 200 ]]
     }
     
-    # fall_back_hosts replaces in HOSTS, the hosts of BACKUP_HOSTS, the preferred replica of every shard whose ClickHouse
-    # does not answer by the host of the shard BACKUP_FALLBACK_HOSTS names in its place, the first replica of the shard,
-    # whose storage path is the shard's as well: the Altinity Cloud Manager backs up another replica when its backup
-    # replica is not available. BACKUP_FALLBACK_HOSTS unset or empty leaves HOSTS as they are
     fall_back_hosts() {
     	local i
     	local -a preferred=("${HOSTS[@]}") fallback
@@ -11077,11 +10731,6 @@ data:
     	done
     }
     
-    # drop_failed_backup HOST... deletes, as well as it can, what a create_remote that failed on every HOST left there:
-    # clickhouse-backup deletes the local backup of a create that fails, but not that of an upload that fails, nor the part
-    # of the remote backup it uploaded, which lists as broken; the Job resumes no upload. A copy that is not there is no
-    # failure; a host that does not answer is asked once. A host whose backup only appeared in its storage, made by another
-    # host, is no HOST
     drop_failed_backup() {
     	local host where name BEST_EFFORT=1
     	for host in "$@"; do
@@ -11101,10 +10750,6 @@ data:
     	done
     }
     
-    # backup_unseen HOST reports whether the storage of HOST does not hold the backup this run makes there yet, as before it
-    # submits it there: one that does was made by another host of this run, at the same storage path. It sets STEP_NAME and
-    # STEP_ARGS to the name of the backup on HOST and the request that makes it there, from CREATE_PARAMS and the base
-    # BASE_OF names on HOST
     backup_unseen() {
     	local name=${HOST_BACKUP[$1]}
     	if ! list_backups "$1" remote; then
@@ -11115,7 +10760,6 @@ data:
     		return 1
     	fi
     	STEP_NAME=${name}
-    	# With config overrides the backup is a command of the actions endpoint, of tokens checked each
     	if [[ ${CREATE_KIND} == action ]]; then
     		STEP_ARGS=("create_remote${CREATE_FLAGS}${BASE_OF[$1]:+ --diff-from-remote=${BASE_OF[$1]}}${CREATE_ENV} ${name}")
     		return 0
@@ -11126,11 +10770,7 @@ data:
     	fi
     }
     
-    # config_overrides sets CREATE_KIND to how the backup is made: op, the typed create_remote request, or action, the
-    # create_remote command of the actions endpoint, which alone takes the --env flags of config overrides, CREATE_ENV, as
-    # the heaviest entry of the slot of a scheduled run gives them, or CONFIG_OVERRIDES those of a backup that runs no
-    # schedule; CREATE_FLAGS are then the flags of its options, each a token checked as the API checks it. A backup run now
-    # from the schedule takes no overrides
+    # config_overrides sets CREATE_KIND to how the backup is made
     config_overrides() {
     	local item
     	local -a items
@@ -11181,7 +10821,6 @@ data:
     	parse_hosts BACKUP_HOSTS
     	fall_back_hosts
     	backup_hosts=("${HOSTS[@]}")
-    	# The hosts make their parts of the backup at once: one host twice would make its part twice, at one storage path
     	for ((i = 1; i < ${#backup_hosts[@]}; i++)); do
     		if listed "${backup_hosts[i]}" "${backup_hosts[@]:0:i}"; then
     			die "BACKUP_HOSTS lists ${backup_hosts[i]} twice: hosts of one backup must not share a storage path"
@@ -11206,7 +10845,6 @@ data:
     		naming_key BACKUP_NAME "${BACKUP_NAME_PREFIX:-}"
     		BACKUP_KEY=${REPLY}
     	elif ((${#NAMING_PARTS[@]} > 0)); then
-    		# A scheduled backup is named after its slot, as the naming template makes it on each shard
     		if naming_holds prefix && [[ -z ${BACKUP_NAME_PREFIX:-} ]]; then
     			die "BACKUP_NAME_PREFIX must be set for the naming template '${BACKUP_NAMING}', which holds {prefix}"
     		fi
@@ -11223,7 +10861,6 @@ data:
     	fi
     	resolve_names "${backup_hosts[@]}"
     	if ((${#NAMING_PARTS[@]} > 0)); then
-    		# The backup is told by the name of the backup of its first shard, as the operator records it
     		naming_render 1 "${BACKUP_KEY}" "${NAMING_PREFIX}" || :
     		BACKUP_NAME=${REPLY}
     		log "backup ${BACKUP_NAME}: named by the naming template '${BACKUP_NAMING}', $(for host in "${backup_hosts[@]}"; do printf '%s ' "${host}=${HOST_BACKUP[${host}]}"; done)"
@@ -11242,7 +10879,6 @@ data:
     	CREATE_ENV=
     	if [[ -n ${DIFF_FROM_REMOTE:-} ]]; then
     		check_name DIFF_FROM_REMOTE
-    		# The base of a backup of a naming template is named by it alike, the backup of the shard of every host
     		local key=${BACKUP_KEY} prefix=${NAMING_PREFIX}
     		naming_key DIFF_FROM_REMOTE "${BACKUP_NAME_PREFIX:-}"
     		BACKUP_KEY=${REPLY}
@@ -11253,8 +10889,6 @@ data:
     		BACKUP_KEY=${key} NAMING_PREFIX=${prefix}
     	fi
     	if ((${#SCHED_PERIOD[@]} > 0)) && [[ -n ${BACKUP_NAME_GIVEN} ]]; then
-    		# A backup that runs the schedule now has no slot: as the Altinity Cloud Manager makes a backup by hand, it is
-    		# incremental as the first incremental entry of the schedule says
     		incremental_entry
     		if [[ -z ${WINNER} ]]; then
     			log "backup ${BACKUP_NAME}: runs the schedule now, which has no incremental entry: the backup is full"
@@ -11273,7 +10907,6 @@ data:
     				incremental=1
     				keep=${SCHED_KEEP[WINNER]}
     			fi
-    			# The config overrides of the heaviest entry of the slot, as its incremental
     			CREATE_ENV=${SCHED_ENV[WINNER]}
     		fi
     	fi
@@ -11288,12 +10921,9 @@ data:
     		if ! list_backups "${host}" remote; then
     			fail "preflight failed on ${host}"
     		fi
-    		# create_remote "resumes" into an existing backup of the same name and overwrites its manifest
     		if find_backup "${HOST_BACKUP[${host}]}"; then
     			die "backup ${HOST_BACKUP[${host}]} already exists in the storage of ${host}"
     		fi
-    		# A storage path the shards share lists the backups of every shard: another shard's backup of the same time is
-    		# a backup of a run of this slot as well
     		if ((${#NAMING_PARTS[@]} > 0)); then
     			for i in "${!LIST_NAMES[@]}"; do
     				if naming_parse "${LIST_NAMES[i]}" "${NAMING_PREFIX}" && [[ ${N_KEY} == "${BACKUP_KEY}" ]]; then
@@ -11324,23 +10954,18 @@ data:
     		fi
     	fi
     
-    	# Every host makes its part of the backup at the same time, as the Altinity Cloud Manager has every shard make its own;
-    	# one that fails leaves the others to finish, which the Job waits for before it fails
     	if ! run_all "${CREATE_KIND}" "${backup_hosts[*]}" backup_unseen create_remote "${BACKUP_NAME}"; then
     		drop_failed_backup ${STEP_FAILED_HOSTS[@]+"${STEP_FAILED_HOSTS[@]}"}
     		fail_all "backup ${BACKUP_NAME}"
     	fi
     	log "backup ${BACKUP_NAME} completed on ${#backup_hosts[@]} host(s)"
-    	# The operator records the replicas the backup was made on when one fell back to another
     	if [[ ${backup_hosts[*]} != "${PREFERRED_HOSTS[*]}" && -n ${HOSTS_USED_MESSAGE:-} ]]; then
     		report_message "${HOSTS_USED_MESSAGE} ${backup_hosts[*]}"
     	fi
-    	# A schema-only backup never holds data, which needs no telling
     	if ! is_true SCHEMA_ONLY; then
     		report_data "${backup_hosts[@]}"
     	fi
     	event Normal OrchestratorBackupCompleted "backup ${BACKUP_NAME} completed on ${#backup_hosts[@]} host(s)"
-    	# A failed retention never fails the backup that has just been made
     	if ! retention; then
     		warn "retention failed"
     	fi
@@ -11364,7 +10989,6 @@ data:
     	for host in "${verify_hosts[@]}"; do
     		name=${HOST_BACKUP[${host}]}
     		log "${host}: verifying ${name}"
-    		# Drop any local copy so the download really pulls the backup from the storage
     		if list_backups "${host}" local && find_backup "${name}"; then
     			if ! delete_local "${host}" "${name}"; then
     				fail "verify failed on ${host}: cannot drop the local copy of ${name}"
@@ -11384,9 +11008,6 @@ data:
     	event Normal OrchestratorVerifyCompleted "backup ${BACKUP_NAME} verified on ${#verify_hosts[@]} host(s)"
     }
     
-    # restored_db DATABASE sets REPLY to the database of the backup the restore restores into the live DATABASE: the one
-    # DATABASE_MAPPING maps to it, else DATABASE itself, unless the mapping maps that elsewhere, which returns 1, as the
-    # restore then touches nothing of DATABASE
     restored_db() {
     	REPLY=${DB_SOURCE["$1"]:-}
     	if [[ -n ${REPLY} ]]; then
@@ -11398,10 +11019,6 @@ data:
     	REPLY=$1
     }
     
-    # db_dropped DATABASE reports whether the schema restore drops DATABASE as a whole, with every table it holds, those
-    # made after the backup too: with rm it drops every database of the backup when no table pattern narrows it, and with
-    # one each that a pattern names as "<database>.*", or that a pattern matches with the dot that ends the name of a
-    # database. The patterns hold nothing but names, "*" and "?", which bash matches as clickhouse-backup does
     db_dropped() {
     	local db=$1 pattern
     	local -a patterns
@@ -11417,20 +11034,10 @@ data:
     	return 1
     }
     
-    # drops_database DATABASE reports whether the schema restore drops DATABASE as a whole, as far as the tables of the
-    # backup, which BACKUP_DBS holds the databases of, tell: with a pattern any database it takes as a whole, which the
-    # backup may hold without a table; without one any database the backup of any shard holds a table of, or any database
-    # at all once a table of the backup does not read as one. No listing tells a database the backup of every shard holds
-    # without a table, which the restore drops as a whole too
     drops_database() {
     	db_dropped "$1" && [[ -n ${TABLES:-} || -n ${BACKUP_TABLES_UNREADABLE:-} || -n ${BACKUP_DBS["$1."]:-} ]]
     }
     
-    # list_backup_tables HOST fills HOST_TABLES with the "<database>.<table>" names of the tables of the backup that the
-    # table pattern matches in the storage of HOST, and HOST_DBS with their databases as "<database>.", and sets
-    # BACKUP_TABLES_UNREADABLE to HOST when it lists a row that does not read as one. A listing of a backup in the storage
-    # reads the paths of the sidecar, whatever a command sets: a restore from the paths of another installation lists the
-    # copy of the schema source_copy downloads from there, which holds the same tables
     list_backup_tables() {
     	local host=$1 line where="the storage of $1"
     	local -a params
@@ -11461,8 +11068,6 @@ data:
     	done <<<"${HTTP_BODY}"
     }
     
-    # backup_tables HOST... adds to BACKUP_TABLES and BACKUP_DBS what list_backup_tables finds in the storage of
-    # every HOST, and fills SHARD_TABLES_DIFFER with each table that the backup holds there on one HOST and not on the first
     backup_tables() {
     	local host first= name
     	local -A first_tables=()
@@ -11495,10 +11100,6 @@ data:
     	done
     }
     
-    # live_tables HOST... fills LIVE_HOSTS, LIVE_DBS, LIVE_TABLES, LIVE_ENGINES, LIVE_UUIDS and LIVE_SIZES with the host,
-    # database, name, engine, UUID and size in bytes of every user table of every HOST - a field empty when the row does not
-    # tell it - and LIVE_UNREADABLE and LIVE_UNREADABLE_SIZES with the host and size of every row that does not read as a
-    # table, whose size still reads when only its name does not
     live_tables() {
     	local host row db table
     	LIVE_HOSTS=() LIVE_DBS=() LIVE_TABLES=() LIVE_ENGINES=() LIVE_UUIDS=() LIVE_SIZES=() LIVE_UNREADABLE=()
@@ -11529,16 +11130,13 @@ data:
     			LIVE_ENGINES+=("${REPLY}")
     			json_get UUID "${row}"
     			LIVE_UUIDS+=("${REPLY}")
-    			# The size system.tables gives, which ClickHouse compares with max_table_size_to_drop
     			json_get TotalBytes "${row}"
     			LIVE_SIZES+=("${REPLY}")
     		done <<<"${HTTP_BODY}"
     	done
     }
     
-    # dropped_tables fills LIVE_DROPPED with whether the schema restore drops each table live_tables found: one of the
-    # backup that the table pattern matches, BACKUP_TABLES, any of a database that it drops as a whole, and the inner table
-    # of a materialized view it drops, which goes with the view - each in the database the restore restores it into
+    # dropped_tables fills LIVE_DROPPED with whether the schema restore drops each table live_tables found
     dropped_tables() {
     	local i
     	local -A inner=()
@@ -11563,10 +11161,6 @@ data:
     	done
     }
     
-    # guard_tables SOURCES HOST... refuses a restore that would drop a user table of any HOST: one of the backup the table
-    # pattern matches in the storage of any of the space-separated hosts SOURCES, which the schema restore drops and
-    # recreates, or one of a database it drops as a whole - in the database DATABASE_MAPPING restores it into. Without a pattern, or when a table of the backup or of a HOST
-    # does not read as one, that is every user table: the guard fails closed
     guard_tables() {
     	local host i
     	local -a sources found=()
@@ -11578,12 +11172,10 @@ data:
     	for host in "${LIVE_UNREADABLE[@]}"; do
     		found+=("${host}:?")
     	done
-    	# Only a restore that some user table is in the way of needs the tables of the backup
     	if ((${#LIVE_TABLES[@]} > 0)) && [[ -n ${TABLES:-} ]]; then
     		backup_tables "${sources[@]}"
     	fi
     	for i in "${!LIVE_TABLES[@]}"; do
-    		# A database the mapping restores elsewhere is left alone, one it restores into holds the tables of its source
     		if ! restored_db "${LIVE_DBS[i]}"; then
     			continue
     		fi
@@ -11597,7 +11189,6 @@ data:
     	fi
     }
     
-    # join_items ITEM... sets REPLY to every ITEM, separated by commas
     join_items() {
     	local item
     	REPLY=
@@ -11606,8 +11197,7 @@ data:
     	done
     }
     
-    # greater SIZE LIMIT reports whether the number SIZE is greater than the number LIMIT. They are compared as text: either
-    # may be 2^63 or more, which would wrap negative in bash arithmetic
+    # greater SIZE LIMIT reports whether the number SIZE is greater than the number LIMIT
     greater() {
     	local size=${1#"${1%%[!0]*}"} limit=${2#"${2%%[!0]*}"}
     	if ((${#size} != ${#limit})); then
@@ -11617,27 +11207,15 @@ data:
     	[[ ${size} > ${limit} ]]
     }
     
-    # no_zookeeper reports whether the operator tells that the target cluster has no ZooKeeper, which one that does not tell
-    # is taken to have; a value that is no boolean is fatal
     no_zookeeper() {
     	[[ -n ${REPLICATED:-} ]] && ! is_true REPLICATED
     }
     
-    # drop_size_limited reports whether MAX_TABLE_SIZE_TO_DROP limits the size of a table ClickHouse drops: 0 lifts it
+    # drop_size_limited reports whether MAX_TABLE_SIZE_TO_DROP limits the size of a table ClickHouse drops
     drop_size_limited() {
     	[[ ! ${MAX_TABLE_SIZE_TO_DROP} =~ ^0+$ ]]
     }
     
-    # refuse_database_drops SOURCES HOST... refuses, before anything changes, an overwrite that would stop half way on a HOST
-    # that drops a database as a whole on its own: the host that runs the drop ON CLUSTER, or any host when every replica
-    # drops the tables of the backup on its own. ClickHouse drops a table larger than max_table_size_to_drop only when a
-    # flag file on its host forces it, and takes the flag as it does: clickhouse-backup writes one for every table it drops,
-    # and a single one for a whole database, so two such tables of one database on one HOST stop the drop at the second,
-    # the databases before it already dropped. A table of unknown size counts as larger, and a row of HOST that does not
-    # read as a table, larger or of unknown size, counts in every database of HOST, as its name does not tell its database.
-    # live_tables has listed every HOST. The tables of the backup tell which databases the restore drops as a whole: they
-    # are listed in the storage of the space-separated hosts SOURCES only when a database could stop the drop and no
-    # pattern names those databases, SOURCES empty when they are listed
     refuse_database_drops() {
     	local host i key n what stop="larger than"
     	local -a sources keys found=()
@@ -11657,7 +11235,6 @@ data:
     		unreadable[${host}]=$((n + 1))
     		unreadable_rows[${host}]+="${unreadable_rows[${host}]:+, }${host}:? (a table whose name cannot be read, ${what})"
     	done
-    	# A database name never takes part in arithmetic, where bash would expand it once more
     	for i in "${!LIVE_TABLES[@]}"; do
     		host=${LIVE_HOSTS[i]}
     		if ! listed "${host}" "$@"; then
@@ -11706,15 +11283,6 @@ data:
     	fi
     }
     
-    # plan_overwrite SHARDS HOST... decides whether an overwrite drops the tables of the backup ON CLUSTER, setting
-    # ON_CLUSTER, and refuses, before anything changes, one whose drop ON CLUSTER would recreate other tables than those of
-    # every shard, or one that would stop half way. SHARDS lists, space-separated, the host that runs the drop - the first
-    # schema host - and the first replica of every shard; HOST are every replica, which the schema restore drops the tables
-    # of the backup on. Only a replicated table takes the drop ON CLUSTER: a replica that dropped its own would clone its
-    # old parts back from another replica that still holds it. clickhouse-backup lists the engine of a table and not that of
-    # its database, which tells nothing more: a table of a Replicated database replicates its parts only with a Replicated
-    # engine of its own, and clickhouse-backup drops it without ON CLUSTER, a DROP the database replicates to every replica
-    # of its own
     plan_overwrite() {
     	local initiator host i known=1 replicated=
     	local -a shards oversized=()
@@ -11739,7 +11307,6 @@ data:
     			known=
     		fi
     	done
-    	# The operator tells only what the installation configures: ZooKeeper may come from a configuration file of its own
     	if [[ -n ${replicated} ]]; then
     		ON_CLUSTER=1
     		if no_zookeeper; then
@@ -11760,16 +11327,11 @@ data:
     	if [[ -n ${BACKUP_TABLES_UNREADABLE} ]]; then
     		die "refusing to overwrite: ${BACKUP_TABLES_UNREADABLE} lists a table of ${BACKUP_NAME} that does not read as one, which leaves unknown whether the backup of every shard holds the same tables"
     	fi
-    	# A table only another shard's backup holds would keep its replication, which then clones its old parts back, and one
-    	# only the backup of the shard of the host that runs the drop holds would be made on shards that never had it
     	if ((${#SHARD_TABLES_DIFFER[@]} > 0)); then
     		mapfile -t SHARD_TABLES_DIFFER < <(printf '%s\n' "${SHARD_TABLES_DIFFER[@]}" | sort)
     		join_items "${SHARD_TABLES_DIFFER[@]:0:10}"
     		die "refusing to overwrite: the tables of ${BACKUP_NAME} differ between the shards of cluster ${CLUSTER} (${REPLY}): the drop ON CLUSTER drops and recreates on every shard the tables of the backup of ${initiator}, which takes the backup of every shard to hold the same; narrow the restore with tables to those they all hold"
     	fi
-    	# ClickHouse drops a table larger than max_table_size_to_drop only when a flag file on its own host forces it, which
-    	# clickhouse-backup writes on the host that runs the drop alone: on another host the drop would stop half way, with
-    	# the smaller tables already dropped on every host
     	if ! drop_size_limited; then
     		return 0
     	fi
@@ -11795,9 +11357,6 @@ data:
     	refuse_database_drops "" "${initiator}"
     }
     
-    # check_source_name VAR_NAME MAX_LENGTH WHAT fails unless the env var VAR_NAME is unset, empty or a Kubernetes name of
-    # at most MAX_LENGTH characters, as a valid WHAT is: the value of {installation} or {namespace} in the storage paths of
-    # the installation a restore reads the backup of, which becomes part of the commands of the restore
     check_source_name() {
     	local value=${!1:-}
     	if [[ -z ${value} ]]; then
@@ -11808,10 +11367,6 @@ data:
     	fi
     }
     
-    # source_template TEMPLATE INSTALLATION NAMESPACE sets REPLY to the storage path TEMPLATE of the target cluster with
-    # {installation} replaced by INSTALLATION and {namespace} by NAMESPACE, literally, each unless empty, and every other
-    # macro kept: the sidecar expands the macros of the value of an --env flag as those of its own settings, on the host
-    # that runs the command, and a restore takes a target with the cluster names and the shard layout of the source
     source_template() {
     	local rest=$1 out= macro name
     	while [[ ${rest} =~ \{([^{}]*)\} ]]; do
@@ -11828,12 +11383,6 @@ data:
     	REPLY=${out}${rest}
     }
     
-    # source_paths sets SOURCE_ENV, before anything changes, for a restore that SOURCE_INSTALLATION or SOURCE_NAMESPACE
-    # points at another installation. Its backup is where the storage paths of the target cluster put it with the values of
-    # that installation for {installation} and {namespace}, which takes knowing those paths. The restore then sets the
-    # storage path in every command, and the object disk path along with it whenever the cluster has one: the data of a table
-    # on an object disk does not restore from a backup read at another storage path alone. A restore whose paths are the
-    # same either way - they hold neither macro, or the values are the target's own - runs as any other, with a warning
     source_paths() {
     	local installation= namespace= path object value
     	if [[ -n ${SOURCE_INSTALLATION:-} && ${SOURCE_INSTALLATION} != "${PATH_INSTALLATION:-}" ]]; then
@@ -11862,11 +11411,8 @@ data:
     	if [[ ${path} == "${SELF_PATH}" ]]; then
     		SOURCE_OWN_PATH=1
     	elif [[ -n ${object} && ${object} == "${SELF_OBJECT_DISK_PATH}" ]]; then
-    		# clickhouse-backup deletes the object disk data of a local copy it deletes unless its own storage path holds the
-    		# backup, which is not the case here
     		die "the object disk path '${SELF_OBJECT_DISK_PATH}' of cluster ${SELF_CLUSTER_NAME} holds no {installation} or {namespace} that tells the installation restore ${BACKUP_NAME} names apart from this one, while the storage path does: deleting the copy the restore downloads would delete the object disk data of the backup; give the object disk path the macros of the storage path"
     	fi
-    	# An object disk path that is none stays none; a storage path is always set, at the root of the storage too
     	for value in "${path}" ${object:+"${object}"}; do
     		if [[ ! ${value} =~ ${SOURCE_PATH_RE} ]]; then
     			die "the storage path '${value}' of the installation restore ${BACKUP_NAME} reads the backup of cannot be set in a command of the restore: only a path of letters, digits and _ . / { } - can"
@@ -11876,11 +11422,9 @@ data:
     	if [[ -n ${object} ]]; then
     		SOURCE_ENV+=" --env=${SELF_STORAGE_PREFIX}_OBJECT_DISK_PATH=${object}"
     	fi
-    	# {replica} is the host name, which holds the name of the installation unless its host templates name the hosts
     	if [[ -n ${installation} && ${path} == *"{replica}"* ]]; then
     		SOURCE_HINT="; the storage path holds {replica}, the host name, which holds the name of the installation, so the hosts of installations of different names have different paths"
     	fi
-    	# The shard, unlike the cluster, differs between the hosts
     	if ! expand_macros "${path}" "${SELF_CLUSTER_NAME}" "{shard}"; then
     		REPLY=${path}
     	fi
@@ -11888,9 +11432,6 @@ data:
     	log "restore ${BACKUP_NAME}: reading the backup at the storage path '${SOURCE_PATH_SHOWN}' of the installation it names"
     }
     
-    # refuse_local_copy HOST refuses, before anything changes, a restore from the paths of another installation on a HOST
-    # that holds a local copy of the backup: the restore would restore what that copy holds, whichever paths it came from,
-    # rather than download the backup from those it reads. A restore from its own paths restores from such a copy
     refuse_local_copy() {
     	local host=$1
     	if listed "${host}" "${NO_LOCAL_COPY[@]}"; then
@@ -11905,15 +11446,6 @@ data:
     	NO_LOCAL_COPY+=("${host}")
     }
     
-    # refuse_own_backup HOST refuses, before anything changes, a restore from the storage path of another installation on a
-    # HOST whose own storage path holds a backup of the same name. clickhouse-backup keeps the metadata of the remote backups
-    # it lists in a cache of the storage type, whatever the path, and looks a backup up there by name before it reads the
-    # backup at the path a command sets: the restore would take the tables of a complete backup at the own path for those
-    # of the one it reads, and the next list of the own path the backup it read for a broken one there. Listing the own
-    # path renews the cache with the backups there, unless it finds no backup the cache lacks and as many backups as the
-    # cache holds, broken ones counted, which keeps a backup of another path the cache holds: backup names kept apart
-    # between installations avoid that. OWN_BACKUPS keeps the names for the backup the restored one is incremental from,
-    # looked up the same way
     refuse_own_backup() {
     	local host=$1
     	if ! list_backups "${host}" remote; then
@@ -11925,36 +11457,22 @@ data:
     	fi
     }
     
-    # source_copy HOST downloads the schema of the backup to HOST from the storage paths SOURCE_ENV sets, once: a typed
-    # request reads the paths of the sidecar whatever a command sets, so the preflight of a restore from another
-    # installation reads the backup through this copy. The copy changes nothing the Job is asked to change, and is gone
-    # before the restore steps, or with a Job that fails before them. It holds the access entities too, as a local copy
-    # lists the size of those alone that it holds. A download that fails tells the backup missing at those paths or
-    # unreadable there, and nothing tells which: clickhouse-backup keeps what it read of a storage in a cache of the storage
-    # type, whatever the path, and may find a backup the cache lists broken where it is missing
     source_copy() {
     	local host=$1 READ_ONLY=1 NO_STEP=1
     	if listed "${host}" "${SOURCE_COPIES[@]}"; then
     		return 0
     	fi
     	refuse_local_copy "${host}"
-    	# Recorded ahead of the download, which may leave a copy in part when it fails
     	SOURCE_COPIES+=("${host}")
     	if ! run_action "${host}" download "${HOST_BACKUP[${host}]}" "download --schema --rbac ${SOURCE_ENV} ${HOST_BACKUP[${host}]}"; then
     		die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in the storage path '${SOURCE_PATH_SHOWN}' of ${host}, or cannot be read there${LAST_WARNING:+: ${LAST_WARNING}}${SOURCE_HINT}"
     	fi
     }
     
-    # drop_source_copies [strict] deletes the copies of the backup SOURCE_COPIES lists, which changes nothing the Job is
-    # asked to change. Strict, before the restore steps, a copy of the schema source_copy downloaded that cannot be deleted
-    # fails the restore: the restore would take it for the backup, which holds no data. A Job that
-    # fails deletes what it can and leaves the rest with a warning, as such a copy refuses the next restore from the same
-    # paths
     drop_source_copies() {
     	local host strict=${1:-} READ_ONLY=1 BEST_EFFORT=${BEST_EFFORT:-}
     	local -a hosts=("${SOURCE_COPIES[@]}")
     	if [[ -z ${strict} ]]; then
-    		# The Job fails anyway: a sidecar that does not answer is asked once
     		BEST_EFFORT=1
     		SOURCE_COPIES=()
     	fi
@@ -11972,14 +11490,6 @@ data:
     	done
     }
     
-    # restore_command STEP HOST sets STEP_ARGS to the arguments of run_op, or of run_action, that run the step STEP of the
-    # restore of the backup on HOST, by its name there: download, the backup with the data, every file of it already on the disks of the host
-    # hard-linked rather than downloaded again; download_schema, the backup without the data; schema, which drops the tables
-    # of the backup first, and restores the access entities too when RESTORE_RBAC_WITH_SCHEMA is set; schema_on_cluster,
-    # which drops and creates them ON CLUSTER; or data.
-    # Each restores from the copy the download made. RESTORE_KIND tells which: op, a typed request with query parameters,
-    # or action, the command of the actions endpoint with the flags ACTION_ENV, as a typed request takes no setting in
-    # place of those of the sidecar, such as the storage paths of another installation
     restore_command() {
     	local endpoint=restore command
     	local -a params=() flags=()
@@ -11997,7 +11507,6 @@ data:
     	schema)
     		params=(schema= rm=)
     		flags=(restore --schema --rm)
-    		# As the Altinity Cloud Manager restores them, the access entities come with the schema, before the data
     		if [[ -n ${RESTORE_RBAC_WITH_SCHEMA} ]]; then
     			params+=(rbac=)
     			flags+=(--rbac)
@@ -12013,7 +11522,6 @@ data:
     		params+=("table=${TABLES}")
     		flags+=("--tables=${TABLES}")
     	fi
-    	# The partitions narrow the data, which the download of the schema alone holds none of
     	if [[ -n ${PARTITIONS:-} && ($1 == download || $1 == data) ]]; then
     		params+=("partitions=${PARTITIONS}")
     		flags+=("--partitions=${PARTITIONS}")
@@ -12043,8 +11551,6 @@ data:
     	"run_${kind}" "$1" "$2" "${HOST_BACKUP[$1]}" "${STEP_ARGS[@]}"
     }
     
-    # check_filter VAR_NAME REGEX MAX_LENGTH WHAT fails unless the env var VAR_NAME is unset, empty, or a value of at most
-    # MAX_LENGTH characters that REGEX matches, as a valid WHAT is
     check_filter() {
     	local value=${!1:-}
     	if [[ -n ${value} ]] && [[ ! ${value} =~ $2 ]] || ((${#value} > $3)); then
@@ -12052,9 +11558,6 @@ data:
     	fi
     }
     
-    # check_restore_filters fails unless the partitions, the tables and engines left out and the database mapping of a
-    # restore are each empty or a single token of a command, as the API validates them, and fills DB_SOURCE and DB_TARGET
-    # from the mapping: the source of every target database, and the target of every source database
     check_restore_filters() {
     	local pair
     	local -a pairs
@@ -12078,9 +11581,7 @@ data:
     	done
     }
     
-    # restore_env sets ACTION_ENV to the --env flags of the commands of the restore: those of SOURCE_ENV, the tables and
-    # table engines it leaves out, and, for a restore of partitions, no check of the replicas before the parts are
-    # attached, as the Altinity Cloud Manager restores partitions. A typed request takes none of them
+    # restore_env sets ACTION_ENV to the --env flags of the commands of the restore
     restore_env() {
     	ACTION_ENV=${SOURCE_ENV}
     	if [[ -n ${SKIP_TABLES:-} ]]; then
@@ -12094,8 +11595,6 @@ data:
     	fi
     }
     
-    # download_args HOST sets STEP_NAME and STEP_ARGS to the name of the backup on HOST and its download to HOST: with the
-    # data on a host of DATA_DOWNLOADS, which restores the data, the schema alone on another
     download_args() {
     	STEP_NAME=${HOST_BACKUP[$1]}
     	if [[ " ${DATA_DOWNLOADS} " == *" $1 "* ]]; then
@@ -12105,14 +11604,11 @@ data:
     	fi
     }
     
-    # data_args HOST sets STEP_NAME and STEP_ARGS to the name of the backup on HOST and the restore of its data there
     data_args() {
     	STEP_NAME=${HOST_BACKUP[$1]}
     	restore_command data "$1"
     }
     
-    # drop_downloads HOST... deletes, as well as it can, the copies of the backup the download step of a restore made on
-    # every HOST, which a restore would take for its own; a host that does not answer is asked once
     drop_downloads() {
     	local host BEST_EFFORT=1 READ_ONLY=1
     	for host in "$@"; do
@@ -12122,8 +11618,6 @@ data:
     	done
     }
     
-    # other_installation_hint sets REPLY to what the preflight adds to a backup it finds missing at the storage path of the
-    # target cluster when that path keeps apart the backups of installations of another name or namespace, empty otherwise
     other_installation_hint() {
     	local macros= what= fields=
     	REPLY=
@@ -12169,8 +11663,6 @@ data:
     	fi
     	check_source_name SOURCE_INSTALLATION "${SOURCE_INSTALLATION_MAX_LENGTH}" "installation name"
     	check_source_name SOURCE_NAMESPACE "${SOURCE_NAMESPACE_MAX_LENGTH}" namespace
-    	# With a naming template the backup of every shard has a name of its own, which its time and prefix give, of the
-    	# names of the installation that made it
     	naming_init
     	naming_key BACKUP_NAME
     	BACKUP_KEY=${REPLY}
@@ -12180,9 +11672,6 @@ data:
     		fi
     	fi
     	check_restore_filters
-    	# As the Altinity Cloud Manager restores partitions, a restore of partitions attaches their data into the tables as
-    	# they are: no schema step, which would drop and recreate the tables, and with it no access entities. clickhouse-backup
-    	# drops each of those partitions before it attaches it, and nothing else; the tables must exist
     	if [[ -n ${PARTITIONS:-} ]]; then
     		if [[ -z ${restore_data} ]]; then
     			die "PARTITIONS restore data, which SCHEMA_ONLY leaves out"
@@ -12194,8 +11683,6 @@ data:
     		overwrite=
     		schema_hosts=()
     	fi
-    	# An overwrite may drop the tables of the backup ON CLUSTER only where a replica could clone their old parts back from
-    	# another replica of its shard: a shard of one replica, which every data host is, has none
     	if [[ -n ${overwrite} ]]; then
     		if [[ ! ${MAX_TABLE_SIZE_TO_DROP:-} =~ ${NUMBER_RE} ]]; then
     			die "MAX_TABLE_SIZE_TO_DROP must be a number of bytes"
@@ -12207,7 +11694,6 @@ data:
     		done
     	fi
     	if [[ -n ${replicas} ]]; then
-    		# Only read once the tables are listed, but checked before any request
     		no_zookeeper || :
     	fi
     	used=(${schema_hosts[@]+"${schema_hosts[@]}"})
@@ -12218,8 +11704,6 @@ data:
     	targets=(${schema_hosts[@]+"${schema_hosts[@]}"} "${data_hosts[@]}")
     	mapfile -t targets < <(printf '%s\n' "${targets[@]}" | awk 'NF && !seen[$0]++')
     	resolve_names "${targets[@]}"
-    	# The schema restore drops the tables of the backup on every replica, so the guard checks them all; a restore of
-    	# partitions has neither
     	parse_hosts GUARD_HOSTS optional
     	if [[ -z ${restore_schema} ]]; then
     		HOSTS=()
@@ -12231,7 +11715,6 @@ data:
     	wait_for_apis "${guarded[@]}"
     
     	event Normal OrchestratorRestoreStarted "restore ${BACKUP_NAME} on ${#targets[@]} host(s)"
-    	# Nothing destructive happens before every check has passed on every host
     	if [[ -n ${overwrite} ]]; then
     		log "restore ${BACKUP_NAME}: preflight on ${#targets[@]} host(s)"
     	else
@@ -12243,8 +11726,6 @@ data:
     			die "preflight failed: sidecar of ${host} answered HTTP ${HTTP_CODE}: $(error_of)"
     		fi
     	done
-    	# Every host that restores the backup downloads it, which a local copy of it, or a backup of its name at the own
-    	# storage path, would be taken for; a backup read at the own storage path is that backup
     	if [[ -n ${SOURCE_ENV} ]]; then
     		for host in "${used[@]}"; do
     			refuse_local_copy "${host}"
@@ -12259,7 +11740,6 @@ data:
     		for host in "${used[@]}"; do
     			where="the storage of ${host}"
     			if [[ -n ${SOURCE_ENV} ]]; then
-    				# A sidecar lists the backups at its own paths alone: the copy downloaded from the source tells
     				where="the storage path '${SOURCE_PATH_SHOWN}' of ${host}"
     				source_copy "${host}"
     				if ! list_backups "${host}" local; then
@@ -12286,7 +11766,6 @@ data:
     			if [[ ${LIST_DESC[FOUND]} == broken* ]]; then
     				die "preflight failed: backup ${HOST_BACKUP[${host}]} is ${LIST_DESC[FOUND]} in ${where}"
     			fi
-    			# Sizes are compared as text, as holds_data does
     			if [[ ${LIST_RBAC_SIZE[FOUND]:-0} != 0 ]]; then
     				holds_rbac=1
     			fi
@@ -12314,9 +11793,6 @@ data:
     			if ! list_backups "${host}" local || ! find_backup "${HOST_BACKUP[${host}]}"; then
     				continue
     			fi
-    			# An incomplete copy, as a download that failed or was stopped leaves it, is downloaded again, which
-    			# clickhouse-backup resumes from its resumable state (use_resumable_state) rather than starting over; it is
-    			# never deleted before that
     			if [[ ${LIST_DESC[FOUND]} == broken* ]]; then
     				log "${host}: holds an incomplete local copy of ${HOST_BACKUP[${host}]}, whose download the restore resumes"
     				resumed+=("${host}")
@@ -12325,9 +11801,7 @@ data:
     			fi
     		done
     	else
-    		# Only the copies of the schema the preflight downloaded are left, which a restore would take for the backup
     		drop_source_copies strict
-    		# The restore steps download the backup to every host they restore it on, where a step that fails leaves a copy
     		SOURCE_COPIES=("${used[@]}")
     	fi
     	restore_env
@@ -12336,9 +11810,6 @@ data:
     		RESTORE_KIND=action
     	fi
     
-    	# As the Altinity Cloud Manager restores, every host first downloads the backup, at once, the data to those that
-    	# restore it, hard-linking every file of it already on their disks: a host short of disk space fails the restore here,
-    	# before anything is dropped. A host that holds a complete copy of the backup already restores from it
     	downloads=()
     	for host in "${used[@]}"; do
     		if ! listed "${host}" ${had_local[@]+"${had_local[@]}"}; then
@@ -12350,12 +11821,10 @@ data:
     		DATA_DOWNLOADS=${data_hosts[*]}
     	fi
     	if ((${#downloads[@]} > 0)); then
-    		# A download changes nothing the Job is asked to change: a restore that fails there leaves the cluster as it was
     		READ_ONLY=1
     		if ! run_all "${RESTORE_KIND}" "${downloads[*]}" download_args download "${BACKUP_NAME}"; then
     			READ_ONLY=
     			if [[ -z ${SOURCE_ENV} ]]; then
-    				# The incomplete copies the hosts held before are left for the next restore to resume
     				drop=()
     				for host in "${downloads[@]}"; do
     					if ! listed "${host}" ${resumed[@]+"${resumed[@]}"}; then
@@ -12369,32 +11838,22 @@ data:
     		READ_ONLY=
     	fi
     
-    	# The drop ON CLUSTER drops the tables of the backup the pattern takes, and the databases it takes as a whole, on every
-    	# host from the first schema host, and recreates them as the backup of its shard holds them, which the preflight found
-    	# alike on every shard: no replica then keeps an old part that a replica which recreated its table would clone back.
-    	# clickhouse-backup rewrites on the way a Distributed table that names another cluster, which the restore of every
-    	# replica on its own undoes next, as it drops and creates that table again from the backup
     	if [[ -n ${ON_CLUSTER} ]]; then
     		if ! restore_step "${schema_hosts[0]}" "restore schema on cluster ${CLUSTER}" schema_on_cluster; then
     			fail "schema restore of ${BACKUP_NAME} on cluster ${CLUSTER} failed on ${schema_hosts[0]}"
     		fi
     	fi
-    	# Every replica restores the schema on its own, dropping what it has of the backup first: a table that has come
-    	# through the replication of a Replicated database would fail its CREATE. Access entities are stored apart on every
-    	# host, and a backup holds those of the replica it was made on: they come with the schema of every replica
     	RESTORE_RBAC_WITH_SCHEMA=${restore_rbac}
     	for host in ${schema_hosts[@]+"${schema_hosts[@]}"}; do
     		if ! restore_step "${host}" "restore schema" schema; then
     			fail "schema restore of ${BACKUP_NAME} failed on ${host}"
     		fi
     	done
-    	# Every host that restores data restores it at once
     	if [[ -n ${restore_data} ]]; then
     		if ! run_all "${RESTORE_KIND}" "${data_hosts[*]}" data_args "restore data" "${BACKUP_NAME}"; then
     			fail_all "data restore of ${BACKUP_NAME}"
     		fi
     	fi
-    	# Drop the copies the restore downloaded, they would otherwise double the disk usage
     	for host in "${used[@]}"; do
     		if [[ " ${had_local[*]} " == *" ${host} "* ]]; then
     			continue
@@ -12408,9 +11867,6 @@ data:
     	report_rbac "${restore_rbac}" "${holds_rbac}" "${validate}"
     }
     
-    # report_rbac RESTORED HOLDS LISTED tells when the restore that has just completed left out the access entities the
-    # backup holds: it then writes RBAC_NOT_RESTORED_MESSAGE to the termination message, which the operator reports on the
-    # restore's resource. The backup holds them when any host lists a size of them; one not LISTED leaves that unknown
     report_rbac() {
     	if [[ -n $1 ]]; then
     		return 0
@@ -12429,36 +11885,24 @@ data:
     	fi
     }
     
-    # The steps of a restore on every host, and the backups at the own storage path of every host
     declare -A LAST_OP=() LAST_ACTION_START=() LAST_ACTION_COMMAND=() OWN_BACKUPS=()
-    # The step that runs on every host: the operation id of an operation, the command of an action and the start times of
-    # the rows of that command before it was submitted
     declare -A OP_ID=() ACTION_COMMAND=() ACTION_BEFORE=()
-    # The sets of backups list_all fills, which retention_plan reads
     declare -A COMPLETE=() WITH_DATA=() EMPTY=() SIZED=() BROKEN=() ALL_NAMES=()
-    # The database mapping of a restore: the database of the backup restored into each target, and the target of each
     declare -A DB_SOURCE=() DB_TARGET=()
     FAILED_HOSTS=()
-    # The hosts BACKUP_HOSTS names, before fall_back_hosts puts another replica in place of one that does not answer
     PREFERRED_HOSTS=()
     FAILURES=()
     STEP_FAILED_HOSTS=()
-    # The arguments of the step of a host, as restore_command makes them; how the restore steps run, RESTORE_KIND op or
-    # action, and ACTION_ENV, the --env flags of their commands; the hosts DATA_DOWNLOADS lists download the data too
     STEP_ARGS=()
     RESTORE_KIND=op
     ACTION_ENV=
     DATA_DOWNLOADS=
-    # How create_remote runs, CREATE_KIND op or action, with the flags CREATE_FLAGS of its options and the --env flags
-    # CREATE_ENV of its config overrides when an action
     CREATE_KIND=op
     CREATE_FLAGS=
     CREATE_ENV=
-    # RESTORE_RBAC_WITH_SCHEMA is set when the schema restore of every replica restores the access entities too
     RESTORE_RBAC_WITH_SCHEMA=
     
     main() {
-    	# Retention keeps its sets in associative arrays, which bash handles under set -u from 4.4 on
     	if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); then
     		die "bash 4.4 or newer is required, the image has ${BASH_VERSION}"
     	fi
@@ -12484,7 +11928,6 @@ data:
     	esac
     }
     
-    # Run as a script - bash -c, or a file - and not when sourced, which leaves the functions to the tests
     if [[ ${BASH_SOURCE[0]:-$0} == "$0" ]]; then
     	main "$@"
     fi
