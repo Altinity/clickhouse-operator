@@ -8701,6 +8701,7 @@ data:
     # Every input arrives through the environment (see script.go), never spliced into this text; values reach curl as
     # URL-encoded parameters, or commands of the actions endpoint as tokens validated against the *_RE regexes.
     # Sourced, it runs nothing and leaves its functions to the tests. See docs/backup.md for what it does and why.
+    # shellcheck disable=SC2034 # arrays filled through namerefs
     set -euo pipefail
     
     NAME_RE='^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$'
@@ -8763,58 +8764,63 @@ data:
     EVENT_MAX_FAILURES=3
     EVENT_SOURCE_COMPONENT=clickhouse-backup-orchestrator
     EVENT_MESSAGE_MAX_LENGTH=1024
-    EVENT_FAILURES=0
-    EVENTS_DISABLED=
-    SCHED_PERIOD=()
-    SCHED_HOUR=()
-    SCHED_MINUTE=()
-    SCHED_DAY=()
-    SCHED_KEEP=()
-    SCHED_INCREMENTAL=()
-    SCHED_ENV=()
-    SLOT_TAG=
-    WINNER=
-    NAMING_PARTS=()
-    declare -A SHARD_OF=() HOST_BACKUP=()
-    SLOT_TOLERANCE=0
-    BACKUP_KEY=
-    NAMING_PREFIX=
-    BACKUP_NAME_GIVEN=
-    MUTATED=
-    READ_ONLY=
-    NO_STEP=
-    LAST_WARNING=
-    SELF_PATH=
-    SELF_OBJECT_DISK_PATH=
-    SELF_STORAGE_PREFIX=
-    SELF_CLUSTER_NAME=
-    SELF_PATHS_UNKNOWN=
-    SOURCE_ENV=
-    SOURCE_PATH_SHOWN=
-    SOURCE_HINT=
-    SOURCE_OWN_PATH=
-    SOURCE_COPIES=()
-    NO_LOCAL_COPY=()
-    ON_CLUSTER=
     
-    log() { printf '%s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$*"; }
+    # The state of a run, by owner. MUTATED: the run changed something; READ_ONLY: its changes do not count; NO_STEP: its
+    # steps are not remembered
+    EVENT_FAILURES=0 EVENTS_DISABLED='' MUTATED='' READ_ONLY='' NO_STEP='' LAST_WARNING=''
+    declare -A LAST_OP=() LAST_ACTION_START=() LAST_ACTION_COMMAND=() OP_ID=() ACTION_COMMAND=() ACTION_BEFORE=()
+    FAILED_HOSTS=() FAILURES=() STEP_FAILED_HOSTS=() STEP_ARGS=() STEP_KIND=op
+    # listing, schedule, naming
+    declare -A COMPLETE=() WITH_DATA=() EMPTY=() SIZED=() BROKEN=() ALL_NAMES=() SHARD_OF=() HOST_BACKUP=()
+    SCHED_PERIOD=() SCHED_HOUR=() SCHED_MINUTE=() SCHED_DAY=() SCHED_KEEP=() SCHED_INCREMENTAL=() SCHED_ENV=()
+    SLOT_TAG='' WINNER='' SLOT_TOLERANCE=0 NAMING_PARTS=() BACKUP_KEY='' NAMING_PREFIX='' BACKUP_NAME_GIVEN=''
+    # storage path check
+    SELF_PATH='' SELF_OBJECT_DISK_PATH='' SELF_STORAGE_PREFIX='' SELF_CLUSTER_NAME='' SELF_PATHS_UNKNOWN=''
+    # backup
+    PREFERRED_HOSTS=() CREATE_KIND=op CREATE_FLAGS='' CREATE_ENV='' INCREMENTAL_KEEP=''
+    # restore
+    SOURCE_ENV='' SOURCE_PATH_SHOWN='' SOURCE_HINT='' SOURCE_OWN_PATH='' SOURCE_COPIES=() NO_LOCAL_COPY=() ON_CLUSTER=''
+    declare -A OWN_BACKUPS=() DB_SOURCE=() DB_TARGET=()
+    RESTORE_KIND=op ACTION_ENV='' DATA_DOWNLOADS='' RESTORE_RBAC_WITH_SCHEMA='' HOLDS_RBAC=''
+    
+    # ===== Logging, Events and the termination message
+    
+    log() { TZ=UTC0 printf '%(%Y-%m-%dT%H:%M:%SZ)T %s\n' -1 "$*"; }
+    
     warn() {
     	LAST_WARNING=$*
     	log "WARNING: $*" >&2
     }
+    
     advise() {
     	log "WARNING: $*" >&2
     }
+    
     termination_message() {
     	if [[ -n ${TERMINATION_MESSAGE_PATH:-} ]]; then
     		{ printf '%s\n' "$*" >"${TERMINATION_MESSAGE_PATH}"; } 2>/dev/null || true
     	fi
     }
-    report_message() {
-    	if [[ -n ${TERMINATION_MESSAGE_PATH:-} ]]; then
-    		{ printf '%s\n' "$*" >>"${TERMINATION_MESSAGE_PATH}"; } 2>/dev/null || true
+    
+    # report LINE [DETAIL] appends a line to the termination message, unless LINE is empty
+    report() {
+    	if [[ -n $1 && -n ${TERMINATION_MESSAGE_PATH:-} ]]; then
+    		{ printf '%s\n' "$1${2:+ $2}" >>"${TERMINATION_MESSAGE_PATH}"; } 2>/dev/null || true
     	fi
     }
+    
+    # notice REASON MESSAGE logs MESSAGE and posts it as a Normal Event
+    notice() {
+    	log "$2"
+    	event Normal "$1" "$2"
+    }
+    
+    # alert REASON MESSAGE warns of MESSAGE and posts it as a Warning Event
+    alert() {
+    	warn "$2"
+    	event Warning "$1" "$2"
+    }
+    
     die() {
     	log "ERROR: $*" >&2
     	termination_message "$*"
@@ -8828,6 +8834,7 @@ data:
     	fi
     	exit 1
     }
+    
     # fail MESSAGE dies after a step that has just warned why it failed, adding that reason to MESSAGE
     fail() {
     	die "$*${LAST_WARNING:+: ${LAST_WARNING}}"
@@ -8910,7 +8917,7 @@ data:
     
     # event TYPE REASON MESSAGE posts a Kubernetes Event on the object EVENT_OBJECT_* names
     event() {
-    	local type=$1 reason=$2 message=$3 host=${KUBERNETES_SERVICE_HOST:-} at code token
+    	local type=$1 reason=$2 message=$3 host=${KUBERNETES_SERVICE_HOST:-} at code token=
     	if [[ -n ${EVENTS_DISABLED} || -z ${EVENT_OBJECT_KIND:-} || -z ${EVENT_OBJECT_NAME:-} || -z ${EVENT_OBJECT_UID:-} ||
     		-z ${EVENT_OBJECT_API_VERSION:-} || -z ${POD_NAMESPACE:-} || -z ${host} || ! -r ${SERVICE_ACCOUNT_DIR}/token ]]; then
     		return 0
@@ -8920,7 +8927,7 @@ data:
     	fi
     	TZ=UTC0 printf -v at '%(%Y-%m-%dT%H:%M:%SZ)T' -1
     	event_body "${type}" "${reason}" "${message}" "${at}"
-    	token=$(<"${SERVICE_ACCOUNT_DIR}/token") || token=
+    	IFS= read -r token <"${SERVICE_ACCOUNT_DIR}/token" || :
     	code=$(printf 'Authorization: Bearer %s\n' "${token}" |
     		curl -sS -o /dev/null -w '%{http_code}' --noproxy '*' --cacert "${SERVICE_ACCOUNT_DIR}/ca.crt" \
     			--connect-timeout "${EVENT_TIMEOUT}" --max-time "${EVENT_TIMEOUT}" -X POST -H @- \
@@ -8931,12 +8938,14 @@ data:
     		return 0
     	fi
     	EVENT_FAILURES=$((EVENT_FAILURES + 1))
-    	log "WARNING: cannot post the event ${reason}: ${code}" >&2
+    	advise "cannot post the event ${reason}: ${code}"
     	if ((EVENT_FAILURES >= EVENT_MAX_FAILURES)); then
     		EVENTS_DISABLED=1
-    		log "WARNING: no more events are posted after ${EVENT_FAILURES} failures in a row" >&2
+    		advise "no more events are posted after ${EVENT_FAILURES} failures in a row"
     	fi
     }
+    
+    # ===== Validation and JSON
     
     # json_get FIELD JSON sets REPLY to the raw, still escaped, value of the first string or number field FIELD
     json_get() {
@@ -8947,10 +8956,23 @@ data:
     	fi
     }
     
-    # json_field FIELD JSON prints what json_get finds of FIELD in JSON
-    json_field() {
-    	json_get "$1" "$2"
-    	printf '%s' "${REPLY}"
+    # json_row JSON FIELD=ARRAY... appends the json_get of every FIELD to its ARRAY
+    json_row() {
+    	local _json=$1 _pair
+    	shift
+    	for _pair in "$@"; do
+    		local -n _array=${_pair#*=}
+    		json_get "${_pair%%=*}" "${_json}"
+    		_array+=("${REPLY}")
+    	done
+    }
+    
+    # json_string VALUE sets REPLY to VALUE as a JSON string
+    json_string() {
+    	if [[ $1 == *[\"\\[:cntrl:]]* ]]; then
+    		die "a command value holds a character that JSON escapes"
+    	fi
+    	REPLY="\"$1\""
     }
     
     # is_true VAR_NAME reports whether the boolean env var VAR_NAME is set to true
@@ -8977,23 +8999,37 @@ data:
     	fi
     }
     
-    listed() {
-    	local value=$1 item
-    	shift
-    	for item in "$@"; do
-    		if [[ ${item} == "${value}" ]]; then
-    			return 0
-    		fi
-    	done
-    	return 1
+    check_filter() {
+    	local value=${!1:-}
+    	if [[ -n ${value} ]] && [[ ! ${value} =~ $2 ]] || ((${#value} > $3)); then
+    		die "$1 is not a valid $4"
+    	fi
     }
     
-    # json_string VALUE sets REPLY to VALUE as a JSON string
-    json_string() {
-    	if [[ $1 == *[\"\\[:cntrl:]]* ]]; then
-    		die "a command value holds a character that JSON escapes"
+    # one_line VAR_NAME fails unless VAR_NAME is one line
+    one_line() {
+    	if [[ ${!1:-} == *[[:cntrl:]]* ]]; then
+    		die "$1 must be one line"
     	fi
-    	REPLY="\"$1\""
+    }
+    
+    check_override() {
+    	local key=${1%%=*} value=${1#*=} token
+    	REPLY=
+    	if [[ ! $1 =~ ${CONFIG_OVERRIDE_RE} ]] || ((${#key} > CONFIG_OVERRIDE_KEY_MAX_LENGTH || ${#value} > CONFIG_OVERRIDE_VALUE_MAX_LENGTH)); then
+    		REPLY="the config override '$1' is no KEY=VALUE of a clickhouse-backup setting"
+    		return 1
+    	fi
+    	if [[ ${CONFIG_OVERRIDE_FORBIDDEN} == *" ${key} "* || ${key} == API_* ]] || listed "${key}" "${PATH_CHECK_KEYS[@]}"; then
+    		REPLY="the config override of ${key} is refused: the operator sets it, or it tells where the backups are"
+    		return 1
+    	fi
+    	for token in "${CONFIG_OVERRIDE_SENSITIVE[@]}"; do
+    		if [[ ${key} == *"${token}"* ]]; then
+    			REPLY="the config override of ${key} is refused: it is a secret, which belongs in the configuration of the sidecar"
+    			return 1
+    		fi
+    	done
     }
     
     # parse_hosts VAR_NAME [optional] fills HOSTS from the space-separated host list in VAR_NAME
@@ -9010,6 +9046,52 @@ data:
     		fi
     	done
     }
+    
+    listed() {
+    	local value=$1 item
+    	shift
+    	for item in "$@"; do
+    		if [[ ${item} == "${value}" ]]; then
+    			return 0
+    		fi
+    	done
+    	return 1
+    }
+    
+    # unique_into ARRAY ITEM... sets ARRAY to the non-empty ITEMs, once each, in order
+    unique_into() {
+    	local -n _unique=$1
+    	local _item
+    	local -A _seen=()
+    	shift
+    	_unique=()
+    	for _item in "$@"; do
+    		if [[ -n ${_item} && -z ${_seen[${_item}]:-} ]]; then
+    			_seen[${_item}]=1
+    			_unique+=("${_item}")
+    		fi
+    	done
+    }
+    
+    merge_keys() {
+    	local -n _into=$1 _from=$2
+    	local _key
+    	for _key in "${!_from[@]}"; do
+    		_into["${_key}"]=1
+    	done
+    }
+    
+    # join_items SEPARATOR ITEM... sets REPLY to the items joined by SEPARATOR
+    join_items() {
+    	local separator=$1 item
+    	REPLY=
+    	shift
+    	for item in "$@"; do
+    		REPLY+=${REPLY:+${separator}}${item}
+    	done
+    }
+    
+    # ===== HTTP: the clickhouse-backup REST API
     
     request() {
     	local method=$1 host=$2 path=$3 out last connect code url
@@ -9047,19 +9129,30 @@ data:
     	[[ ${HTTP_CODE} == 50[234] ]]
     }
     
+    # changes_so_far SEP SEP_CHANGED sets REPLY to what the run changed so far, after SEP, or SEP_CHANGED
+    changes_so_far() {
+    	if [[ -z ${MUTATED} ]]; then
+    		REPLY="$1 nothing was changed"
+    	else
+    		REPLY="$2 the ${OPERATION} is partially applied"
+    	fi
+    }
+    
     # call METHOD HOST PATH [CURL_ARGS...] performs an API call, retrying while the sidecar is unreachable
     call() {
-    	local method=$1 host=$2 last= since=${SECONDS}
+    	local method=$1 host=$2 last= since=${SECONDS} limit
     	while :; do
     		request "$@"
     		if [[ -n ${BEST_EFFORT:-} ]] || ! unreachable "${method}"; then
     			return 0
     		fi
-    		if [[ -z ${MUTATED} ]] && ((SECONDS - since >= UNREACHABLE_TIMEOUT)); then
-    			die "${host}: sidecar unreachable for $((SECONDS - since))s (curl exit ${CURL_EXIT}, HTTP ${HTTP_CODE}), nothing was changed"
+    		limit=${UNREACHABLE_TIMEOUT}
+    		if [[ -n ${MUTATED} ]]; then
+    			limit=${MUTATED_UNREACHABLE_TIMEOUT}
     		fi
-    		if [[ -n ${MUTATED} ]] && ((SECONDS - since >= MUTATED_UNREACHABLE_TIMEOUT)); then
-    			die "${host}: sidecar unreachable for $((SECONDS - since))s (curl exit ${CURL_EXIT}, HTTP ${HTTP_CODE}), the ${OPERATION} is partially applied"
+    		if ((SECONDS - since >= limit)); then
+    			changes_so_far , ,
+    			die "${host}: sidecar unreachable for $((SECONDS - since))s (curl exit ${CURL_EXIT}, HTTP ${HTTP_CODE})${REPLY}"
     		fi
     		if [[ ${last} != "${CURL_EXIT}/${HTTP_CODE}" ]]; then
     			last="${CURL_EXIT}/${HTTP_CODE}"
@@ -9072,16 +9165,28 @@ data:
     # error_of prints the sidecar error carried by the last response
     error_of() {
     	local err
-    	err=$(json_field error "${HTTP_BODY}")
+    	err=$(
+    		json_get error "${HTTP_BODY}"
+    		printf '%s' "${REPLY}"
+    	)
     	printf '%s' "${err:-${HTTP_BODY}}"
+    }
+    
+    # get_ok HOST WHAT PATH [CURL_ARGS...] GETs PATH, warning that it cannot WHAT unless HOST answers 200
+    get_ok() {
+    	local host=$1 what=$2
+    	shift 2
+    	call GET "${host}" "$@"
+    	if [[ ${HTTP_CODE} != 200 ]]; then
+    		warn "${host}: cannot ${what} (HTTP ${HTTP_CODE}): $(error_of)"
+    		return 1
+    	fi
     }
     
     wait_idle() {
     	local host=$1 announced=
     	while :; do
-    		call GET "${host}" /backup/actions
-    		if [[ ${HTTP_CODE} != 200 ]]; then
-    			warn "${host}: cannot read sidecar actions (HTTP ${HTTP_CODE}): $(error_of)"
+    		if ! get_ok "${host}" "read sidecar actions" /backup/actions; then
     			return 1
     		fi
     		if [[ ! ${HTTP_BODY} =~ ${IN_PROGRESS_RE} ]]; then
@@ -9112,8 +9217,7 @@ data:
     		shift
     	done
     	message="${host}: ${what}: POST ${REQUEST_URL}${body}${note:+ (${note})}"
-    	log "${message}"
-    	event Normal OrchestratorCommand "${message}"
+    	notice OrchestratorCommand "${message}"
     }
     
     finished_event() {
@@ -9165,6 +9269,8 @@ data:
     	done
     }
     
+    # ===== Steps: ops and actions, polled to their end
+    
     # remember_step HOST [OPERATION_ID [START COMMAND]] records the last step that succeeded on HOST
     remember_step() {
     	LAST_OP[$1]=${2:-}
@@ -9176,12 +9282,11 @@ data:
     sidecar_kept() {
     	local host=$1 i
     	if [[ -n ${LAST_OP[${host}]:-} ]]; then
-    		call GET "${host}" /backup/status -G --data-urlencode "operationid=${LAST_OP[${host}]}"
-    		if [[ ${HTTP_CODE} != 200 ]]; then
-    			warn "${host}: cannot read the status of the last step (HTTP ${HTTP_CODE}): $(error_of)"
+    		if ! get_ok "${host}" "read the status of the last step" /backup/status -G --data-urlencode "operationid=${LAST_OP[${host}]}"; then
     			return 1
     		fi
-    		if [[ $(json_field status "${HTTP_BODY}") == success ]]; then
+    		json_get status "${HTTP_BODY}"
+    		if [[ ${REPLY} == success ]]; then
     			return 0
     		fi
     	elif [[ -n ${LAST_ACTION_COMMAND[${host}]:-} ]]; then
@@ -9196,41 +9301,42 @@ data:
     	else
     		return 0
     	fi
-    	if [[ -z ${MUTATED} ]]; then
-    		warn "${host}: the sidecar restarted after the last step of this ${OPERATION} on it, which it no longer knows; nothing was changed"
-    		return 1
-    	fi
-    	warn "${host}: the sidecar restarted after the last step of this ${OPERATION} on it, which it no longer knows: the ${OPERATION} is partially applied"
+    	changes_so_far ";" ":"
+    	warn "${host}: the sidecar restarted after the last step of this ${OPERATION} on it, which it no longer knows${REPLY}"
     	return 1
     }
     
+    # action_rows HOST COMMAND [NAME] sets ACTION_STARTS, ACTION_STATUSES and ACTION_ERRORS to the rows of COMMAND on
+    # HOST, or, with NAME, of the COMMAND HOST resumed on the backup NAME
     action_rows() {
-    	local host=$1 command=$2 line
-    	ACTION_STARTS=()
-    	ACTION_STATUSES=()
-    	ACTION_ERRORS=()
-    	call GET "${host}" /backup/actions
-    	if [[ ${HTTP_CODE} != 200 ]]; then
-    		warn "${host}: cannot read sidecar actions (HTTP ${HTTP_CODE}): $(error_of)"
+    	local host=$1 line
+    	ACTION_STARTS=() ACTION_STATUSES=() ACTION_ERRORS=()
+    	if ! get_ok "${host}" "read sidecar actions" /backup/actions; then
     		return 1
     	fi
     	while IFS= read -r line; do
     		json_get command "${line}"
-    		if [[ ${REPLY} != "${command}" ]]; then
+    		if [[ -n ${3:-} && ${REPLY} != "$2 "*"--resumable=1 $3" || -z ${3:-} && ${REPLY} != "$2" ]]; then
     			continue
     		fi
-    		json_get start "${line}"
-    		ACTION_STARTS+=("${REPLY}")
-    		json_get status "${line}"
-    		ACTION_STATUSES+=("${REPLY}")
-    		json_get error "${line}"
-    		ACTION_ERRORS+=("${REPLY}")
+    		json_row "${line}" start=ACTION_STARTS status=ACTION_STATUSES error=ACTION_ERRORS
     	done <<<"${HTTP_BODY}"
     }
     
-    run_action() {
-    	if run_action_steps "$@"; then
-    		return 0
+    # run_step op|action HOST WHAT NAME ARGS... starts a step, op_start PATH [CURL_ARGS...] or action_start COMMAND,
+    # and polls it to its end; unless NO_STEP, a failure is an Event
+    run_step() {
+    	local kind=$1 rc=2
+    	shift
+    	if "${kind}_start" "$@"; then
+    		while ((rc == 2)); do
+    			sleep "${POLL_INTERVAL}"
+    			rc=0
+    			"${kind}_poll" "$1" "$2" "$3" || rc=$?
+    		done
+    		if ((rc == 0)); then
+    			return 0
+    		fi
     	fi
     	if [[ -z ${NO_STEP:-} ]]; then
     		event Warning OrchestratorHostFailed "$1: $2 $3 failed${LAST_WARNING:+: ${LAST_WARNING}}"
@@ -9238,20 +9344,13 @@ data:
     	return 1
     }
     
-    # run_action_steps HOST WHAT NAME COMMAND is run_action without the Event of a failure
-    run_action_steps() {
-    	local rc
-    	if ! action_start "$@"; then
-    		return 1
+    # step_succeeded HOST WHAT NAME [ID [START COMMAND]] tells of a step that succeeded; unless NO_STEP, remembers it
+    step_succeeded() {
+    	log "$1: $2 $3 succeeded"
+    	if [[ -z ${NO_STEP:-} ]]; then
+    		remember_step "$1" "${@:4}"
+    		event Normal OrchestratorHostStepSucceeded "$1: $2 $3 succeeded"
     	fi
-    	while :; do
-    		sleep "${POLL_INTERVAL}"
-    		rc=0
-    		action_poll "$1" "$2" "$3" || rc=$?
-    		if ((rc != 2)); then
-    			return "${rc}"
-    		fi
-    	done
     }
     
     action_start() {
@@ -9270,13 +9369,14 @@ data:
     	if ! submit "${host}" "${what}" /backup/actions --data-binary "${body}"; then
     		return 1
     	fi
-    	if [[ $(json_field status "${HTTP_BODY}") != acknowledged ]]; then
+    	json_get status "${HTTP_BODY}"
+    	if [[ ${REPLY} != acknowledged ]]; then
     		warn "${host}: ${what} was not acknowledged: ${HTTP_BODY}"
     		return 1
     	fi
     }
     
-    # action_poll HOST WHAT NAME reads once the row of the action action_start submitted to HOST
+    # action_poll HOST WHAT NAME reads once the row of the action action_start submitted: 2 while it runs
     action_poll() {
     	local host=$1 what=$2 name=$3 command=${ACTION_COMMAND[$1]} i start= status= error=
     	if ! action_rows "${host}" "${command}"; then
@@ -9291,61 +9391,31 @@ data:
     	case ${status} in
     	"in progress") return 2 ;;
     	success)
-    		log "${host}: ${what} ${name} succeeded"
-    		if [[ -z ${NO_STEP:-} ]]; then
-    			remember_step "${host}" "" "${start}" "${command}"
-    			event Normal OrchestratorHostStepSucceeded "${host}: ${what} ${name} succeeded"
-    		fi
+    		step_succeeded "${host}" "${what}" "${name}" "" "${start}" "${command}"
     		return 0
     		;;
-    	"")
-    		if [[ -n ${NO_STEP:-} ]]; then
-    			warn "${host}: the sidecar restarted during ${what} ${name}"
-    			return 1
-    		fi
-    		if [[ ${what} == create_remote ]]; then
-    			if ! lost_op "${host}" "${what}" "${name}"; then
-    				return 1
-    			fi
-    			remember_step "${host}"
-    			local message="${host}: the sidecar restarted during the upload of ${name}, which it resumed without the config overrides${CREATE_ENV:-}: the parts uploaded after the restart are stored with the settings of the sidecar"
-    			advise "${message}"
-    			event Warning OrchestratorOverridesNotResumed "${message}"
-    			return 0
-    		fi
-    		warn "${host}: the sidecar restarted during ${what} ${name}, which it does not resume: the ${OPERATION} is partially applied"
-    		return 1
-    		;;
+    	"") ;;
     	*)
     		warn "${host}: ${what} ${name} ended with status '${status}': ${error}"
     		return 1
     		;;
     	esac
-    }
-    
-    # run_op HOST WHAT NAME PATH [CURL_ARGS...] starts an asynchronous sidecar operation on backup NAME
-    run_op() {
-    	if run_op_steps "$@"; then
-    		return 0
-    	fi
-    	event Warning OrchestratorHostFailed "$1: $2 $3 failed${LAST_WARNING:+: ${LAST_WARNING}}"
-    	return 1
-    }
-    
-    # run_op_steps HOST WHAT NAME PATH [CURL_ARGS...] is run_op without the Event of a failure
-    run_op_steps() {
-    	local rc
-    	if ! op_start "$@"; then
+    	# the sidecar restarted: it lost the row, and resumes nothing but an upload
+    	if [[ -n ${NO_STEP:-} ]]; then
+    		warn "${host}: the sidecar restarted during ${what} ${name}"
     		return 1
     	fi
-    	while :; do
-    		sleep "${POLL_INTERVAL}"
-    		rc=0
-    		op_poll "$1" "$2" "$3" || rc=$?
-    		if ((rc != 2)); then
-    			return "${rc}"
-    		fi
-    	done
+    	if [[ ${what} != create_remote ]]; then
+    		warn "${host}: the sidecar restarted during ${what} ${name}, which it does not resume: the ${OPERATION} is partially applied"
+    		return 1
+    	fi
+    	if ! lost_op "${host}" "${what}" "${name}"; then
+    		return 1
+    	fi
+    	remember_step "${host}"
+    	local message="${host}: the sidecar restarted during the upload of ${name}, which it resumed without the config overrides${CREATE_ENV:-}: the parts uploaded after the restart are stored with the settings of the sidecar"
+    	advise "${message}"
+    	event Warning OrchestratorOverridesNotResumed "${message}"
     }
     
     op_start() {
@@ -9358,11 +9428,13 @@ data:
     	if ! submit "${host}" "${what}" "$@"; then
     		return 1
     	fi
-    	if [[ $(json_field backup_name "${HTTP_BODY}") != "${name}" ]]; then
+    	json_get backup_name "${HTTP_BODY}"
+    	if [[ ${REPLY} != "${name}" ]]; then
     		warn "${host}: ${what} acknowledged a different backup: ${HTTP_BODY}"
     		return 1
     	fi
-    	id=$(json_field operation_id "${HTTP_BODY}")
+    	json_get operation_id "${HTTP_BODY}"
+    	id=${REPLY}
     	if [[ -z ${id} ]]; then
     		warn "${host}: ${what} returned no operation id: ${HTTP_BODY}"
     		return 1
@@ -9370,32 +9442,25 @@ data:
     	OP_ID[${host}]=${id}
     }
     
-    # op_poll HOST WHAT NAME reads once the status of the operation op_start submitted to HOST
+    # op_poll HOST WHAT NAME reads once the status of the operation op_start submitted: 2 while it runs
     op_poll() {
     	local host=$1 what=$2 name=$3 id=${OP_ID[$1]} status
-    	call GET "${host}" /backup/status -G --data-urlencode "operationid=${id}"
-    	if [[ ${HTTP_CODE} != 200 ]]; then
-    		warn "${host}: cannot read status of ${what} (HTTP ${HTTP_CODE}): $(error_of)"
+    	if ! get_ok "${host}" "read status of ${what}" /backup/status -G --data-urlencode "operationid=${id}"; then
     		return 1
     	fi
-    	status=$(json_field status "${HTTP_BODY}")
+    	json_get status "${HTTP_BODY}"
+    	status=${REPLY}
     	if [[ -n ${status} && ${status} != "in progress" ]]; then
     		finished_event "${host}" "${what} ${name}" "${id}" "${status}"
     	fi
     	case ${status} in
     	"in progress") return 2 ;;
-    	success)
-    		log "${host}: ${what} ${name} succeeded"
-    		remember_step "${host}" "${id}"
-    		event Normal OrchestratorHostStepSucceeded "${host}: ${what} ${name} succeeded"
-    		return 0
-    		;;
+    	success) step_succeeded "${host}" "${what}" "${name}" "${id}" ;;
     	"")
     		if ! lost_op "${host}" "${what}" "${name}"; then
     			return 1
     		fi
     		remember_step "${host}"
-    		return 0
     		;;
     	*)
     		warn "${host}: ${what} ${name} ended with status '${status}': $(error_of)"
@@ -9404,26 +9469,24 @@ data:
     	esac
     }
     
+    # run_all KIND PREPARE WHAT NAME HOST... runs a step on every HOST at once: PREPARE HOST sets STEP_ARGS and
+    # STEP_NAME, NAME by default, or fails, which leaves the later hosts unstarted
     run_all() {
-    	local kind=$1 check=$3 what=$4 name=$5 host rc
-    	local -a hosts pending=() running
+    	local kind=$1 prepare=$2 what=$3 name=$4 host rc
+    	local -a pending=() running
     	local -A names=()
-    	read -r -a hosts <<<"$2"
-    	shift 5
-    	FAILED_HOSTS=()
-    	FAILURES=()
-    	STEP_FAILED_HOSTS=()
-    	for host in "${hosts[@]}"; do
+    	shift 4
+    	FAILED_HOSTS=() FAILURES=() STEP_FAILED_HOSTS=()
+    	for host in "$@"; do
     		LAST_WARNING=
-    		STEP_ARGS=("$@")
     		STEP_NAME=${name}
-    		if [[ -n ${check} ]] && ! "${check}" "${host}"; then
-    			step_failed "${kind}" "${host}" "${what}" "${STEP_NAME}"
+    		if ! "${prepare}" "${host}"; then
+    			step_failed "${host}" "${what}" "${STEP_NAME}"
     			break
     		fi
     		names[${host}]=${STEP_NAME}
     		if ! "${kind}_start" "${host}" "${what}" "${STEP_NAME}" "${STEP_ARGS[@]}"; then
-    			step_failed "${kind}" "${host}" "${what}" "${STEP_NAME}"
+    			step_failed "${host}" "${what}" "${STEP_NAME}"
     			STEP_FAILED_HOSTS+=("${host}")
     			break
     		fi
@@ -9440,7 +9503,7 @@ data:
     			0) ;;
     			2) running+=("${host}") ;;
     			*)
-    				step_failed "${kind}" "${host}" "${what}" "${names[${host}]}"
+    				step_failed "${host}" "${what}" "${names[${host}]}"
     				STEP_FAILED_HOSTS+=("${host}")
     				;;
     			esac
@@ -9450,49 +9513,24 @@ data:
     	((${#FAILED_HOSTS[@]} == 0))
     }
     
+    # step_failed HOST WHAT NAME records the failure of a step of run_all
     step_failed() {
-    	FAILED_HOSTS+=("$2")
-    	FAILURES+=("${LAST_WARNING:-$2: $3 $4 failed}")
-    	if [[ $1 == op || -z ${NO_STEP:-} ]]; then
-    		event Warning OrchestratorHostFailed "$2: $3 $4 failed${LAST_WARNING:+: ${LAST_WARNING}}"
-    	fi
+    	FAILED_HOSTS+=("$1")
+    	FAILURES+=("${LAST_WARNING:-$1: $2 $3 failed}")
+    	event Warning OrchestratorHostFailed "$1: $2 $3 failed${LAST_WARNING:+: ${LAST_WARNING}}"
     }
     
     fail_all() {
-    	local hosts failure
-    	join_items "${FAILED_HOSTS[@]}"
+    	local hosts
+    	join_items ", " "${FAILED_HOSTS[@]}"
     	hosts=${REPLY}
-    	if ((${#FAILURES[@]} == 1)); then
-    		die "$1 failed on ${hosts}: ${FAILURES[0]}"
-    	fi
-    	REPLY=
-    	for failure in "${FAILURES[@]}"; do
-    		REPLY+=${REPLY:+; }${failure}
-    	done
+    	join_items "; " "${FAILURES[@]}"
     	die "$1 failed on ${hosts}: ${REPLY}"
-    }
-    
-    # resumed_action HOST COMMAND NAME sets RESUMED_STATUS and RESUMED_ERROR from the last COMMAND
-    resumed_action() {
-    	local host=$1 command=$2 name=$3 line
-    	RESUMED_STATUS=
-    	RESUMED_ERROR=
-    	call GET "${host}" /backup/actions
-    	if [[ ${HTTP_CODE} != 200 ]]; then
-    		warn "${host}: cannot read sidecar actions (HTTP ${HTTP_CODE}): $(error_of)"
-    		return 1
-    	fi
-    	while IFS= read -r line; do
-    		if [[ $(json_field command "${line}") == "${command} "*"--resumable=1 ${name}" ]]; then
-    			RESUMED_STATUS=$(json_field status "${line}")
-    			RESUMED_ERROR=$(json_field error "${line}")
-    		fi
-    	done <<<"${HTTP_BODY}"
     }
     
     # lost_op HOST WHAT NAME settles an operation that a restarted sidecar no longer knows
     lost_op() {
-    	local host=$1 what=$2 name=$3 resumed where outcome since=${SECONDS}
+    	local host=$1 what=$2 name=$3 resumed where outcome status error since=${SECONDS}
     	case ${what} in
     	create_remote) resumed=upload where=remote outcome="the remote backup ${name} may still complete" ;;
     	download) resumed=download where=local outcome="the download of ${name} may still complete" ;;
@@ -9503,10 +9541,11 @@ data:
     	esac
     	log "${host}: the sidecar restarted during ${what} ${name}, waiting for it to resume the ${resumed}"
     	while :; do
-    		if ! resumed_action "${host}" "${resumed}" "${name}"; then
+    		if ! action_rows "${host}" "${resumed}" "${name}"; then
     			return 1
     		fi
-    		case ${RESUMED_STATUS} in
+    		status=${ACTION_STATUSES[*]: -1} error=${ACTION_ERRORS[*]: -1}
+    		case ${status} in
     		"in progress")
     			since=${SECONDS}
     			;;
@@ -9525,7 +9564,7 @@ data:
     			fi
     			;;
     		*)
-    			warn "${host}: the resumed ${resumed} of ${name} ended with status '${RESUMED_STATUS}': ${RESUMED_ERROR}"
+    			warn "${host}: the resumed ${resumed} of ${name} ended with status '${status}': ${error}"
     			return 1
     			;;
     		esac
@@ -9533,36 +9572,18 @@ data:
     	done
     }
     
+    # ===== Listing
+    
     list_backups() {
     	local host=$1 where=$2 line
-    	LIST_NAMES=()
-    	LIST_REQUIRED=()
-    	LIST_DESC=()
-    	LIST_DATA_SIZE=()
-    	LIST_OBJECT_DISK_SIZE=()
-    	LIST_METADATA_SIZE=()
-    	LIST_RBAC_SIZE=()
-    	call GET "${host}" "/backup/list/${where}"
-    	if [[ ${HTTP_CODE} != 200 ]]; then
-    		warn "${host}: cannot list ${where} backups (HTTP ${HTTP_CODE}): $(error_of)"
+    	LIST_NAMES=() LIST_REQUIRED=() LIST_DESC=() LIST_DATA_SIZE=() LIST_OBJECT_DISK_SIZE=() LIST_METADATA_SIZE=() LIST_RBAC_SIZE=()
+    	if ! get_ok "${host}" "list ${where} backups" "/backup/list/${where}"; then
     		return 1
     	fi
     	while IFS= read -r line; do
     		if [[ -n ${line} ]]; then
-    			json_get name "${line}"
-    			LIST_NAMES+=("${REPLY}")
-    			json_get required "${line}"
-    			LIST_REQUIRED+=("${REPLY}")
-    			json_get desc "${line}"
-    			LIST_DESC+=("${REPLY}")
-    			json_get data_size "${line}"
-    			LIST_DATA_SIZE+=("${REPLY}")
-    			json_get object_disk_size "${line}"
-    			LIST_OBJECT_DISK_SIZE+=("${REPLY}")
-    			json_get metadata_size "${line}"
-    			LIST_METADATA_SIZE+=("${REPLY}")
-    			json_get rbac_size "${line}"
-    			LIST_RBAC_SIZE+=("${REPLY}")
+    			json_row "${line}" name=LIST_NAMES required=LIST_REQUIRED desc=LIST_DESC data_size=LIST_DATA_SIZE \
+    				object_disk_size=LIST_OBJECT_DISK_SIZE metadata_size=LIST_METADATA_SIZE rbac_size=LIST_RBAC_SIZE
     		fi
     	done <<<"${HTTP_BODY}"
     }
@@ -9592,13 +9613,18 @@ data:
     	log "$1: local copy of $2 deleted"
     }
     
-    holds_data() {
-    	[[ -z ${LIST_METADATA_SIZE[$1]} ]] || [[ ${LIST_DATA_SIZE[$1]:-0} != 0 ]] || [[ ${LIST_OBJECT_DISK_SIZE[$1]:-0} != 0 ]]
+    # drop_local HOST NAME deletes the local copy of NAME if HOST lists one
+    drop_local() {
+    	if list_backups "$1" local && find_backup "$2"; then
+    		delete_local "$1" "$2"
+    	fi
     }
     
+    # list_all FILTER HOST... sorts the remote backups that FILTER HOST NAME keys (REPLY) into sets of keys: ALL_NAMES,
+    # SIZED, BROKEN, WITH_DATA, EMPTY, and COMPLETE on every host listed; UNLISTED are the hosts that cannot be
     list_all() {
-    	local filter=$1 host first=1 i name key
-    	local -A listed both
+    	local filter=$1 host first=1 i name key size
+    	local -A listed
     	declare -gA COMPLETE=() WITH_DATA=() EMPTY=() SIZED=() BROKEN=() ALL_NAMES=()
     	UNLISTED=()
     	shift
@@ -9617,580 +9643,40 @@ data:
     			fi
     			key=${REPLY}
     			ALL_NAMES[${key}]=1
-    			if [[ -n ${LIST_METADATA_SIZE[i]} ]] && [[ ${LIST_DATA_SIZE[i]:-0} != 0 || ${LIST_OBJECT_DISK_SIZE[i]:-0} != 0 ||
-    				${LIST_METADATA_SIZE[i]} != 0 || ${LIST_RBAC_SIZE[i]:-0} != 0 ]]; then
-    				SIZED[${key}]=1
+    			size=unknown
+    			if [[ -n ${LIST_METADATA_SIZE[i]} ]]; then
+    				size=empty
+    				if [[ ${LIST_DATA_SIZE[i]:-0} != 0 || ${LIST_OBJECT_DISK_SIZE[i]:-0} != 0 || ${LIST_METADATA_SIZE[i]} != 0 ||
+    					${LIST_RBAC_SIZE[i]:-0} != 0 ]]; then
+    					size=sized
+    					SIZED[${key}]=1
+    				fi
     			fi
     			if [[ ${LIST_DESC[i]} == broken* ]]; then
     				BROKEN[${key}]=1
     				continue
     			fi
     			listed[${key}]=1
-    			if holds_data "${i}"; then
+    			if [[ ${size} == unknown || ${LIST_DATA_SIZE[i]:-0} != 0 || ${LIST_OBJECT_DISK_SIZE[i]:-0} != 0 ]]; then
     				WITH_DATA[${key}]=1
     			fi
-    			if [[ -n ${LIST_METADATA_SIZE[i]} && ${LIST_DATA_SIZE[i]:-0} == 0 && ${LIST_OBJECT_DISK_SIZE[i]:-0} == 0 &&
-    				${LIST_METADATA_SIZE[i]} == 0 && ${LIST_RBAC_SIZE[i]:-0} == 0 ]]; then
+    			if [[ ${size} == empty ]]; then
     				EMPTY[${key}]=1
     			fi
     		done
-    		both=()
-    		for name in "${!listed[@]}"; do
-    			if [[ -n ${first} || -n ${COMPLETE[${name}]:-} ]]; then
-    				both[${name}]=1
-    			fi
-    		done
-    		COMPLETE=()
-    		for name in "${!both[@]}"; do
-    			COMPLETE[${name}]=1
-    		done
-    		first=
-    	done
-    }
-    
-    retention_pattern() {
-    	REPLY="^${BACKUP_NAME_PREFIX//./[.]}-[0-9]{8}T?[0-9]{6}$"
-    }
-    
-    retention_plan() {
-    	local name tag key newest= made=${BACKUP_KEY:-${BACKUP_NAME:-}}
-    	local -a ordered=() incomplete=() obsolete=() held=()
-    	declare -gA KEEP=()
-    	OBSOLETE=()
-    	HELD_OBSOLETE=()
-    	for name in ${NAMES[@]+"${NAMES[@]}"}; do
-    		key_time "${name}"
-    		key=${REPLY}
-    		if ! tag_valid "${key}"; then
-    			continue
-    		fi
-    		if [[ -z ${COMPLETE[${name}]:-} ]]; then
-    			if [[ -n ${SIZED[${name}]:-}${BROKEN[${name}]:-} && ${name} != "${made}" ]]; then
-    				incomplete+=("${key} ${name}")
-    			fi
-    		elif [[ -z ${EMPTY[${name}]:-} ]]; then
-    			ordered+=("${key} ${name}")
-    		fi
-    	done
-    	if ((${#ordered[@]} > 0)); then
-    		mapfile -t ordered < <(printf '%s\n' "${ordered[@]}" | sort -r)
-    		newest=${ordered[0]%% *}
-    	fi
-    	rules_keep ${ordered[@]+"${ordered[@]}"}
-    	for name in "${!RULES_KEEP[@]}"; do
-    		KEEP[${name}]=1
-    	done
-    	for tag in ${ordered[@]+"${ordered[@]}"}; do
-    		if [[ ${tag#* } == "${made}" ]]; then
-    			KEEP[${made}]=1
-    		fi
-    	done
-    	pinned_keys
-    	for name in "${!PINNED[@]}"; do
-    		KEEP[${name}]=1
-    	done
-    	held_keys ${ordered[@]+"${ordered[@]}"}
-    	for tag in ${ordered[@]+"${ordered[@]}"}; do
-    		if [[ -n ${KEEP[${tag#* }]:-} ]]; then
-    			continue
-    		fi
-    		if [[ -n ${HELD_KEYS[${tag#* }]:-} ]]; then
-    			held+=("${tag#* }")
-    		else
-    			obsolete+=("${tag}")
-    		fi
-    	done
-    	HELD_OBSOLETE=(${held[@]+"${held[@]}"})
-    	for tag in ${incomplete[@]+"${incomplete[@]}"}; do
-    		if [[ -n ${newest} && ${tag%% *} < ${newest} ]]; then
-    			obsolete+=("${tag}")
-    		fi
-    	done
-    	if ((${#obsolete[@]} > 0)); then
-    		mapfile -t obsolete < <(printf '%s\n' "${obsolete[@]}" | sort -r)
-    		for tag in "${obsolete[@]}"; do
-    			OBSOLETE+=("${tag#* }")
-    		done
-    	fi
-    }
-    
-    rules_keep() {
-    	local tag key name i oldest= first=1
-    	local -a manual=() counts=()
-    	declare -gA RULES_KEEP=()
-    	for i in "${!SCHED_PERIOD[@]}"; do
-    		counts[i]=0
-    	done
-    	for tag in "$@"; do
-    		key=${tag%% *}
-    		name=${tag#* }
     		if [[ -n ${first} ]]; then
-    			RULES_KEEP[${name}]=1
+    			merge_keys COMPLETE listed
     			first=
     		fi
-    		key_time "${name}"
-    		if [[ -n ${KEY_AT_ONCE} ]]; then
-    			manual+=("${tag}")
-    			continue
-    		fi
-    		for i in "${!SCHED_PERIOD[@]}"; do
-    			if slot_matches "${i}" "${key}"; then
-    				counts[i]=$((counts[i] + 1))
-    				if ((counts[i] <= SCHED_KEEP[i])); then
-    					RULES_KEEP[${name}]=1
-    					oldest=${key}
-    				fi
+    		for name in "${!COMPLETE[@]}"; do
+    			if [[ -z ${listed[${name}]:-} ]]; then
+    				unset 'COMPLETE[${name}]'
     			fi
     		done
     	done
-    	for tag in ${manual[@]+"${manual[@]}"}; do
-    		key=${tag%% *}
-    		if [[ -z ${oldest} || ! ${key} < ${oldest} ]]; then
-    			RULES_KEEP[${tag#* }]=1
-    		fi
-    	done
     }
     
-    # pinned_keys sets PINNED to the keys of the backups KEEP_BACKUPS pins, which retention never deletes
-    pinned_keys() {
-    	local value prefix=
-    	declare -gA PINNED=()
-    	if [[ ${KEEP_BACKUPS:-} == *[[:cntrl:]]* ]]; then
-    		die "KEEP_BACKUPS must be one line"
-    	fi
-    	if naming_holds prefix; then
-    		prefix=${BACKUP_NAME_PREFIX:-}
-    	fi
-    	for value in ${KEEP_BACKUPS:-}; do
-    		if ((${#NAMING_PARTS[@]} == 0)) || [[ ${value} =~ ${NAMING_TAG_RE} ]]; then
-    			PINNED[${value}]=1
-    		elif naming_parse "${value}" "${prefix}"; then
-    			PINNED[${N_KEY}]=1
-    		fi
-    	done
-    }
-    
-    held_keys() {
-    	local record change entries name
-    	local -a records subset period=("${SCHED_PERIOD[@]}") hour=("${SCHED_HOUR[@]}") minute=("${SCHED_MINUTE[@]}")
-    	local -a day=("${SCHED_DAY[@]}") keep=("${SCHED_KEEP[@]}") incremental=("${SCHED_INCREMENTAL[@]}") env=("${SCHED_ENV[@]}")
-    	declare -gA HELD_KEYS=()
-    	if [[ -z ${PREVIOUS_SCHEDULES:-} ]]; then
-    		return 0
-    	fi
-    	if [[ ${PREVIOUS_SCHEDULES} == *[[:cntrl:]]* ]]; then
-    		die "PREVIOUS_SCHEDULES must be one line"
-    	fi
-    	IFS='#' read -r -a records <<<"${PREVIOUS_SCHEDULES}"
-    	for record in "${records[@]}"; do
-    		if [[ ! ${record} =~ ^([0-9]{1,12})\|([^|]*)\|([^|]+)$ ]]; then
-    			die "PREVIOUS_SCHEDULES must list <epoch>|<time zone>|<entries> records separated by #"
-    		fi
-    		entries=${BASH_REMATCH[3]}
-    		local SCHEDULE_TIMEZONE=${BASH_REMATCH[2]} SCHEDULES=${entries}
-    		check_timezone
-    		slot_tag "${BASH_REMATCH[1]}"
-    		change=${REPLY}
-    		subset=()
-    		for name in "$@"; do
-    			if [[ ${name%% *} < ${change} ]]; then
-    				subset+=("${name}")
-    			fi
-    		done
-    		if [[ ${entries} == "*" ]]; then
-    			for name in ${subset[@]+"${subset[@]}"}; do
-    				HELD_KEYS[${name#* }]=1
-    			done
-    			continue
-    		fi
-    		parse_schedules
-    		rules_keep ${subset[@]+"${subset[@]}"}
-    		for name in "${!RULES_KEEP[@]}"; do
-    			HELD_KEYS[${name}]=1
-    		done
-    	done
-    	SCHED_PERIOD=(${period[@]+"${period[@]}"}) SCHED_HOUR=(${hour[@]+"${hour[@]}"}) SCHED_MINUTE=(${minute[@]+"${minute[@]}"})
-    	SCHED_DAY=(${day[@]+"${day[@]}"}) SCHED_KEEP=(${keep[@]+"${keep[@]}"}) SCHED_INCREMENTAL=(${incremental[@]+"${incremental[@]}"})
-    	SCHED_ENV=(${env[@]+"${env[@]}"})
-    }
-    
-    # retention_on_host HOST deletes on HOST the backups of OBSOLETE it lists, newest first
-    retention_on_host() {
-    	local host=$1 name key
-    	local -A held=()
-    	if ! list_backups "${host}" remote; then
-    		return 1
-    	fi
-    	for name in "${LIST_NAMES[@]}"; do
-    		if [[ -n ${name} ]]; then
-    			held[${name}]=1
-    		fi
-    	done
-    	for key in ${OBSOLETE[@]+"${OBSOLETE[@]}"}; do
-    		host_name "${host}" "${key}"
-    		name=${REPLY}
-    		if [[ -z ${held[${name}]:-} ]]; then
-    			continue
-    		fi
-    		if submit "${host}" "delete remote ${name}" "/backup/delete/remote/${name}" --max-time "${DELETE_TIMEOUT}"; then
-    			log "${host}: retention deleted ${name}"
-    			event Normal OrchestratorRetentionDeleted "${host}: retention deleted ${name}"
-    		else
-    			event Warning OrchestratorRetentionFailed "${LAST_WARNING}"
-    		fi
-    	done
-    }
-    
-    retention() {
-    	local host
-    	if ((${#SCHED_PERIOD[@]} == 0)); then
-    		return 0
-    	fi
-    	if is_true RESTORE_IN_PROGRESS; then
-    		warn "retention skipped: a restore of the cluster is in progress"
-    		return 0
-    	fi
-    	if [[ -z ${BACKUP_NAME_PREFIX:-} ]]; then
-    		warn "retention skipped: BACKUP_NAME_PREFIX is not set"
-    		return 0
-    	fi
-    	read -r -a HOSTS <<<"${RETENTION_HOSTS:-}"
-    	if ((${#HOSTS[@]} == 0)); then
-    		warn "retention skipped: RETENTION_HOSTS is empty"
-    		return 0
-    	fi
-    	log "retention: keeping the newest ${BACKUP_NAME_PREFIX}-* backup, the newest backups of the slots of every schedule entry it keeps, and the backups made at once no older than the oldest of those"
-    	BEST_EFFORT=1
-    	list_all series_key "${HOSTS[@]}"
-    	if ((${#UNLISTED[@]} > 0)); then
-    		warn "retention skipped: ${UNLISTED[*]} cannot be listed, backups are left as they are"
-    		event Warning OrchestratorRetentionSkipped "${LAST_WARNING}"
-    		return 0
-    	fi
-    	NAMES=("${!ALL_NAMES[@]}")
-    	retention_plan
-    	report_held
-    	for host in "${HOSTS[@]}"; do
-    		if [[ ! ${host} =~ ${HOST_RE} ]]; then
-    			warn "retention skipped an invalid host name"
-    		elif ! retention_on_host "${host}"; then
-    			warn "${host}: retention failed, backups are left as they are"
-    		fi
-    	done
-    }
-    
-    this_backup() {
-    	REPLY=${BACKUP_KEY}
-    	[[ $2 == "${HOST_BACKUP[$1]:-}" ]]
-    }
-    
-    report_held() {
-    	local key
-    	local -a names=()
-    	if ((${#HELD_OBSOLETE[@]} == 0)); then
-    		return 0
-    	fi
-    	for key in "${HELD_OBSOLETE[@]}"; do
-    		REPLY=${key}
-    		if ((${#NAMING_PARTS[@]} > 0)); then
-    			naming_render 1 "${key}" "${NAMING_PREFIX}" || :
-    		fi
-    		names+=("${REPLY}")
-    	done
-    	warn "retention holds ${#names[@]} backup(s) the schedule kept before a change of it, which it would delete now: ${names[*]:0:HELD_REPORT_MAX}${names[HELD_REPORT_MAX]:+ ...}; keep those to keep in spec.retention.keepBackups and release the change with spec.retention.releaseHeld"
-    	event Warning OrchestratorRetentionHeld "${LAST_WARNING}"
-    	if [[ -n ${HELD_BACKUPS_MESSAGE:-} ]]; then
-    		if ((${#names[@]} > HELD_REPORT_MAX)); then
-    			report_message "${HELD_BACKUPS_MESSAGE} ${names[*]:0:HELD_REPORT_MAX} +$((${#names[@]} - HELD_REPORT_MAX))"
-    		else
-    			report_message "${HELD_BACKUPS_MESSAGE} ${names[*]}"
-    		fi
-    	fi
-    }
-    
-    report_data() {
-    	local BEST_EFFORT=1
-    	list_all this_backup "$@"
-    	if ((${#UNLISTED[@]} > 0)); then
-    		log "whether ${BACKUP_NAME} holds data is unknown: ${UNLISTED[*]} cannot be listed"
-    		return 0
-    	fi
-    	if [[ -z ${COMPLETE[${BACKUP_KEY}]:-} || -n ${WITH_DATA[${BACKUP_KEY}]:-} ]]; then
-    		return 0
-    	fi
-    	warn "${BACKUP_NAME} holds no data"
-    	event Warning OrchestratorNoData "${BACKUP_NAME} holds no data"
-    	if [[ -n ${NO_DATA_MESSAGE:-} ]]; then
-    		report_message "${NO_DATA_MESSAGE}"
-    	fi
-    }
-    
-    storage_prefix() {
-    	case $1 in
-    	s3) REPLY=S3 ;;
-    	gcs) REPLY=GCS ;;
-    	azblob) REPLY=AZBLOB ;;
-    	cos) REPLY=COS ;;
-    	ftp) REPLY=FTP ;;
-    	sftp) REPLY=SFTP ;;
-    	*) REPLY= ;;
-    	esac
-    }
-    
-    path_setting() {
-    	local name="PATH_$1_$2"
-    	REPLY=${!name-}
-    	SETTING_SET=${!name+1}
-    }
-    
-    identity_default() {
-    	case $1 in
-    	AZBLOB_ENDPOINT_SUFFIX) REPLY=core.windows.net ;;
-    	SFTP_PORT) REPLY=22 ;;
-    	*) REPLY= ;;
-    	esac
-    }
-    
-    # trim_path STORAGE PATH sets REPLY to PATH as clickhouse-backup trims it
-    trim_path() {
-    	local value=$2 both=$' \t\r\n/' trailing=
-    	if [[ $1 == ftp || $1 == sftp ]]; then
-    		both=$' \t\r\n'
-    		trailing=/
-    	fi
-    	while [[ -n ${value} && ${value:0:1} == ["${both}"] ]]; do
-    		value=${value:1}
-    	done
-    	while [[ -n ${value} && ${value: -1} == ["${both}"] ]]; do
-    		value=${value::-1}
-    	done
-    	while [[ -n ${trailing} && ${value} == */ ]]; do
-    		value=${value::-1}
-    	done
-    	REPLY=${value}
-    }
-    
-    clean_path() {
-    	local rest=$1 element rooted= IFS=/
-    	local -a elements=()
-    	if [[ ${rest} == /* ]]; then
-    		rooted=/
-    	fi
-    	while [[ -n ${rest} ]]; do
-    		element=${rest%%/*}
-    		if [[ ${rest} == */* ]]; then
-    			rest=${rest#*/}
-    		else
-    			rest=
-    		fi
-    		case ${element} in
-    		"" | .) ;;
-    		..)
-    			if ((${#elements[@]} > 0)) && [[ ${elements[-1]} != .. ]]; then
-    				unset 'elements[-1]'
-    			elif [[ -z ${rooted} ]]; then
-    				elements+=(..)
-    			fi
-    			;;
-    		*) elements+=("${element}") ;;
-    		esac
-    	done
-    	REPLY=${rooted}${elements[*]}
-    }
-    
-    expand_macros() {
-    	local rest=$1 out= macro name
-    	while [[ ${rest} =~ \{([^{}]*)\} ]]; do
-    		macro=${BASH_REMATCH[0]}
-    		name=${BASH_REMATCH[1]}
-    		out+=${rest%%"${macro}"*}
-    		rest=${rest#*"${macro}"}
-    		case ${name} in
-    		installation) out+=${PATH_INSTALLATION:-} ;;
-    		namespace) out+=${PATH_NAMESPACE:-} ;;
-    		cluster) out+=$2 ;;
-    		shard) out+=$3 ;;
-    		replica) out+=${macro} ;;
-    		*)
-    			UNKNOWN_MACRO=${macro}
-    			return 1
-    			;;
-    		esac
-    	done
-    	REPLY=${out}${rest}
-    }
-    
-    # default_path INDEX NAME sets REPLY to the default path NAME
-    default_path() {
-    	local own="PATH_$1_$2"
-    	if [[ -n ${!own+set} ]]; then
-    		REPLY=${!own}
-    	else
-    		REPLY=${!2:-}
-    	fi
-    }
-    
-    path_check_inconclusive() {
-    	SELF_PATHS_UNKNOWN=$3
-    	if (($1 > 1)); then
-    		die "the storage path check cannot tell whether cluster $2 shares a storage path with another of the $1 backup-enabled clusters of the installation, which would mix their backups and restore one with the data of the other: $3"
-    	fi
-    	advise "the storage path check is skipped: $3"
-    }
-    
-    # check_storage_paths refuses, before anything changes, a storage path the target cluster shares
-    check_storage_paths() {
-    	local index storage prefix identity key template object shard name what value self=${PATH_SELF:-} self_name= shared=
-    	local selection=${PATH_REPLICA_SELECTION:-}
-    	local -a indexes others=() shards
-    	local -A owners=() self_owned=()
-    	read -r -a indexes <<<"${PATH_CLUSTERS:-}"
-    	if ((${#indexes[@]} == 0)); then
-    		SELF_PATHS_UNKNOWN="PATH_CLUSTERS names no cluster"
-    		advise "the storage path check is skipped: ${SELF_PATHS_UNKNOWN}"
-    		return 0
-    	fi
-    	for index in "${indexes[@]}"; do
-    		if [[ ! ${index} =~ ${INDEX_RE} ]]; then
-    			die "PATH_CLUSTERS must list cluster indexes"
-    		fi
-    		if [[ ${index} != "${self}" ]]; then
-    			others+=("${index}")
-    		fi
-    	done
-    	if ! listed "${self}" "${indexes[@]}"; then
-    		die "PATH_SELF must be one of the indexes PATH_CLUSTERS lists"
-    	fi
-    	case ${selection} in
-    	"" | FirstPerShard | AllReplicas) ;;
-    	*) die "PATH_REPLICA_SELECTION must be FirstPerShard or AllReplicas" ;;
-    	esac
-    	for index in "${self}" "${others[@]}"; do
-    		path_setting "${index}" CLUSTER
-    		name=${REPLY}
-    		if [[ ${index} == "${self}" ]]; then
-    			self_name=${name}
-    		fi
-    		path_setting "${index}" UNVERIFIABLE
-    		what=${REPLY//[[:cntrl:]]/ }
-    		if [[ -n ${what} ]]; then
-    			what="the operator cannot tell the sidecar settings of cluster ${name}: ${what}"
-    			if [[ ${index} == "${self}" ]]; then
-    				path_check_inconclusive "${#indexes[@]}" "${name}" "${what}"
-    				return 0
-    			fi
-    			advise "cluster ${name} is left out of the storage path check: ${what}"
-    			continue
-    		fi
-    		path_setting "${index}" REMOTE_STORAGE
-    		storage=${REPLY}
-    		storage_prefix "${storage}"
-    		prefix=${REPLY}
-    		if [[ -z ${prefix} ]]; then
-    			if [[ -z ${storage} ]]; then
-    				what="its configuration does not set remote_storage"
-    			else
-    				what="it keeps its backups in ${storage} storage, where the check cannot tell their paths"
-    			fi
-    			if [[ ${index} == "${self}" ]]; then
-    				path_check_inconclusive "${#indexes[@]}" "${name}" "${what}"
-    				return 0
-    			fi
-    			advise "cluster ${name} is left out of the storage path check: ${what}"
-    			continue
-    		fi
-    		identity=${storage}
-    		for key in "${PATH_CHECK_KEYS[@]}"; do
-    			if [[ ${key} == "${prefix}_"* && ${key} != "${prefix}_PATH" && ${key} != "${prefix}_OBJECT_DISK_PATH" ]]; then
-    				path_setting "${index}" "${key}"
-    				if [[ -z ${SETTING_SET} ]]; then
-    					identity_default "${key}"
-    				fi
-    				printf -v value ' %q' "${REPLY}"
-    				identity+=${value}
-    			fi
-    		done
-    		path_setting "${index}" "${prefix}_PATH"
-    		if [[ -z ${SETTING_SET} ]]; then
-    			default_path "${index}" DEFAULT_PATH
-    		fi
-    		trim_path "${storage}" "${REPLY}"
-    		clean_path "${REPLY}"
-    		template=${REPLY}
-    		path_setting "${index}" "${prefix}_OBJECT_DISK_PATH"
-    		if [[ -z ${SETTING_SET} ]]; then
-    			default_path "${index}" DEFAULT_OBJECT_DISK_PATH
-    		fi
-    		trim_path "${storage}" "${REPLY}"
-    		object=${REPLY}
-    		if [[ -n ${object} ]]; then
-    			clean_path "${object}"
-    			object=${REPLY:-.}
-    		fi
-    		if [[ ${index} == "${self}" ]]; then
-    			SELF_PATH=${template}
-    			if [[ ${OPERATION} == backup && ${selection} == AllReplicas && ${template} != *"{replica}"* ]]; then
-    				die "the storage path '${template}' of cluster ${name} lacks {replica}: a backup of every replica would keep those of all replicas of a shard at one path"
-    			fi
-    			if [[ ${OPERATION} == backup && ${selection} != AllReplicas && ${template} == *"{replica}"* ]]; then
-    				die "the storage path '${template}' of cluster ${name} holds {replica}: a backup of the first replica of each shard would not be at the path every other replica restores its schema from"
-    			fi
-    			if [[ ${OPERATION} == restore && ${template} == *"{replica}"* ]] && ! is_true VALIDATE_TOPOLOGY; then
-    				advise "the storage path '${template}' of cluster ${name} holds {replica}: every replica restores its schema from its own path, which holds the backup only if it is one of every replica"
-    			fi
-    		fi
-    		for value in "${template}" "${object}"; do
-    			if ! expand_macros "${value}" "${name}" ""; then
-    				if [[ ${index} == "${self}" ]]; then
-    					path_check_inconclusive "${#indexes[@]}" "${name}" "the path '${value}' of cluster ${name} holds ${UNKNOWN_MACRO}, a macro whose value it does not know"
-    					return 0
-    				fi
-    				advise "cluster ${name} is left out of the storage path check: its path '${value}' holds ${UNKNOWN_MACRO}, a macro whose value it does not know"
-    				continue 2
-    			fi
-    		done
-    		if [[ ${index} == "${self}" ]]; then
-    			SELF_OBJECT_DISK_PATH=${object}
-    			SELF_STORAGE_PREFIX=${prefix}
-    			SELF_CLUSTER_NAME=${name}
-    		fi
-    		path_setting "${index}" SHARDS
-    		read -r -a shards <<<"${REPLY}"
-    		for shard in "${shards[@]}"; do
-    			for what in "storage path" "object disk path"; do
-    				value=${template}
-    				if [[ ${what} != "storage path" ]]; then
-    					value=${object}
-    				fi
-    				if [[ ${value} == *"{replica}"* ]] || [[ ${what} != "storage path" && -z ${value} ]]; then
-    					continue
-    				fi
-    				expand_macros "${value}" "${name}" "${shard}"
-    				clean_path "${REPLY}"
-    				printf -v key '%s %q %q' "${identity}" "${what}" "${REPLY}"
-    				if [[ -n ${owners[${key}]:-} ]]; then
-    					if [[ ${index} == "${self}" && ${#NAMING_PARTS[@]} -gt 0 ]]; then
-    						shared=1
-    						continue
-    					fi
-    					if [[ -n ${self_owned[${key}]:-} ]]; then
-    						die "the ${what} '${REPLY:-.}' of shard ${shard} of cluster ${name} is that of ${owners[${key}]} too, in the same ${storage} storage: every shard of every cluster needs a path of its own, as {cluster} and {shard} give it"
-    					fi
-    					continue
-    				fi
-    				owners[${key}]="shard ${shard} of cluster ${name}"
-    				if [[ ${index} == "${self}" ]]; then
-    					self_owned[${key}]=1
-    				fi
-    			done
-    		done
-    	done
-    	if [[ -n ${shared} ]]; then
-    		log "storage path check: the shards of cluster ${self_name} share a path, where the naming template '${BACKUP_NAMING}' names the backup of each apart, and no other cluster has it"
-    		return 0
-    	fi
-    	log "storage path check: every shard of cluster ${self_name} has a path of its own"
-    }
+    # ===== Calendar and schedule
     
     days_from_civil() {
     	local y=$1 m=$2 d=$3 era yoe doy doe
@@ -10231,274 +9717,6 @@ data:
     	((d >= 1 && d <= REPLY && 10#${tag:8:2} < 24 && 10#${tag:10:2} < 60 && 10#${tag:12:2} < 60))
     }
     
-    naming_init() {
-    	local rest=${BACKUP_NAMING:-} macro name tokens token pair
-    	local -A seen=()
-    	NAMING_PARTS=()
-    	SLOT_TOLERANCE=0
-    	declare -gA SHARD_OF=()
-    	if [[ -z ${rest} ]]; then
-    		return 0
-    	fi
-    	if [[ ! ${rest} =~ ${NAMING_RE} ]] || ((${#rest} > NAMING_MAX_LENGTH)); then
-    		die "BACKUP_NAMING is not a valid naming template"
-    	fi
-    	while [[ ${rest} =~ \{([A-Za-z]+)\} ]]; do
-    		macro=${BASH_REMATCH[0]}
-    		name=${BASH_REMATCH[1]}
-    		if [[ -n ${rest%%"${macro}"*} ]]; then
-    			NAMING_PARTS+=("l:${rest%%"${macro}"*}")
-    		fi
-    		rest=${rest#*"${macro}"}
-    		case ${name} in
-    		shard | cluster | chi | namespace | prefix)
-    			NAMING_PARTS+=("p:${name}")
-    			seen[${name}]=$((${seen[${name}]:-0} + 1))
-    			continue
-    			;;
-    		esac
-    		tokens=${name}
-    		while [[ -n ${tokens} ]]; do
-    			case ${tokens} in
-    			YYYY*) token=YYYY ;;
-    			MM*) token=MM ;;
-    			DD*) token=DD ;;
-    			HH*) token=HH ;;
-    			II*) token=II ;;
-    			SS*) token=SS ;;
-    			*) die "BACKUP_NAMING holds {${name}}, which is no placeholder" ;;
-    			esac
-    			NAMING_PARTS+=("t:${token}")
-    			seen[${token}]=$((${seen[${token}]:-0} + 1))
-    			tokens=${tokens:${#token}}
-    		done
-    	done
-    	if [[ -n ${rest} ]]; then
-    		NAMING_PARTS+=("l:${rest}")
-    	fi
-    	for name in shard YYYY MM DD HH II SS; do
-    		if [[ ${seen[${name}]:-0} != 1 ]]; then
-    			die "BACKUP_NAMING must hold {shard} and every token of the time, YYYY, MM, DD, HH, II and SS, once"
-    		fi
-    	done
-    	for name in cluster chi namespace prefix; do
-    		if ((${seen[${name}]:-0} > 1)); then
-    			die "BACKUP_NAMING holds {${name}} twice"
-    		fi
-    	done
-    	for pair in ${SHARD_NUMBERS:-}; do
-    		if [[ ! ${pair} =~ ^[^=]+=[1-9][0-9]{0,4}$ || ! ${pair%%=*} =~ ${HOST_RE} ]]; then
-    			die "SHARD_NUMBERS must list host=number pairs"
-    		fi
-    		SHARD_OF[${pair%%=*}]=${pair#*=}
-    	done
-    	SLOT_TOLERANCE=${NAMING_SLOT_TOLERANCE}
-    	unset NAMING_CACHED
-    }
-    
-    naming_value() {
-    	case $1 in
-    	cluster) REPLY=${CLUSTER:-} ;;
-    	chi) REPLY=${SOURCE_INSTALLATION:-${NAMING_INSTALLATION:-}} ;;
-    	namespace) REPLY=${SOURCE_NAMESPACE:-${NAMING_NAMESPACE:-}} ;;
-    	esac
-    }
-    
-    naming_regex() {
-    	local part group=0 regex='^'
-    	declare -gA NAMING_GROUP=()
-    	for part in "${NAMING_PARTS[@]}"; do
-    		case ${part} in
-    		l:*)
-    			part=${part#l:}
-    			regex+=${part//./[.]}
-    			;;
-    		p:shard)
-    			group=$((group + 1))
-    			NAMING_GROUP[shard]=${group}
-    			regex+='([1-9][0-9]*)'
-    			;;
-    		p:prefix)
-    			if [[ -n $1 ]]; then
-    				regex+=${1//./[.]}
-    			else
-    				group=$((group + 1))
-    				NAMING_GROUP[prefix]=${group}
-    				regex+='([A-Za-z0-9._-]+)'
-    			fi
-    			;;
-    		p:*)
-    			naming_value "${part#p:}"
-    			regex+=${REPLY//./[.]}
-    			;;
-    		t:*)
-    			if [[ ${part} == t:HH ]]; then
-    				group=$((group + 1))
-    				NAMING_GROUP[T]=${group}
-    				regex+='(T?)'
-    			fi
-    			group=$((group + 1))
-    			NAMING_GROUP[${part#t:}]=${group}
-    			if [[ ${part} == t:YYYY ]]; then
-    				regex+='([0-9]{4})'
-    			else
-    				regex+='([0-9]{2})'
-    			fi
-    			;;
-    		esac
-    	done
-    	REPLY=${regex}'$'
-    }
-    
-    naming_parse() {
-    	local name=$1
-    	if [[ -z ${NAMING_CACHED+set} || ${NAMING_CACHED} != "p:${2:-}" ]]; then
-    		naming_regex "${2:-}"
-    		NAMING_CACHED_REGEX=${REPLY}
-    		NAMING_CACHED=p:${2:-}
-    	fi
-    	if [[ ! ${name} =~ ${NAMING_CACHED_REGEX} ]]; then
-    		return 1
-    	fi
-    	N_SHARD=${BASH_REMATCH[NAMING_GROUP[shard]]}
-    	N_PREFIX=${2:-}
-    	if [[ -n ${NAMING_GROUP[prefix]:-} ]]; then
-    		N_PREFIX=${BASH_REMATCH[NAMING_GROUP[prefix]]}
-    	fi
-    	N_KEY=${BASH_REMATCH[NAMING_GROUP[YYYY]]}${BASH_REMATCH[NAMING_GROUP[MM]]}${BASH_REMATCH[NAMING_GROUP[DD]]}
-    	N_KEY+=${BASH_REMATCH[NAMING_GROUP[T]]}${BASH_REMATCH[NAMING_GROUP[HH]]}${BASH_REMATCH[NAMING_GROUP[II]]}${BASH_REMATCH[NAMING_GROUP[SS]]}
-    	tag_valid "${N_KEY/T/}"
-    }
-    
-    naming_render() {
-    	local part digits=${2/T/} name=
-    	for part in "${NAMING_PARTS[@]}"; do
-    		case ${part} in
-    		l:*) name+=${part#l:} ;;
-    		p:shard) name+=$1 ;;
-    		p:prefix) name+=$3 ;;
-    		p:*)
-    			naming_value "${part#p:}"
-    			name+=${REPLY}
-    			;;
-    		t:YYYY) name+=${digits:0:4} ;;
-    		t:MM) name+=${digits:4:2} ;;
-    		t:DD) name+=${digits:6:2} ;;
-    		t:HH)
-    			if [[ $2 == *T* ]]; then
-    				name+=T
-    			fi
-    			name+=${digits:8:2}
-    			;;
-    		t:II) name+=${digits:10:2} ;;
-    		t:SS) name+=${digits:12:2} ;;
-    		esac
-    	done
-    	REPLY=${name}
-    	[[ ${REPLY} =~ ${NAME_RE} ]]
-    }
-    
-    # naming_holds PLACEHOLDER reports whether the naming template holds the placeholder
-    naming_holds() {
-    	listed "p:$1" ${NAMING_PARTS[@]+"${NAMING_PARTS[@]}"}
-    }
-    
-    series_key() {
-    	local prefix=
-    	if ((${#NAMING_PARTS[@]} == 0)); then
-    		retention_pattern
-    		if [[ ! $2 =~ ${REPLY} ]]; then
-    			return 1
-    		fi
-    		REPLY=$2
-    		return 0
-    	fi
-    	if naming_holds prefix; then
-    		prefix=${BACKUP_NAME_PREFIX:-}
-    		if [[ -z ${prefix} ]]; then
-    			return 1
-    		fi
-    	fi
-    	if ! naming_parse "$2" "${prefix}" || [[ ${N_SHARD} != "${SHARD_OF[$1]:-}" ]]; then
-    		return 1
-    	fi
-    	REPLY=${N_KEY}
-    }
-    
-    key_time() {
-    	REPLY=$1
-    	if ((${#NAMING_PARTS[@]} == 0)); then
-    		REPLY=${1:${#BACKUP_NAME_PREFIX}+1}
-    	fi
-    	KEY_AT_ONCE=
-    	if [[ ${REPLY} == *T* ]]; then
-    		KEY_AT_ONCE=1
-    	fi
-    	REPLY=${REPLY/T/}
-    }
-    
-    # host_name HOST KEY sets REPLY to the name of the backup of the key KEY on HOST
-    host_name() {
-    	if ((${#NAMING_PARTS[@]} == 0)); then
-    		REPLY=$2
-    		return 0
-    	fi
-    	if [[ -z ${SHARD_OF[$1]:-} ]]; then
-    		die "SHARD_NUMBERS tells no shard of $1, whose backup the naming template names by its shard"
-    	fi
-    	if ! naming_render "${SHARD_OF[$1]}" "$2" "${NAMING_PREFIX}"; then
-    		die "the naming template '${BACKUP_NAMING}' makes '${REPLY}' of the backup $2 of $1, which is no valid backup name"
-    	fi
-    }
-    
-    naming_key() {
-    	local value=${!1}
-    	NAMING_PREFIX=${2:-}
-    	if ((${#NAMING_PARTS[@]} == 0)); then
-    		REPLY=${value}
-    		return 0
-    	fi
-    	if [[ ${value} =~ ${NAMING_TAG_RE} ]] && tag_valid "${value/T/}"; then
-    		if naming_holds prefix && [[ -z ${NAMING_PREFIX} ]]; then
-    			die "$1 ${value} tells the time of the backup alone, while the naming template '${BACKUP_NAMING}' holds {prefix}: name the backup in full, as the name of the backup of any shard"
-    		fi
-    		REPLY=${value}
-    		return 0
-    	fi
-    	if ! naming_parse "${value}" "${NAMING_PREFIX}"; then
-    		die "$1 ${value} is no name the naming template '${BACKUP_NAMING}' makes on cluster ${CLUSTER:-}, nor the time of one, YYYYMMDDHHMMSS"
-    	fi
-    	NAMING_PREFIX=${N_PREFIX}
-    	REPLY=${N_KEY}
-    }
-    
-    resolve_names() {
-    	local host
-    	for host in "$@"; do
-    		host_name "${host}" "${BACKUP_KEY}"
-    		HOST_BACKUP[${host}]=${REPLY}
-    	done
-    }
-    
-    check_override() {
-    	local key=${1%%=*} value=${1#*=} token
-    	REPLY=
-    	if [[ ! $1 =~ ${CONFIG_OVERRIDE_RE} ]] || ((${#key} > CONFIG_OVERRIDE_KEY_MAX_LENGTH || ${#value} > CONFIG_OVERRIDE_VALUE_MAX_LENGTH)); then
-    		REPLY="the config override '$1' is no KEY=VALUE of a clickhouse-backup setting"
-    		return 1
-    	fi
-    	if [[ ${CONFIG_OVERRIDE_FORBIDDEN} == *" ${key} "* || ${key} == API_* ]] || listed "${key}" "${PATH_CHECK_KEYS[@]}"; then
-    		REPLY="the config override of ${key} is refused: the operator sets it, or it tells where the backups are"
-    		return 1
-    	fi
-    	for token in "${CONFIG_OVERRIDE_SENSITIVE[@]}"; do
-    		if [[ ${key} == *"${token}"* ]]; then
-    			REPLY="the config override of ${key} is refused: it is a secret, which belongs in the configuration of the sidecar"
-    			return 1
-    		fi
-    	done
-    }
-    
     # period_weight PERIOD sets REPLY to the weight of a schedule period
     period_weight() {
     	case $1 in
@@ -10518,9 +9736,7 @@ data:
     	local -a entries fields
     	local -A periods=()
     	SCHED_PERIOD=() SCHED_HOUR=() SCHED_MINUTE=() SCHED_DAY=() SCHED_KEEP=() SCHED_INCREMENTAL=() SCHED_ENV=()
-    	if [[ ${SCHEDULES:-} == *[[:cntrl:]]* ]]; then
-    		die "SCHEDULES must be one line"
-    	fi
+    	one_line SCHEDULES
     	IFS=';' read -r -a entries <<<"${SCHEDULES:-}"
     	for entry in "${entries[@]}"; do
     		read -r -a fields <<<"${entry}"
@@ -10717,6 +9933,498 @@ data:
     	SLOT_TAG=${REPLY}
     }
     
+    # ===== Naming
+    
+    naming_init() {
+    	local rest=${BACKUP_NAMING:-} macro name tokens token pair
+    	local -A seen=()
+    	NAMING_PARTS=()
+    	SLOT_TOLERANCE=0
+    	declare -gA SHARD_OF=()
+    	if [[ -z ${rest} ]]; then
+    		return 0
+    	fi
+    	if [[ ! ${rest} =~ ${NAMING_RE} ]] || ((${#rest} > NAMING_MAX_LENGTH)); then
+    		die "BACKUP_NAMING is not a valid naming template"
+    	fi
+    	while [[ ${rest} =~ \{([A-Za-z]+)\} ]]; do
+    		macro=${BASH_REMATCH[0]}
+    		name=${BASH_REMATCH[1]}
+    		if [[ -n ${rest%%"${macro}"*} ]]; then
+    			NAMING_PARTS+=("l:${rest%%"${macro}"*}")
+    		fi
+    		rest=${rest#*"${macro}"}
+    		case ${name} in
+    		shard | cluster | chi | namespace | prefix)
+    			NAMING_PARTS+=("p:${name}")
+    			seen[${name}]=$((${seen[${name}]:-0} + 1))
+    			continue
+    			;;
+    		esac
+    		tokens=${name}
+    		while [[ -n ${tokens} ]]; do
+    			case ${tokens} in
+    			YYYY*) token=YYYY ;;
+    			MM*) token=MM ;;
+    			DD*) token=DD ;;
+    			HH*) token=HH ;;
+    			II*) token=II ;;
+    			SS*) token=SS ;;
+    			*) die "BACKUP_NAMING holds {${name}}, which is no placeholder" ;;
+    			esac
+    			NAMING_PARTS+=("t:${token}")
+    			seen[${token}]=$((${seen[${token}]:-0} + 1))
+    			tokens=${tokens:${#token}}
+    		done
+    	done
+    	if [[ -n ${rest} ]]; then
+    		NAMING_PARTS+=("l:${rest}")
+    	fi
+    	for name in shard YYYY MM DD HH II SS; do
+    		if [[ ${seen[${name}]:-0} != 1 ]]; then
+    			die "BACKUP_NAMING must hold {shard} and every token of the time, YYYY, MM, DD, HH, II and SS, once"
+    		fi
+    	done
+    	for name in cluster chi namespace prefix; do
+    		if ((${seen[${name}]:-0} > 1)); then
+    			die "BACKUP_NAMING holds {${name}} twice"
+    		fi
+    	done
+    	for pair in ${SHARD_NUMBERS:-}; do
+    		if [[ ! ${pair} =~ ^[^=]+=[1-9][0-9]{0,4}$ || ! ${pair%%=*} =~ ${HOST_RE} ]]; then
+    			die "SHARD_NUMBERS must list host=number pairs"
+    		fi
+    		SHARD_OF[${pair%%=*}]=${pair#*=}
+    	done
+    	SLOT_TOLERANCE=${NAMING_SLOT_TOLERANCE}
+    	unset NAMING_CACHED
+    }
+    
+    naming_value() {
+    	case $1 in
+    	cluster) REPLY=${CLUSTER:-} ;;
+    	chi) REPLY=${SOURCE_INSTALLATION:-${NAMING_INSTALLATION:-}} ;;
+    	namespace) REPLY=${SOURCE_NAMESPACE:-${NAMING_NAMESPACE:-}} ;;
+    	esac
+    }
+    
+    naming_regex() {
+    	local part group=0 regex='^'
+    	declare -gA NAMING_GROUP=()
+    	for part in "${NAMING_PARTS[@]}"; do
+    		case ${part} in
+    		l:*)
+    			part=${part#l:}
+    			regex+=${part//./[.]}
+    			;;
+    		p:shard)
+    			group=$((group + 1))
+    			NAMING_GROUP[shard]=${group}
+    			regex+='([1-9][0-9]*)'
+    			;;
+    		p:prefix)
+    			if [[ -n $1 ]]; then
+    				regex+=${1//./[.]}
+    			else
+    				group=$((group + 1))
+    				NAMING_GROUP[prefix]=${group}
+    				regex+='([A-Za-z0-9._-]+)'
+    			fi
+    			;;
+    		p:*)
+    			naming_value "${part#p:}"
+    			regex+=${REPLY//./[.]}
+    			;;
+    		t:*)
+    			if [[ ${part} == t:HH ]]; then
+    				group=$((group + 1))
+    				NAMING_GROUP[T]=${group}
+    				regex+='(T?)'
+    			fi
+    			group=$((group + 1))
+    			NAMING_GROUP[${part#t:}]=${group}
+    			if [[ ${part} == t:YYYY ]]; then
+    				regex+='([0-9]{4})'
+    			else
+    				regex+='([0-9]{2})'
+    			fi
+    			;;
+    		esac
+    	done
+    	REPLY=${regex}'$'
+    }
+    
+    naming_parse() {
+    	local name=$1
+    	if [[ ${NAMING_CACHED-} != "p:${2:-}" ]]; then
+    		naming_regex "${2:-}"
+    		NAMING_CACHED_REGEX=${REPLY}
+    		NAMING_CACHED=p:${2:-}
+    	fi
+    	if [[ ! ${name} =~ ${NAMING_CACHED_REGEX} ]]; then
+    		return 1
+    	fi
+    	N_SHARD=${BASH_REMATCH[NAMING_GROUP[shard]]}
+    	N_PREFIX=${2:-}
+    	if [[ -n ${NAMING_GROUP[prefix]:-} ]]; then
+    		N_PREFIX=${BASH_REMATCH[NAMING_GROUP[prefix]]}
+    	fi
+    	N_KEY=${BASH_REMATCH[NAMING_GROUP[YYYY]]}${BASH_REMATCH[NAMING_GROUP[MM]]}${BASH_REMATCH[NAMING_GROUP[DD]]}
+    	N_KEY+=${BASH_REMATCH[NAMING_GROUP[T]]}${BASH_REMATCH[NAMING_GROUP[HH]]}${BASH_REMATCH[NAMING_GROUP[II]]}${BASH_REMATCH[NAMING_GROUP[SS]]}
+    	tag_valid "${N_KEY/T/}"
+    }
+    
+    naming_render() {
+    	local part digits=${2/T/} name=
+    	for part in "${NAMING_PARTS[@]}"; do
+    		case ${part} in
+    		l:*) name+=${part#l:} ;;
+    		p:shard) name+=$1 ;;
+    		p:prefix) name+=$3 ;;
+    		p:*)
+    			naming_value "${part#p:}"
+    			name+=${REPLY}
+    			;;
+    		t:YYYY) name+=${digits:0:4} ;;
+    		t:MM) name+=${digits:4:2} ;;
+    		t:DD) name+=${digits:6:2} ;;
+    		t:HH)
+    			if [[ $2 == *T* ]]; then
+    				name+=T
+    			fi
+    			name+=${digits:8:2}
+    			;;
+    		t:II) name+=${digits:10:2} ;;
+    		t:SS) name+=${digits:12:2} ;;
+    		esac
+    	done
+    	REPLY=${name}
+    	[[ ${REPLY} =~ ${NAME_RE} ]]
+    }
+    
+    # naming_holds PLACEHOLDER reports whether the naming template holds the placeholder
+    naming_holds() {
+    	listed "p:$1" ${NAMING_PARTS[@]+"${NAMING_PARTS[@]}"}
+    }
+    
+    # naming_prefix sets REPLY to the {prefix} of the naming template, BACKUP_NAME_PREFIX, or nothing without one; it
+    # fails when BACKUP_NAME_PREFIX leaves a {prefix} empty
+    naming_prefix() {
+    	REPLY=
+    	if naming_holds prefix; then
+    		REPLY=${BACKUP_NAME_PREFIX:-}
+    		[[ -n ${REPLY} ]]
+    	fi
+    }
+    
+    # series_key HOST NAME sets REPLY to the key of NAME, a backup of the series retention keeps, or fails
+    series_key() {
+    	local pattern
+    	if ((${#NAMING_PARTS[@]} == 0)); then
+    		pattern="^${BACKUP_NAME_PREFIX//./[.]}-[0-9]{8}T?[0-9]{6}$"
+    		if [[ ! $2 =~ ${pattern} ]]; then
+    			return 1
+    		fi
+    		REPLY=$2
+    		return 0
+    	fi
+    	if ! naming_prefix || ! naming_parse "$2" "${REPLY}" || [[ ${N_SHARD} != "${SHARD_OF[$1]:-}" ]]; then
+    		return 1
+    	fi
+    	REPLY=${N_KEY}
+    }
+    
+    key_time() {
+    	REPLY=$1
+    	if ((${#NAMING_PARTS[@]} == 0)); then
+    		REPLY=${1:${#BACKUP_NAME_PREFIX}+1}
+    	fi
+    	KEY_AT_ONCE=
+    	if [[ ${REPLY} == *T* ]]; then
+    		KEY_AT_ONCE=1
+    	fi
+    	REPLY=${REPLY/T/}
+    }
+    
+    # host_name HOST KEY sets REPLY to the name of the backup of the key KEY on HOST
+    host_name() {
+    	if ((${#NAMING_PARTS[@]} == 0)); then
+    		REPLY=$2
+    		return 0
+    	fi
+    	if [[ -z ${SHARD_OF[$1]:-} ]]; then
+    		die "SHARD_NUMBERS tells no shard of $1, whose backup the naming template names by its shard"
+    	fi
+    	if ! naming_render "${SHARD_OF[$1]}" "$2" "${NAMING_PREFIX}"; then
+    		die "the naming template '${BACKUP_NAMING}' makes '${REPLY}' of the backup $2 of $1, which is no valid backup name"
+    	fi
+    }
+    
+    naming_key() {
+    	local value=${!1}
+    	NAMING_PREFIX=${2:-}
+    	if ((${#NAMING_PARTS[@]} == 0)); then
+    		REPLY=${value}
+    		return 0
+    	fi
+    	if [[ ${value} =~ ${NAMING_TAG_RE} ]] && tag_valid "${value/T/}"; then
+    		if naming_holds prefix && [[ -z ${NAMING_PREFIX} ]]; then
+    			die "$1 ${value} tells the time of the backup alone, while the naming template '${BACKUP_NAMING}' holds {prefix}: name the backup in full, as the name of the backup of any shard"
+    		fi
+    		REPLY=${value}
+    		return 0
+    	fi
+    	if ! naming_parse "${value}" "${NAMING_PREFIX}"; then
+    		die "$1 ${value} is no name the naming template '${BACKUP_NAMING}' makes on cluster ${CLUSTER:-}, nor the time of one, YYYYMMDDHHMMSS"
+    	fi
+    	NAMING_PREFIX=${N_PREFIX}
+    	REPLY=${N_KEY}
+    }
+    
+    # resolve_names INTO KEY HOST... sets INTO[HOST] to the name of the backup KEY on every HOST
+    resolve_names() {
+    	local -n _names=$1
+    	local _key=$2 _host
+    	shift 2
+    	for _host in "$@"; do
+    		host_name "${_host}" "${_key}"
+    		_names["${_host}"]=${REPLY}
+    	done
+    }
+    
+    # ===== Retention and incremental bases
+    
+    retention_plan() {
+    	local name tag key newest= made=${BACKUP_KEY:-${BACKUP_NAME:-}}
+    	local -a ordered=() incomplete=() obsolete=() held=()
+    	declare -gA KEEP=()
+    	OBSOLETE=()
+    	HELD_OBSOLETE=()
+    	for name in ${NAMES[@]+"${NAMES[@]}"}; do
+    		key_time "${name}"
+    		key=${REPLY}
+    		if ! tag_valid "${key}"; then
+    			continue
+    		fi
+    		if [[ -z ${COMPLETE[${name}]:-} ]]; then
+    			if [[ -n ${SIZED[${name}]:-}${BROKEN[${name}]:-} && ${name} != "${made}" ]]; then
+    				incomplete+=("${key} ${name}")
+    			fi
+    		elif [[ -z ${EMPTY[${name}]:-} ]]; then
+    			ordered+=("${key} ${name}")
+    		fi
+    	done
+    	if ((${#ordered[@]} > 0)); then
+    		mapfile -t ordered < <(printf '%s\n' "${ordered[@]}" | sort -r)
+    		newest=${ordered[0]%% *}
+    	fi
+    	rules_keep ${ordered[@]+"${ordered[@]}"}
+    	merge_keys KEEP RULES_KEEP
+    	for tag in ${ordered[@]+"${ordered[@]}"}; do
+    		if [[ ${tag#* } == "${made}" ]]; then
+    			KEEP[${made}]=1
+    		fi
+    	done
+    	pinned_keys
+    	merge_keys KEEP PINNED
+    	held_keys ${ordered[@]+"${ordered[@]}"}
+    	for tag in ${ordered[@]+"${ordered[@]}"}; do
+    		if [[ -n ${KEEP[${tag#* }]:-} ]]; then
+    			continue
+    		fi
+    		if [[ -n ${HELD_KEYS[${tag#* }]:-} ]]; then
+    			held+=("${tag#* }")
+    		else
+    			obsolete+=("${tag}")
+    		fi
+    	done
+    	HELD_OBSOLETE=(${held[@]+"${held[@]}"})
+    	for tag in ${incomplete[@]+"${incomplete[@]}"}; do
+    		if [[ -n ${newest} && ${tag%% *} < ${newest} ]]; then
+    			obsolete+=("${tag}")
+    		fi
+    	done
+    	if ((${#obsolete[@]} > 0)); then
+    		mapfile -t obsolete < <(printf '%s\n' "${obsolete[@]}" | sort -r)
+    		for tag in "${obsolete[@]}"; do
+    			OBSOLETE+=("${tag#* }")
+    		done
+    	fi
+    }
+    
+    rules_keep() {
+    	local tag key name i oldest= first=1
+    	local -a manual=() counts=()
+    	declare -gA RULES_KEEP=()
+    	for i in "${!SCHED_PERIOD[@]}"; do
+    		counts[i]=0
+    	done
+    	for tag in "$@"; do
+    		key=${tag%% *}
+    		name=${tag#* }
+    		if [[ -n ${first} ]]; then
+    			RULES_KEEP[${name}]=1
+    			first=
+    		fi
+    		key_time "${name}"
+    		if [[ -n ${KEY_AT_ONCE} ]]; then
+    			manual+=("${tag}")
+    			continue
+    		fi
+    		for i in "${!SCHED_PERIOD[@]}"; do
+    			if slot_matches "${i}" "${key}"; then
+    				counts[i]=$((counts[i] + 1))
+    				if ((counts[i] <= SCHED_KEEP[i])); then
+    					RULES_KEEP[${name}]=1
+    					oldest=${key}
+    				fi
+    			fi
+    		done
+    	done
+    	for tag in ${manual[@]+"${manual[@]}"}; do
+    		key=${tag%% *}
+    		if [[ -z ${oldest} || ! ${key} < ${oldest} ]]; then
+    			RULES_KEEP[${tag#* }]=1
+    		fi
+    	done
+    }
+    
+    # pinned_keys sets PINNED to the keys of the backups KEEP_BACKUPS pins, which retention never deletes
+    pinned_keys() {
+    	local value prefix
+    	declare -gA PINNED=()
+    	one_line KEEP_BACKUPS
+    	naming_prefix || :
+    	prefix=${REPLY}
+    	for value in ${KEEP_BACKUPS:-}; do
+    		if ((${#NAMING_PARTS[@]} == 0)) || [[ ${value} =~ ${NAMING_TAG_RE} ]]; then
+    			PINNED[${value}]=1
+    		elif naming_parse "${value}" "${prefix}"; then
+    			PINNED[${N_KEY}]=1
+    		fi
+    	done
+    }
+    
+    held_keys() {
+    	local record change entries name
+    	# parse_schedules fills these locals with the entries of every record
+    	local -a records subset SCHED_PERIOD SCHED_HOUR SCHED_MINUTE SCHED_DAY SCHED_KEEP SCHED_INCREMENTAL SCHED_ENV
+    	declare -gA HELD_KEYS=()
+    	if [[ -z ${PREVIOUS_SCHEDULES:-} ]]; then
+    		return 0
+    	fi
+    	one_line PREVIOUS_SCHEDULES
+    	IFS='#' read -r -a records <<<"${PREVIOUS_SCHEDULES}"
+    	for record in "${records[@]}"; do
+    		if [[ ! ${record} =~ ^([0-9]{1,12})\|([^|]*)\|([^|]+)$ ]]; then
+    			die "PREVIOUS_SCHEDULES must list <epoch>|<time zone>|<entries> records separated by #"
+    		fi
+    		entries=${BASH_REMATCH[3]}
+    		local SCHEDULE_TIMEZONE=${BASH_REMATCH[2]} SCHEDULES=${entries}
+    		check_timezone
+    		slot_tag "${BASH_REMATCH[1]}"
+    		change=${REPLY}
+    		subset=()
+    		for name in "$@"; do
+    			if [[ ${name%% *} < ${change} ]]; then
+    				subset+=("${name}")
+    			fi
+    		done
+    		if [[ ${entries} == "*" ]]; then
+    			for name in ${subset[@]+"${subset[@]}"}; do
+    				HELD_KEYS[${name#* }]=1
+    			done
+    			continue
+    		fi
+    		parse_schedules
+    		rules_keep ${subset[@]+"${subset[@]}"}
+    		merge_keys HELD_KEYS RULES_KEEP
+    	done
+    }
+    
+    # retention_on_host HOST deletes on HOST the backups of OBSOLETE it lists, newest first
+    retention_on_host() {
+    	local host=$1 name key
+    	local -A held=()
+    	if ! list_backups "${host}" remote; then
+    		return 1
+    	fi
+    	for name in "${LIST_NAMES[@]}"; do
+    		if [[ -n ${name} ]]; then
+    			held[${name}]=1
+    		fi
+    	done
+    	for key in ${OBSOLETE[@]+"${OBSOLETE[@]}"}; do
+    		host_name "${host}" "${key}"
+    		name=${REPLY}
+    		if [[ -z ${held[${name}]:-} ]]; then
+    			continue
+    		fi
+    		if submit "${host}" "delete remote ${name}" "/backup/delete/remote/${name}" --max-time "${DELETE_TIMEOUT}"; then
+    			notice OrchestratorRetentionDeleted "${host}: retention deleted ${name}"
+    		else
+    			event Warning OrchestratorRetentionFailed "${LAST_WARNING}"
+    		fi
+    	done
+    }
+    
+    retention() {
+    	local host
+    	if ((${#SCHED_PERIOD[@]} == 0)); then
+    		return 0
+    	fi
+    	if is_true RESTORE_IN_PROGRESS; then
+    		warn "retention skipped: a restore of the cluster is in progress"
+    		return 0
+    	fi
+    	if [[ -z ${BACKUP_NAME_PREFIX:-} ]]; then
+    		warn "retention skipped: BACKUP_NAME_PREFIX is not set"
+    		return 0
+    	fi
+    	read -r -a HOSTS <<<"${RETENTION_HOSTS:-}"
+    	if ((${#HOSTS[@]} == 0)); then
+    		warn "retention skipped: RETENTION_HOSTS is empty"
+    		return 0
+    	fi
+    	log "retention: keeping the newest ${BACKUP_NAME_PREFIX}-* backup, the newest backups of the slots of every schedule entry it keeps, and the backups made at once no older than the oldest of those"
+    	BEST_EFFORT=1
+    	list_all series_key "${HOSTS[@]}"
+    	if ((${#UNLISTED[@]} > 0)); then
+    		alert OrchestratorRetentionSkipped "retention skipped: ${UNLISTED[*]} cannot be listed, backups are left as they are"
+    		return 0
+    	fi
+    	NAMES=("${!ALL_NAMES[@]}")
+    	retention_plan
+    	report_held
+    	for host in "${HOSTS[@]}"; do
+    		if [[ ! ${host} =~ ${HOST_RE} ]]; then
+    			warn "retention skipped an invalid host name"
+    		elif ! retention_on_host "${host}"; then
+    			warn "${host}: retention failed, backups are left as they are"
+    		fi
+    	done
+    }
+    
+    report_held() {
+    	local key more=
+    	local -a names=()
+    	if ((${#HELD_OBSOLETE[@]} == 0)); then
+    		return 0
+    	fi
+    	for key in "${HELD_OBSOLETE[@]}"; do
+    		REPLY=${key}
+    		if ((${#NAMING_PARTS[@]} > 0)); then
+    			naming_render 1 "${key}" "${NAMING_PREFIX}" || :
+    		fi
+    		names+=("${REPLY}")
+    	done
+    	alert OrchestratorRetentionHeld "retention holds ${#names[@]} backup(s) the schedule kept before a change of it, which it would delete now: ${names[*]:0:HELD_REPORT_MAX}${names[HELD_REPORT_MAX]:+ ...}; keep those to keep in spec.retention.keepBackups and release the change with spec.retention.releaseHeld"
+    	if ((${#names[@]} > HELD_REPORT_MAX)); then
+    		more=" +$((${#names[@]} - HELD_REPORT_MAX))"
+    	fi
+    	report "${HELD_BACKUPS_MESSAGE:-}" "${names[*]:0:HELD_REPORT_MAX}${more}"
+    }
+    
     record_series() {
     	local host=$1 i
     	for i in "${!LIST_NAMES[@]}"; do
@@ -10730,15 +10438,17 @@ data:
     incremental_base() {
     	local keep=$1 host key name newest= newest_time= count n
     	local -a names
-    	local -A hosts=() held=()
+    	local -A hosts=() held=() rows=()
     	shift
     	for host in "$@"; do
     		hosts[${host}]=1
     	done
     	for key in "${!SERIES_REQUIRED[@]}"; do
-    		if [[ -n ${hosts[${key%% *}]:-} ]]; then
-    			name=${key#* }
+    		host=${key%% *} name=${key#* }
+    		if [[ -n ${hosts[${host}]:-} ]]; then
     			held[${name}]=$((${held[${name}]:-0} + 1))
+    			key_time "${name}"
+    			rows[${host}]+="${REPLY} ${name}"$'\n'
     		fi
     	done
     	for name in "${!held[@]}"; do
@@ -10755,19 +10465,9 @@ data:
     		return 0
     	fi
     	for host in "${!hosts[@]}"; do
-    		names=()
-    		for key in "${!SERIES_REQUIRED[@]}"; do
-    			if [[ ${key%% *} == "${host}" ]]; then
-    				key_time "${key#* }"
-    				names+=("${REPLY} ${key#* }")
-    			fi
-    		done
-    		mapfile -t names < <(printf '%s\n' ${names[@]+"${names[@]}"} | sort -r)
+    		mapfile -t names < <(printf '%s' "${rows[${host}]:-}" | sort -r)
     		count=0
-    		for name in "${names[@]}"; do
-    			if [[ -z ${name} ]]; then
-    				continue
-    			fi
+    		for name in ${names[@]+"${names[@]}"}; do
     			if [[ ${name%% *} > ${newest_time} ]]; then
     				continue
     			fi
@@ -10786,6 +10486,293 @@ data:
     		REPLY=${newest}
     	fi
     }
+    
+    # ===== Storage path check
+    
+    storage_prefix() {
+    	case $1 in
+    	s3) REPLY=S3 ;;
+    	gcs) REPLY=GCS ;;
+    	azblob) REPLY=AZBLOB ;;
+    	cos) REPLY=COS ;;
+    	ftp) REPLY=FTP ;;
+    	sftp) REPLY=SFTP ;;
+    	*) REPLY= ;;
+    	esac
+    }
+    
+    path_setting() {
+    	local name="PATH_$1_$2"
+    	REPLY=${!name-}
+    	SETTING_SET=${!name+1}
+    }
+    
+    identity_default() {
+    	case $1 in
+    	AZBLOB_ENDPOINT_SUFFIX) REPLY=core.windows.net ;;
+    	SFTP_PORT) REPLY=22 ;;
+    	*) REPLY= ;;
+    	esac
+    }
+    
+    # trim_path STORAGE PATH sets REPLY to PATH as clickhouse-backup trims it
+    trim_path() {
+    	local value=$2 both=$' \t\r\n/' trailing=
+    	if [[ $1 == ftp || $1 == sftp ]]; then
+    		both=$' \t\r\n'
+    		trailing=/
+    	fi
+    	while [[ -n ${value} && ${value:0:1} == ["${both}"] ]]; do
+    		value=${value:1}
+    	done
+    	while [[ -n ${value} && ${value: -1} == ["${both}"] ]]; do
+    		value=${value::-1}
+    	done
+    	while [[ -n ${trailing} && ${value} == */ ]]; do
+    		value=${value::-1}
+    	done
+    	REPLY=${value}
+    }
+    
+    clean_path() {
+    	local rest=$1 element rooted= IFS=/
+    	local -a elements=()
+    	if [[ ${rest} == /* ]]; then
+    		rooted=/
+    	fi
+    	while [[ -n ${rest} ]]; do
+    		element=${rest%%/*}
+    		if [[ ${rest} == */* ]]; then
+    			rest=${rest#*/}
+    		else
+    			rest=
+    		fi
+    		case ${element} in
+    		"" | .) ;;
+    		..)
+    			if ((${#elements[@]} > 0)) && [[ ${elements[-1]} != .. ]]; then
+    				unset 'elements[-1]'
+    			elif [[ -z ${rooted} ]]; then
+    				elements+=(..)
+    			fi
+    			;;
+    		*) elements+=("${element}") ;;
+    		esac
+    	done
+    	REPLY=${rooted}${elements[*]}
+    }
+    
+    # substitute_macros TEMPLATE STRICT INSTALLATION NAMESPACE [CLUSTER SHARD] sets REPLY to TEMPLATE with its macros
+    # replaced: STRICT, all but {replica}, failing at an unknown one, UNKNOWN_MACRO; else non-empty {installation} and
+    # {namespace} alone
+    substitute_macros() {
+    	local rest=$1 out= macro value
+    	while [[ ${rest} =~ \{([^{}]*)\} ]]; do
+    		macro=${BASH_REMATCH[0]}
+    		case ${BASH_REMATCH[1]} in
+    		installation) value=$3 ;;
+    		namespace) value=$4 ;;
+    		cluster) value=${5-} ;;
+    		shard) value=${6-} ;;
+    		replica) value=${macro} ;;
+    		*)
+    			if [[ -n $2 ]]; then
+    				UNKNOWN_MACRO=${macro}
+    				return 1
+    			fi
+    			value=
+    			;;
+    		esac
+    		if [[ -z $2 ]]; then
+    			value=${value:-${macro}}
+    		fi
+    		out+=${rest%%"${macro}"*}${value}
+    		rest=${rest#*"${macro}"}
+    	done
+    	REPLY=${out}${rest}
+    }
+    
+    expand_macros() {
+    	substitute_macros "$1" strict "${PATH_INSTALLATION:-}" "${PATH_NAMESPACE:-}" "$2" "$3"
+    }
+    
+    # default_path INDEX NAME sets REPLY to the default path NAME
+    default_path() {
+    	local own="PATH_$1_$2"
+    	if [[ -n ${!own+set} ]]; then
+    		REPLY=${!own}
+    	else
+    		REPLY=${!2:-}
+    	fi
+    }
+    
+    path_check_inconclusive() {
+    	SELF_PATHS_UNKNOWN=$3
+    	if (($1 > 1)); then
+    		die "the storage path check cannot tell whether cluster $2 shares a storage path with another of the $1 backup-enabled clusters of the installation, which would mix their backups and restore one with the data of the other: $3"
+    	fi
+    	advise "the storage path check is skipped: $3"
+    }
+    
+    # path_unknown INDEX COUNT NAME WHY [WHY_OF_ANOTHER] ends the check at the target cluster, returning 0, or leaves
+    # another cluster out of it
+    path_unknown() {
+    	if [[ $1 == "${PATH_SELF:-}" ]]; then
+    		path_check_inconclusive "$2" "$3" "$4"
+    		return 0
+    	fi
+    	advise "cluster $3 is left out of the storage path check: ${5:-$4}"
+    	return 1
+    }
+    
+    # check_storage_paths refuses, before anything changes, a storage path the target cluster shares
+    check_storage_paths() {
+    	local index storage prefix identity key template object shard name what value self=${PATH_SELF:-} self_name= shared=
+    	local selection=${PATH_REPLICA_SELECTION:-}
+    	local -a indexes others=() shards
+    	local -A owners=() self_owned=()
+    	read -r -a indexes <<<"${PATH_CLUSTERS:-}"
+    	if ((${#indexes[@]} == 0)); then
+    		path_check_inconclusive 0 "" "PATH_CLUSTERS names no cluster"
+    		return 0
+    	fi
+    	for index in "${indexes[@]}"; do
+    		if [[ ! ${index} =~ ${INDEX_RE} ]]; then
+    			die "PATH_CLUSTERS must list cluster indexes"
+    		fi
+    		if [[ ${index} != "${self}" ]]; then
+    			others+=("${index}")
+    		fi
+    	done
+    	if ! listed "${self}" "${indexes[@]}"; then
+    		die "PATH_SELF must be one of the indexes PATH_CLUSTERS lists"
+    	fi
+    	case ${selection} in
+    	"" | FirstPerShard | AllReplicas) ;;
+    	*) die "PATH_REPLICA_SELECTION must be FirstPerShard or AllReplicas" ;;
+    	esac
+    	for index in "${self}" "${others[@]}"; do
+    		path_setting "${index}" CLUSTER
+    		name=${REPLY}
+    		if [[ ${index} == "${self}" ]]; then
+    			self_name=${name}
+    		fi
+    		path_setting "${index}" UNVERIFIABLE
+    		what=${REPLY//[[:cntrl:]]/ }
+    		if [[ -n ${what} ]]; then
+    			if path_unknown "${index}" "${#indexes[@]}" "${name}" "the operator cannot tell the sidecar settings of cluster ${name}: ${what}"; then
+    				return 0
+    			fi
+    			continue
+    		fi
+    		path_setting "${index}" REMOTE_STORAGE
+    		storage=${REPLY}
+    		storage_prefix "${storage}"
+    		prefix=${REPLY}
+    		if [[ -z ${prefix} ]]; then
+    			if [[ -z ${storage} ]]; then
+    				what="its configuration does not set remote_storage"
+    			else
+    				what="it keeps its backups in ${storage} storage, where the check cannot tell their paths"
+    			fi
+    			if path_unknown "${index}" "${#indexes[@]}" "${name}" "${what}"; then
+    				return 0
+    			fi
+    			continue
+    		fi
+    		identity=${storage}
+    		for key in "${PATH_CHECK_KEYS[@]}"; do
+    			if [[ ${key} == "${prefix}_"* && ${key} != "${prefix}_PATH" && ${key} != "${prefix}_OBJECT_DISK_PATH" ]]; then
+    				path_setting "${index}" "${key}"
+    				if [[ -z ${SETTING_SET} ]]; then
+    					identity_default "${key}"
+    				fi
+    				printf -v value ' %q' "${REPLY}"
+    				identity+=${value}
+    			fi
+    		done
+    		path_setting "${index}" "${prefix}_PATH"
+    		if [[ -z ${SETTING_SET} ]]; then
+    			default_path "${index}" DEFAULT_PATH
+    		fi
+    		trim_path "${storage}" "${REPLY}"
+    		clean_path "${REPLY}"
+    		template=${REPLY}
+    		path_setting "${index}" "${prefix}_OBJECT_DISK_PATH"
+    		if [[ -z ${SETTING_SET} ]]; then
+    			default_path "${index}" DEFAULT_OBJECT_DISK_PATH
+    		fi
+    		trim_path "${storage}" "${REPLY}"
+    		object=${REPLY}
+    		if [[ -n ${object} ]]; then
+    			clean_path "${object}"
+    			object=${REPLY:-.}
+    		fi
+    		if [[ ${index} == "${self}" ]]; then
+    			SELF_PATH=${template}
+    			if [[ ${OPERATION} == backup && ${selection} == AllReplicas && ${template} != *"{replica}"* ]]; then
+    				die "the storage path '${template}' of cluster ${name} lacks {replica}: a backup of every replica would keep those of all replicas of a shard at one path"
+    			fi
+    			if [[ ${OPERATION} == backup && ${selection} != AllReplicas && ${template} == *"{replica}"* ]]; then
+    				die "the storage path '${template}' of cluster ${name} holds {replica}: a backup of the first replica of each shard would not be at the path every other replica restores its schema from"
+    			fi
+    			if [[ ${OPERATION} == restore && ${template} == *"{replica}"* ]] && ! is_true VALIDATE_TOPOLOGY; then
+    				advise "the storage path '${template}' of cluster ${name} holds {replica}: every replica restores its schema from its own path, which holds the backup only if it is one of every replica"
+    			fi
+    		fi
+    		for value in "${template}" "${object}"; do
+    			if ! expand_macros "${value}" "${name}" ""; then
+    				if path_unknown "${index}" "${#indexes[@]}" "${name}" "the path '${value}' of cluster ${name} holds ${UNKNOWN_MACRO}, a macro whose value it does not know" \
+    					"its path '${value}' holds ${UNKNOWN_MACRO}, a macro whose value it does not know"; then
+    					return 0
+    				fi
+    				continue 2
+    			fi
+    		done
+    		if [[ ${index} == "${self}" ]]; then
+    			SELF_OBJECT_DISK_PATH=${object}
+    			SELF_STORAGE_PREFIX=${prefix}
+    			SELF_CLUSTER_NAME=${name}
+    		fi
+    		path_setting "${index}" SHARDS
+    		read -r -a shards <<<"${REPLY}"
+    		for shard in "${shards[@]}"; do
+    			for what in "storage path" "object disk path"; do
+    				value=${template}
+    				if [[ ${what} != "storage path" ]]; then
+    					value=${object}
+    				fi
+    				if [[ ${value} == *"{replica}"* ]] || [[ ${what} != "storage path" && -z ${value} ]]; then
+    					continue
+    				fi
+    				expand_macros "${value}" "${name}" "${shard}"
+    				clean_path "${REPLY}"
+    				printf -v key '%s %q %q' "${identity}" "${what}" "${REPLY}"
+    				if [[ -n ${owners[${key}]:-} ]]; then
+    					if [[ ${index} == "${self}" && ${#NAMING_PARTS[@]} -gt 0 ]]; then
+    						shared=1
+    						continue
+    					fi
+    					if [[ -n ${self_owned[${key}]:-} ]]; then
+    						die "the ${what} '${REPLY:-.}' of shard ${shard} of cluster ${name} is that of ${owners[${key}]} too, in the same ${storage} storage: every shard of every cluster needs a path of its own, as {cluster} and {shard} give it"
+    					fi
+    					continue
+    				fi
+    				owners[${key}]="shard ${shard} of cluster ${name}"
+    				if [[ ${index} == "${self}" ]]; then
+    					self_owned[${key}]=1
+    				fi
+    			done
+    		done
+    	done
+    	if [[ -n ${shared} ]]; then
+    		log "storage path check: the shards of cluster ${self_name} share a path, where the naming template '${BACKUP_NAMING}' names the backup of each apart, and no other cluster has it"
+    		return 0
+    	fi
+    	log "storage path check: every shard of cluster ${self_name} has a path of its own"
+    }
+    
+    # ===== Backup Pods
     
     backup_pod_wait_seconds() {
     	REPLY=${BACKUP_POD_WAIT_SECONDS:-${DEFAULT_BACKUP_POD_WAIT_SECONDS}}
@@ -10840,6 +10827,8 @@ data:
     	((CURL_EXIT == 0)) && [[ ${HTTP_CODE} == 200 ]]
     }
     
+    # ===== Backup
+    
     fall_back_hosts() {
     	local i
     	local -a preferred=("${HOSTS[@]}") fallback
@@ -10870,8 +10859,7 @@ data:
     		for where in local remote; do
     			if submit "${host}" "delete ${where} ${name}" "/backup/delete/${where}/${name}" -G --data-urlencode "force=true" \
     				--max-time "${DELETE_TIMEOUT}"; then
-    				log "${host}: the ${where} copy of the failed backup ${name} deleted"
-    				event Normal OrchestratorFailedBackupDeleted "${host}: the ${where} copy of the failed backup ${name} deleted"
+    				notice OrchestratorFailedBackupDeleted "${host}: the ${where} copy of the failed backup ${name} deleted"
     			elif [[ ${LAST_WARNING} == *"not found"* ]]; then
     				log "${host}: no ${where} copy of the failed backup ${name} to delete"
     			else
@@ -10902,19 +10890,52 @@ data:
     	fi
     }
     
+    this_backup() {
+    	REPLY=${BACKUP_KEY}
+    	[[ $2 == "${HOST_BACKUP[$1]:-}" ]]
+    }
+    
+    report_data() {
+    	local BEST_EFFORT=1
+    	list_all this_backup "$@"
+    	if ((${#UNLISTED[@]} > 0)); then
+    		log "whether ${BACKUP_NAME} holds data is unknown: ${UNLISTED[*]} cannot be listed"
+    		return 0
+    	fi
+    	if [[ -z ${COMPLETE[${BACKUP_KEY}]:-} || -n ${WITH_DATA[${BACKUP_KEY}]:-} ]]; then
+    		return 0
+    	fi
+    	alert OrchestratorNoData "${BACKUP_NAME} holds no data"
+    	report "${NO_DATA_MESSAGE:-}"
+    }
+    
+    # create_args sets the options of the backup: CREATE_PARAMS of an op, CREATE_FLAGS of an action
+    create_args() {
+    	CREATE_PARAMS=() CREATE_FLAGS=
+    	if is_true SCHEMA_ONLY; then
+    		CREATE_PARAMS+=(--data-urlencode "schema=")
+    		CREATE_FLAGS+=" --schema"
+    	fi
+    	if [[ -n ${TABLES:-} ]]; then
+    		CREATE_PARAMS+=(--data-urlencode "table=${TABLES}")
+    		CREATE_FLAGS+=" --tables=${TABLES}"
+    	fi
+    	if [[ -n ${PARTITIONS:-} ]]; then
+    		CREATE_PARAMS+=(--data-urlencode "partitions=${PARTITIONS}")
+    		CREATE_FLAGS+=" --partitions=${PARTITIONS}"
+    	fi
+    }
+    
     # config_overrides sets CREATE_KIND to how the backup is made
     config_overrides() {
     	local item
     	local -a items
     	CREATE_KIND=op
-    	CREATE_FLAGS=
     	if [[ -n ${CONFIG_OVERRIDES:-} ]]; then
     		if ((${#SCHED_PERIOD[@]} > 0)); then
     			die "CONFIG_OVERRIDES are those of a backup that runs no schedule: a scheduled backup takes those of its entries"
     		fi
-    		if [[ ${CONFIG_OVERRIDES} == *[[:cntrl:]]* ]]; then
-    			die "CONFIG_OVERRIDES must be one line"
-    		fi
+    		one_line CONFIG_OVERRIDES
     		read -r -a items <<<"${CONFIG_OVERRIDES}"
     		if ((${#items[@]} > CONFIG_OVERRIDES_MAX_ITEMS)); then
     			die "CONFIG_OVERRIDES holds more than ${CONFIG_OVERRIDES_MAX_ITEMS} overrides"
@@ -10930,32 +10951,17 @@ data:
     		return 0
     	fi
     	CREATE_KIND=action
-    	if is_true SCHEMA_ONLY; then
-    		CREATE_FLAGS+=" --schema"
-    	fi
-    	if [[ -n ${TABLES:-} ]]; then
-    		if [[ ! ${TABLES} =~ ${TABLES_RE} ]] || ((${#TABLES} > TABLES_MAX_LENGTH)); then
-    			die "TABLES is not a valid table pattern"
-    		fi
-    		CREATE_FLAGS+=" --tables=${TABLES}"
-    	fi
-    	if [[ -n ${PARTITIONS:-} ]]; then
-    		check_filter PARTITIONS "${PARTITIONS_RE}" "${FILTER_MAX_LENGTH}" "list of partition ids"
-    		CREATE_FLAGS+=" --partitions=${PARTITIONS}"
-    	fi
+    	check_filter TABLES "${TABLES_RE}" "${TABLES_MAX_LENGTH}" "table pattern"
+    	check_filter PARTITIONS "${PARTITIONS_RE}" "${FILTER_MAX_LENGTH}" "list of partition ids"
     	log "backup ${BACKUP_NAME}: made with the config overrides${CREATE_ENV}, through the actions endpoint"
     	event Normal OrchestratorConfigOverrides "backup ${BACKUP_NAME} is made with the config overrides${CREATE_ENV}"
     }
     
-    do_backup() {
-    	local host incremental= keep i
-    	local -a backup_hosts
-    	parse_hosts BACKUP_HOSTS
-    	fall_back_hosts
-    	backup_hosts=("${HOSTS[@]}")
-    	for ((i = 1; i < ${#backup_hosts[@]}; i++)); do
-    		if listed "${backup_hosts[i]}" "${backup_hosts[@]:0:i}"; then
-    			die "BACKUP_HOSTS lists ${backup_hosts[i]} twice: hosts of one backup must not share a storage path"
+    backup_settings() {
+    	local i
+    	for ((i = 2; i <= $#; i++)); do
+    		if listed "${!i}" "${@:1:i-1}"; then
+    			die "BACKUP_HOSTS lists ${!i} twice: hosts of one backup must not share a storage path"
     		fi
     	done
     	if [[ -n ${BACKUP_NAME_PREFIX:-} ]]; then
@@ -10970,6 +10976,11 @@ data:
     	if [[ -n ${CLUSTER:-} ]]; then
     		check_cluster
     	fi
+    }
+    
+    # backup_name HOST... sets BACKUP_KEY, BACKUP_NAME and HOST_BACKUP
+    backup_name() {
+    	local host
     	naming_init
     	if [[ -n ${BACKUP_NAME:-} ]]; then
     		check_name BACKUP_NAME
@@ -10977,7 +10988,7 @@ data:
     		naming_key BACKUP_NAME "${BACKUP_NAME_PREFIX:-}"
     		BACKUP_KEY=${REPLY}
     	elif ((${#NAMING_PARTS[@]} > 0)); then
-    		if naming_holds prefix && [[ -z ${BACKUP_NAME_PREFIX:-} ]]; then
+    		if ! naming_prefix; then
     			die "BACKUP_NAME_PREFIX must be set for the naming template '${BACKUP_NAMING}', which holds {prefix}"
     		fi
     		NAMING_PREFIX=${BACKUP_NAME_PREFIX:-}
@@ -10991,65 +11002,58 @@ data:
     	else
     		die "either BACKUP_NAME or BACKUP_NAME_PREFIX must be set"
     	fi
-    	resolve_names "${backup_hosts[@]}"
+    	resolve_names HOST_BACKUP "${BACKUP_KEY}" "$@"
     	if ((${#NAMING_PARTS[@]} > 0)); then
     		naming_render 1 "${BACKUP_KEY}" "${NAMING_PREFIX}" || :
     		BACKUP_NAME=${REPLY}
-    		log "backup ${BACKUP_NAME}: named by the naming template '${BACKUP_NAMING}', $(for host in "${backup_hosts[@]}"; do printf '%s ' "${host}=${HOST_BACKUP[${host}]}"; done)"
+    		log "backup ${BACKUP_NAME}: named by the naming template '${BACKUP_NAMING}', $(for host in "$@"; do printf '%s ' "${host}=${HOST_BACKUP[${host}]}"; done)"
     	fi
-    	CREATE_PARAMS=()
-    	if is_true SCHEMA_ONLY; then
-    		CREATE_PARAMS+=(--data-urlencode "schema=")
-    	fi
-    	if [[ -n ${TABLES:-} ]]; then
-    		CREATE_PARAMS+=(--data-urlencode "table=${TABLES}")
-    	fi
-    	if [[ -n ${PARTITIONS:-} ]]; then
-    		CREATE_PARAMS+=(--data-urlencode "partitions=${PARTITIONS}")
-    	fi
+    }
+    
+    # backup_plan HOST... sets BASE_OF to the base DIFF_FROM_REMOTE names and, from the schedule, CREATE_ENV and
+    # INCREMENTAL_KEEP, the longest chain of an incremental entry
+    backup_plan() {
+    	local prefix=${NAMING_PREFIX}
     	declare -gA BASE_OF=()
     	CREATE_ENV=
+    	INCREMENTAL_KEEP=
     	if [[ -n ${DIFF_FROM_REMOTE:-} ]]; then
     		check_name DIFF_FROM_REMOTE
-    		local key=${BACKUP_KEY} prefix=${NAMING_PREFIX}
     		naming_key DIFF_FROM_REMOTE "${BACKUP_NAME_PREFIX:-}"
-    		BACKUP_KEY=${REPLY}
-    		for host in "${backup_hosts[@]}"; do
-    			host_name "${host}" "${BACKUP_KEY}"
-    			BASE_OF[${host}]=${REPLY}
-    		done
-    		BACKUP_KEY=${key} NAMING_PREFIX=${prefix}
+    		resolve_names BASE_OF "${REPLY}" "$@"
+    		NAMING_PREFIX=${prefix}
     	fi
-    	if ((${#SCHED_PERIOD[@]} > 0)) && [[ -n ${BACKUP_NAME_GIVEN} ]]; then
+    	if ((${#SCHED_PERIOD[@]} == 0)); then
+    		return 0
+    	fi
+    	if [[ -n ${BACKUP_NAME_GIVEN} ]]; then
     		incremental_entry
     		if [[ -z ${WINNER} ]]; then
     			log "backup ${BACKUP_NAME}: runs the schedule now, which has no incremental entry: the backup is full"
     		elif [[ -z ${DIFF_FROM_REMOTE:-} && -n ${BACKUP_NAME_PREFIX:-} ]]; then
     			log "backup ${BACKUP_NAME}: runs the schedule now, incremental as its ${SCHED_PERIOD[WINNER]} entry"
-    			incremental=1
-    			keep=${SCHED_KEEP[WINNER]}
     		fi
-    	elif ((${#SCHED_PERIOD[@]} > 0)); then
+    	else
     		winner_entry "${SLOT_TAG}"
     		if [[ -z ${WINNER} ]]; then
     			log "backup ${BACKUP_NAME}: the slot ${SLOT_TAG} is a slot of no schedule entry, the backup is full"
     		else
     			log "backup ${BACKUP_NAME}: the slot ${SLOT_TAG} is a slot of the ${SCHED_PERIOD[WINNER]} entry${MATCHED[1]:+ and lighter ones}"
-    			if [[ ${SCHED_INCREMENTAL[WINNER]} == true && -z ${DIFF_FROM_REMOTE:-} && -n ${BACKUP_NAME_PREFIX:-} ]]; then
-    				incremental=1
-    				keep=${SCHED_KEEP[WINNER]}
-    			fi
     			CREATE_ENV=${SCHED_ENV[WINNER]}
     		fi
     	fi
-    	config_overrides
-    	check_storage_paths
-    	wait_for_apis "${backup_hosts[@]}"
+    	if [[ -n ${WINNER} && ${SCHED_INCREMENTAL[WINNER]} == true && -z ${DIFF_FROM_REMOTE:-} && -n ${BACKUP_NAME_PREFIX:-} ]]; then
+    		INCREMENTAL_KEEP=${SCHED_KEEP[WINNER]}
+    	fi
+    }
     
-    	event Normal OrchestratorBackupStarted "backup ${BACKUP_NAME} on ${#backup_hosts[@]} host(s)"
-    	log "backup ${BACKUP_NAME}: preflight on ${#backup_hosts[@]} host(s)"
+    # backup_preflight HOST... refuses a backup a host holds, by name or time, or whose base it lacks; it picks the
+    # base of an incremental backup of the schedule
+    backup_preflight() {
+    	local host i
+    	log "backup ${BACKUP_NAME}: preflight on $# host(s)"
     	declare -gA SERIES_REQUIRED=()
-    	for host in "${backup_hosts[@]}"; do
+    	for host in "$@"; do
     		if ! list_backups "${host}" remote; then
     			fail "preflight failed on ${host}"
     		fi
@@ -11066,33 +11070,46 @@ data:
     		if [[ -n ${DIFF_FROM_REMOTE:-} ]] && ! find_backup "${BASE_OF[${host}]}"; then
     			die "base backup ${BASE_OF[${host}]} is missing in the storage of ${host}"
     		fi
-    		if [[ -n ${incremental} ]]; then
+    		if [[ -n ${INCREMENTAL_KEEP} ]]; then
     			record_series "${host}"
     		fi
     	done
-    	if [[ -n ${incremental} && -z ${DIFF_FROM_REMOTE:-} ]]; then
-    		incremental_base "${keep}" "${backup_hosts[@]}"
-    		if [[ -n ${REPLY} ]]; then
-    			local base=${REPLY}
-    			for host in "${backup_hosts[@]}"; do
-    				host_name "${host}" "${base}"
-    				BASE_OF[${host}]=${REPLY}
-    			done
-    			log "backup ${BACKUP_NAME}: incremental from ${BASE_OF[${backup_hosts[0]}]}, which ends a chain of ${CHAIN} incremental backups"
-    			event Normal OrchestratorIncrementalBase "${BACKUP_NAME} is incremental from ${BASE_OF[${backup_hosts[0]}]}"
-    		else
-    			log "backup ${BACKUP_NAME}: full, as the chain of incremental backups is ${CHAIN} long, of ${keep} at most, or there is no base every host holds"
-    			event Normal OrchestratorIncrementalFull "${BACKUP_NAME} is a full backup"
-    		fi
+    	if [[ -z ${INCREMENTAL_KEEP} ]]; then
+    		return 0
     	fi
+    	incremental_base "${INCREMENTAL_KEEP}" "$@"
+    	if [[ -n ${REPLY} ]]; then
+    		resolve_names BASE_OF "${REPLY}" "$@"
+    		log "backup ${BACKUP_NAME}: incremental from ${BASE_OF[$1]}, which ends a chain of ${CHAIN} incremental backups"
+    		event Normal OrchestratorIncrementalBase "${BACKUP_NAME} is incremental from ${BASE_OF[$1]}"
+    	else
+    		log "backup ${BACKUP_NAME}: full, as the chain of incremental backups is ${CHAIN} long, of ${INCREMENTAL_KEEP} at most, or there is no base every host holds"
+    		event Normal OrchestratorIncrementalFull "${BACKUP_NAME} is a full backup"
+    	fi
+    }
     
-    	if ! run_all "${CREATE_KIND}" "${backup_hosts[*]}" backup_unseen create_remote "${BACKUP_NAME}"; then
+    do_backup() {
+    	local -a backup_hosts
+    	parse_hosts BACKUP_HOSTS
+    	fall_back_hosts
+    	backup_hosts=("${HOSTS[@]}")
+    	backup_settings "${backup_hosts[@]}"
+    	backup_name "${backup_hosts[@]}"
+    	create_args
+    	backup_plan "${backup_hosts[@]}"
+    	config_overrides
+    	check_storage_paths
+    	wait_for_apis "${backup_hosts[@]}"
+    
+    	event Normal OrchestratorBackupStarted "backup ${BACKUP_NAME} on ${#backup_hosts[@]} host(s)"
+    	backup_preflight "${backup_hosts[@]}"
+    	if ! run_all "${CREATE_KIND}" backup_unseen create_remote "${BACKUP_NAME}" "${backup_hosts[@]}"; then
     		drop_failed_backup ${STEP_FAILED_HOSTS[@]+"${STEP_FAILED_HOSTS[@]}"}
     		fail_all "backup ${BACKUP_NAME}"
     	fi
     	log "backup ${BACKUP_NAME} completed on ${#backup_hosts[@]} host(s)"
-    	if [[ ${backup_hosts[*]} != "${PREFERRED_HOSTS[*]}" && -n ${HOSTS_USED_MESSAGE:-} ]]; then
-    		report_message "${HOSTS_USED_MESSAGE} ${backup_hosts[*]}"
+    	if [[ ${backup_hosts[*]} != "${PREFERRED_HOSTS[*]}" ]]; then
+    		report "${HOSTS_USED_MESSAGE:-}" "${backup_hosts[*]}"
     	fi
     	if ! is_true SCHEMA_ONLY; then
     		report_data "${backup_hosts[@]}"
@@ -11102,6 +11119,8 @@ data:
     		warn "retention failed"
     	fi
     }
+    
+    # ===== Verify
     
     do_verify() {
     	local host name
@@ -11115,18 +11134,16 @@ data:
     	naming_init
     	naming_key BACKUP_NAME "${BACKUP_NAME_PREFIX:-}"
     	BACKUP_KEY=${REPLY}
-    	resolve_names "${verify_hosts[@]}"
+    	resolve_names HOST_BACKUP "${BACKUP_KEY}" "${verify_hosts[@]}"
     	wait_for_apis "${verify_hosts[@]}"
     	event Normal OrchestratorVerifyStarted "verify ${BACKUP_NAME} on ${#verify_hosts[@]} host(s)"
     	for host in "${verify_hosts[@]}"; do
     		name=${HOST_BACKUP[${host}]}
     		log "${host}: verifying ${name}"
-    		if list_backups "${host}" local && find_backup "${name}"; then
-    			if ! delete_local "${host}" "${name}"; then
-    				fail "verify failed on ${host}: cannot drop the local copy of ${name}"
-    			fi
+    		if ! drop_local "${host}" "${name}"; then
+    			fail "verify failed on ${host}: cannot drop the local copy of ${name}"
     		fi
-    		if ! run_op "${host}" download "${name}" "/backup/download/${name}"; then
+    		if ! run_step op "${host}" download "${name}" "/backup/download/${name}"; then
     			fail "verify failed on ${host}: ${name} cannot be downloaded"
     		fi
     		if ! has_usable_backup "${host}" local "${name}"; then
@@ -11136,9 +11153,10 @@ data:
     			warn "${host}: the downloaded copy of ${name} is left on local disk"
     		fi
     	done
-    	log "backup ${BACKUP_NAME} verified on ${#verify_hosts[@]} host(s)"
-    	event Normal OrchestratorVerifyCompleted "backup ${BACKUP_NAME} verified on ${#verify_hosts[@]} host(s)"
+    	notice OrchestratorVerifyCompleted "backup ${BACKUP_NAME} verified on ${#verify_hosts[@]} host(s)"
     }
+    
+    # ===== Restore
     
     restored_db() {
     	REPLY=${DB_SOURCE["$1"]:-}
@@ -11206,17 +11224,11 @@ data:
     	SHARD_TABLES_DIFFER=()
     	for host in "$@"; do
     		list_backup_tables "${host}"
-    		for name in "${!HOST_TABLES[@]}"; do
-    			BACKUP_TABLES[${name}]=1
-    		done
-    		for name in "${!HOST_DBS[@]}"; do
-    			BACKUP_DBS[${name}]=1
-    		done
+    		merge_keys BACKUP_TABLES HOST_TABLES
+    		merge_keys BACKUP_DBS HOST_DBS
     		if [[ -z ${first} ]]; then
     			first=${host}
-    			for name in "${!HOST_TABLES[@]}"; do
-    				first_tables[${name}]=1
-    			done
+    			merge_keys first_tables HOST_TABLES
     			continue
     		fi
     		for name in "${!HOST_TABLES[@]}"; do
@@ -11247,8 +11259,7 @@ data:
     			fi
     			if [[ ! ${row} =~ ${TABLE_ROW_RE} ]]; then
     				LIVE_UNREADABLE+=("${host}")
-    				json_get TotalBytes "${row}"
-    				LIVE_UNREADABLE_SIZES+=("${REPLY}")
+    				json_row "${row}" TotalBytes=LIVE_UNREADABLE_SIZES
     				continue
     			fi
     			db=${BASH_REMATCH[1]} table=${BASH_REMATCH[2]}
@@ -11258,12 +11269,7 @@ data:
     			LIVE_HOSTS+=("${host}")
     			LIVE_DBS+=("${db}")
     			LIVE_TABLES+=("${table}")
-    			json_get Engine "${row}"
-    			LIVE_ENGINES+=("${REPLY}")
-    			json_get UUID "${row}"
-    			LIVE_UUIDS+=("${REPLY}")
-    			json_get TotalBytes "${row}"
-    			LIVE_SIZES+=("${REPLY}")
+    			json_row "${row}" Engine=LIVE_ENGINES UUID=LIVE_UUIDS TotalBytes=LIVE_SIZES
     		done <<<"${HTTP_BODY}"
     	done
     }
@@ -11296,8 +11302,7 @@ data:
     guard_tables() {
     	local host i
     	local -a sources found=()
-    	declare -gA BACKUP_TABLES=() BACKUP_DBS=()
-    	BACKUP_TABLES_UNREADABLE=
+    	reset_backup_tables
     	read -r -a sources <<<"$1"
     	shift
     	live_tables "$@"
@@ -11321,14 +11326,6 @@ data:
     	fi
     }
     
-    join_items() {
-    	local item
-    	REPLY=
-    	for item in "$@"; do
-    		REPLY+=${REPLY:+, }${item}
-    	done
-    }
-    
     # greater SIZE LIMIT reports whether the number SIZE is greater than the number LIMIT
     greater() {
     	local size=${1#"${1%%[!0]*}"} limit=${2#"${2%%[!0]*}"}
@@ -11337,6 +11334,23 @@ data:
     		return
     	fi
     	[[ ${size} > ${limit} ]]
+    }
+    
+    # oversize SIZE sets REPLY to the size of a table max_table_size_to_drop may keep from a drop, or fails
+    oversize() {
+    	if [[ -z $1 ]]; then
+    		REPLY="of unknown size"
+    	elif greater "$1" "${MAX_TABLE_SIZE_TO_DROP}"; then
+    		REPLY="$1 bytes"
+    	else
+    		return 1
+    	fi
+    }
+    
+    # reset_backup_tables empties what backup_tables found
+    reset_backup_tables() {
+    	declare -gA BACKUP_TABLES=() BACKUP_DBS=()
+    	BACKUP_TABLES_UNREADABLE=
     }
     
     no_zookeeper() {
@@ -11356,13 +11370,10 @@ data:
     	shift
     	for i in "${!LIVE_UNREADABLE[@]}"; do
     		host=${LIVE_UNREADABLE[i]}
-    		if [[ -z ${LIVE_UNREADABLE_SIZES[i]} ]]; then
-    			what="of unknown size"
-    		elif greater "${LIVE_UNREADABLE_SIZES[i]}" "${MAX_TABLE_SIZE_TO_DROP}"; then
-    			what="${LIVE_UNREADABLE_SIZES[i]} bytes"
-    		else
+    		if ! oversize "${LIVE_UNREADABLE_SIZES[i]}"; then
     			continue
     		fi
+    		what=${REPLY}
     		n=${unreadable[${host}]:-0}
     		unreadable[${host}]=$((n + 1))
     		unreadable_rows[${host}]+="${unreadable_rows[${host}]:+, }${host}:? (a table whose name cannot be read, ${what})"
@@ -11378,13 +11389,12 @@ data:
     			larger[${key}]=${unreadable_rows[${host}]:-}
     			uncertain[${key}]=${unreadable_rows[${host}]:+1}
     		fi
-    		if [[ -z ${LIVE_SIZES[i]} ]]; then
-    			larger[${key}]+="${larger[${key}]:+, }${host}:${LIVE_DBS[i]}.${LIVE_TABLES[i]} (of unknown size)"
-    			uncertain[${key}]=1
-    		elif greater "${LIVE_SIZES[i]}" "${MAX_TABLE_SIZE_TO_DROP}"; then
-    			larger[${key}]+="${larger[${key}]:+, }${host}:${LIVE_DBS[i]}.${LIVE_TABLES[i]} (${LIVE_SIZES[i]} bytes)"
-    		else
+    		if ! oversize "${LIVE_SIZES[i]}"; then
     			continue
+    		fi
+    		larger[${key}]+="${larger[${key}]:+, }${host}:${LIVE_DBS[i]}.${LIVE_TABLES[i]} (${REPLY})"
+    		if [[ -z ${LIVE_SIZES[i]} ]]; then
+    			uncertain[${key}]=1
     		fi
     		n=${count[${key}]}
     		count[${key}]=$((n + 1))
@@ -11410,7 +11420,7 @@ data:
     		fi
     	done
     	if ((${#found[@]} > 0)); then
-    		join_items "${found[@]:0:10}"
+    		join_items ", " "${found[@]:0:10}"
     		die "refusing to overwrite: a host of cluster ${CLUSTER} that drops a database as a whole would stop at the second table of it ${stop} max_table_size_to_drop (${MAX_TABLE_SIZE_TO_DROP} bytes) (${REPLY}), as clickhouse-backup forces the drop of only one such table of each database it drops as a whole; ${SIZE_LIMIT_ADVICE}"
     	fi
     }
@@ -11421,8 +11431,7 @@ data:
     	read -r -a shards <<<"$1"
     	initiator=${shards[0]}
     	shift
-    	declare -gA BACKUP_TABLES=() BACKUP_DBS=()
-    	BACKUP_TABLES_UNREADABLE=
+    	reset_backup_tables
     	backup_tables "${shards[@]}"
     	live_tables "$@"
     	dropped_tables
@@ -11461,7 +11470,7 @@ data:
     	fi
     	if ((${#SHARD_TABLES_DIFFER[@]} > 0)); then
     		mapfile -t SHARD_TABLES_DIFFER < <(printf '%s\n' "${SHARD_TABLES_DIFFER[@]}" | sort)
-    		join_items "${SHARD_TABLES_DIFFER[@]:0:10}"
+    		join_items ", " "${SHARD_TABLES_DIFFER[@]:0:10}"
     		die "refusing to overwrite: the tables of ${BACKUP_NAME} differ between the shards of cluster ${CLUSTER} (${REPLY}): the drop ON CLUSTER drops and recreates on every shard the tables of the backup of ${initiator}, which takes the backup of every shard to hold the same; narrow the restore with tables to those they all hold"
     	fi
     	if ! drop_size_limited; then
@@ -11476,43 +11485,15 @@ data:
     		if [[ -z ${LIVE_DROPPED[i]} || ${LIVE_HOSTS[i]} == "${initiator}" ]]; then
     			continue
     		fi
-    		if [[ -z ${LIVE_SIZES[i]} ]]; then
-    			oversized+=("${LIVE_HOSTS[i]}:${LIVE_DBS[i]}.${LIVE_TABLES[i]} (of unknown size)")
-    		elif greater "${LIVE_SIZES[i]}" "${MAX_TABLE_SIZE_TO_DROP}"; then
-    			oversized+=("${LIVE_HOSTS[i]}:${LIVE_DBS[i]}.${LIVE_TABLES[i]} (${LIVE_SIZES[i]} bytes)")
+    		if oversize "${LIVE_SIZES[i]}"; then
+    			oversized+=("${LIVE_HOSTS[i]}:${LIVE_DBS[i]}.${LIVE_TABLES[i]} (${REPLY})")
     		fi
     	done
     	if ((${#oversized[@]} > 0)); then
-    		join_items "${oversized[@]:0:10}"
+    		join_items ", " "${oversized[@]:0:10}"
     		die "refusing to overwrite: the drop ON CLUSTER from ${initiator} would stop at tables larger than max_table_size_to_drop (${MAX_TABLE_SIZE_TO_DROP} bytes) of cluster ${CLUSTER} on other hosts (${REPLY}), as clickhouse-backup forces the drop of such a table on ${initiator} alone; ${SIZE_LIMIT_ADVICE}"
     	fi
     	refuse_database_drops "" "${initiator}"
-    }
-    
-    check_source_name() {
-    	local value=${!1:-}
-    	if [[ -z ${value} ]]; then
-    		return 0
-    	fi
-    	if [[ ! ${value} =~ ${SOURCE_NAME_RE} ]] || ((${#value} > $2)); then
-    		die "$1 is not a valid $3"
-    	fi
-    }
-    
-    source_template() {
-    	local rest=$1 out= macro name
-    	while [[ ${rest} =~ \{([^{}]*)\} ]]; do
-    		macro=${BASH_REMATCH[0]}
-    		name=${BASH_REMATCH[1]}
-    		out+=${rest%%"${macro}"*}
-    		rest=${rest#*"${macro}"}
-    		case ${name} in
-    		installation) out+=${2:-${macro}} ;;
-    		namespace) out+=${3:-${macro}} ;;
-    		*) out+=${macro} ;;
-    		esac
-    	done
-    	REPLY=${out}${rest}
     }
     
     source_paths() {
@@ -11532,9 +11513,9 @@ data:
     	if [[ -z ${SELF_STORAGE_PREFIX} ]]; then
     		die "a restore from another installation needs the storage paths of the sidecars, which it reads the backup at with the {installation} and {namespace} of that installation, and the storage path check cannot tell them: ${SELF_PATHS_UNKNOWN}"
     	fi
-    	source_template "${SELF_PATH}" "${installation}" "${namespace}"
+    	substitute_macros "${SELF_PATH}" "" "${installation}" "${namespace}"
     	path=${REPLY}
-    	source_template "${SELF_OBJECT_DISK_PATH}" "${installation}" "${namespace}"
+    	substitute_macros "${SELF_OBJECT_DISK_PATH}" "" "${installation}" "${namespace}"
     	object=${REPLY}
     	if [[ ${path} == "${SELF_PATH}" && ${object} == "${SELF_OBJECT_DISK_PATH}" ]]; then
     		advise "the storage paths of cluster ${SELF_CLUSTER_NAME} hold no {installation} or {namespace} that tells the installation restore ${BACKUP_NAME} names apart from this one, so it reads them as they are: '${SELF_PATH}'${SELF_OBJECT_DISK_PATH:+ and the object disk path '${SELF_OBJECT_DISK_PATH}'}"
@@ -11596,32 +11577,37 @@ data:
     	fi
     	refuse_local_copy "${host}"
     	SOURCE_COPIES+=("${host}")
-    	if ! run_action "${host}" download "${HOST_BACKUP[${host}]}" "download --schema --rbac ${SOURCE_ENV} ${HOST_BACKUP[${host}]}"; then
+    	if ! run_step action "${host}" download "${HOST_BACKUP[${host}]}" "download --schema --rbac ${SOURCE_ENV} ${HOST_BACKUP[${host}]}"; then
     		die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in the storage path '${SOURCE_PATH_SHOWN}' of ${host}, or cannot be read there${LAST_WARNING:+: ${LAST_WARNING}}${SOURCE_HINT}"
     	fi
     }
     
+    # drop_source_copies deletes, as it can, the copies source_copy downloaded
     drop_source_copies() {
-    	local host strict=${1:-} READ_ONLY=1 BEST_EFFORT=${BEST_EFFORT:-}
-    	local -a hosts=("${SOURCE_COPIES[@]}")
-    	if [[ -z ${strict} ]]; then
-    		BEST_EFFORT=1
-    		SOURCE_COPIES=()
-    	fi
-    	for host in "${hosts[@]}"; do
-    		if [[ -n ${strict} ]]; then
-    			if ! delete_local "${host}" "${HOST_BACKUP[${host}]}"; then
-    				fail "${host}: cannot delete the copy of ${HOST_BACKUP[${host}]} the preflight downloaded, which the restore would take for its own"
-    			fi
-    			SOURCE_COPIES=("${SOURCE_COPIES[@]:1}")
-    		elif list_backups "${host}" local && ! find_backup "${HOST_BACKUP[${host}]}"; then
+    	local host READ_ONLY=1 BEST_EFFORT=1
+    	local -a copies=("${SOURCE_COPIES[@]}")
+    	SOURCE_COPIES=()
+    	for host in "${copies[@]}"; do
+    		if list_backups "${host}" local && ! find_backup "${HOST_BACKUP[${host}]}"; then
     			continue
-    		elif ! delete_local "${host}" "${HOST_BACKUP[${host}]}"; then
+    		fi
+    		if ! delete_local "${host}" "${HOST_BACKUP[${host}]}"; then
     			advise "${host}: the copy of ${HOST_BACKUP[${host}]} the restore downloaded is left on local disk, which refuses a restore of ${HOST_BACKUP[${host}]} from another installation until it is deleted"
     		fi
     	done
     }
     
+    delete_source_copies() {
+    	local host READ_ONLY=1
+    	for host in "${SOURCE_COPIES[@]}"; do
+    		if ! delete_local "${host}" "${HOST_BACKUP[${host}]}"; then
+    			fail "${host}: cannot delete the copy of ${HOST_BACKUP[${host}]} the preflight downloaded, which the restore would take for its own"
+    		fi
+    		SOURCE_COPIES=("${SOURCE_COPIES[@]:1}")
+    	done
+    }
+    
+    # restore_command STEP HOST sets STEP_KIND and STEP_ARGS to the step STEP of the restore on HOST
     restore_command() {
     	local endpoint=restore command
     	local -a params=() flags=()
@@ -11662,7 +11648,11 @@ data:
     		params+=("restore_database_mapping=${DATABASE_MAPPING}")
     		flags+=("--restore-database-mapping=${DATABASE_MAPPING}")
     	fi
-    	if [[ ${RESTORE_KIND} == action || $1 == schema_on_cluster ]]; then
+    	STEP_KIND=${RESTORE_KIND}
+    	if [[ $1 == schema_on_cluster ]]; then
+    		STEP_KIND=action
+    	fi
+    	if [[ ${STEP_KIND} == action ]]; then
     		command="${flags[*]}${ACTION_ENV:+ ${ACTION_ENV}} ${HOST_BACKUP[$2]}"
     		STEP_ARGS=("${command}")
     		return 0
@@ -11675,19 +11665,8 @@ data:
     
     # restore_step HOST WHAT STEP runs the step STEP of the restore, as restore_command makes it, on HOST
     restore_step() {
-    	local kind=${RESTORE_KIND}
     	restore_command "$3" "$1"
-    	if [[ $3 == schema_on_cluster ]]; then
-    		kind=action
-    	fi
-    	"run_${kind}" "$1" "$2" "${HOST_BACKUP[$1]}" "${STEP_ARGS[@]}"
-    }
-    
-    check_filter() {
-    	local value=${!1:-}
-    	if [[ -n ${value} ]] && [[ ! ${value} =~ $2 ]] || ((${#value} > $3)); then
-    		die "$1 is not a valid $4"
-    	fi
+    	run_step "${STEP_KIND}" "$1" "$2" "${HOST_BACKUP[$1]}" "${STEP_ARGS[@]}"
     }
     
     check_restore_filters() {
@@ -11744,7 +11723,7 @@ data:
     drop_downloads() {
     	local host BEST_EFFORT=1 READ_ONLY=1
     	for host in "$@"; do
-    		if list_backups "${host}" local && find_backup "${HOST_BACKUP[${host}]}" && ! delete_local "${host}" "${HOST_BACKUP[${host}]}"; then
+    		if ! drop_local "${host}" "${HOST_BACKUP[${host}]}"; then
     			advise "${host}: the copy of ${HOST_BACKUP[${host}]} the restore downloaded is left on local disk"
     		fi
     	done
@@ -11768,271 +11747,259 @@ data:
     	fi
     }
     
-    do_restore() {
-    	local host restore_data=1 restore_schema=1 overwrite= validate= restore_rbac= holds_rbac= replicas= hint where base READ_ONLY=
-    	local -a schema_hosts data_hosts targets guarded used shards had_local=() resumed=() downloads drop
+    # restore_settings validates the settings of the restore and sets its hosts: SCHEMA_TARGETS, DATA_TARGETS,
+    # USED_HOSTS that download the backup, TARGETS, all of them, and GUARDED, those the guard reads
+    restore_settings() {
+    	local host
     	check_name BACKUP_NAME
     	parse_hosts SCHEMA_HOSTS
-    	schema_hosts=("${HOSTS[@]}")
+    	SCHEMA_TARGETS=("${HOSTS[@]}")
+    	RESTORE_DATA=1 RESTORE_SCHEMA=1 RESTORE_OVERWRITE= RESTORE_VALIDATE= RESTORE_RBAC_WITH_SCHEMA= SCHEMA_REPLICAS=
     	if is_true SCHEMA_ONLY; then
-    		restore_data=
+    		RESTORE_DATA=
     		parse_hosts DATA_HOSTS optional
     	else
     		parse_hosts DATA_HOSTS
     	fi
-    	data_hosts=("${HOSTS[@]}")
+    	DATA_TARGETS=("${HOSTS[@]}")
     	if is_true OVERWRITE; then
-    		overwrite=1
+    		RESTORE_OVERWRITE=1
     	fi
     	if is_true VALIDATE_TOPOLOGY; then
-    		validate=1
+    		RESTORE_VALIDATE=1
     	fi
     	if is_true RESTORE_RBAC; then
-    		restore_rbac=1
+    		RESTORE_RBAC_WITH_SCHEMA=1
     	fi
-    	if [[ -n ${CLUSTER:-} || -n ${overwrite} ]]; then
+    	if [[ -n ${CLUSTER:-} || -n ${RESTORE_OVERWRITE} ]]; then
     		check_cluster
     	fi
-    	check_source_name SOURCE_INSTALLATION "${SOURCE_INSTALLATION_MAX_LENGTH}" "installation name"
-    	check_source_name SOURCE_NAMESPACE "${SOURCE_NAMESPACE_MAX_LENGTH}" namespace
+    	check_filter SOURCE_INSTALLATION "${SOURCE_NAME_RE}" "${SOURCE_INSTALLATION_MAX_LENGTH}" "installation name"
+    	check_filter SOURCE_NAMESPACE "${SOURCE_NAME_RE}" "${SOURCE_NAMESPACE_MAX_LENGTH}" namespace
     	naming_init
     	naming_key BACKUP_NAME
     	BACKUP_KEY=${REPLY}
-    	if [[ -n ${TABLES:-} ]]; then
-    		if [[ ! ${TABLES} =~ ${TABLES_RE} ]] || ((${#TABLES} > TABLES_MAX_LENGTH)); then
-    			die "TABLES is not a valid table pattern"
-    		fi
-    	fi
+    	check_filter TABLES "${TABLES_RE}" "${TABLES_MAX_LENGTH}" "table pattern"
     	check_restore_filters
     	if [[ -n ${PARTITIONS:-} ]]; then
-    		if [[ -z ${restore_data} ]]; then
+    		if [[ -z ${RESTORE_DATA} ]]; then
     			die "PARTITIONS restore data, which SCHEMA_ONLY leaves out"
     		fi
-    		if [[ -n ${restore_rbac} ]]; then
+    		if [[ -n ${RESTORE_RBAC_WITH_SCHEMA} ]]; then
     			die "PARTITIONS restore no schema, which RESTORE_RBAC restores the access entities with"
     		fi
-    		restore_schema=
-    		overwrite=
-    		schema_hosts=()
+    		RESTORE_SCHEMA= RESTORE_OVERWRITE=
+    		SCHEMA_TARGETS=()
     	fi
-    	if [[ -n ${overwrite} ]]; then
+    	if [[ -n ${RESTORE_OVERWRITE} ]]; then
     		if [[ ! ${MAX_TABLE_SIZE_TO_DROP:-} =~ ${NUMBER_RE} ]]; then
     			die "MAX_TABLE_SIZE_TO_DROP must be a number of bytes"
     		fi
-    		for host in "${schema_hosts[@]}"; do
-    			if ! listed "${host}" "${data_hosts[@]}"; then
-    				replicas=1
+    		for host in "${SCHEMA_TARGETS[@]}"; do
+    			if ! listed "${host}" "${DATA_TARGETS[@]}"; then
+    				SCHEMA_REPLICAS=1
     			fi
     		done
     	fi
-    	if [[ -n ${replicas} ]]; then
+    	if [[ -n ${SCHEMA_REPLICAS} ]]; then
     		no_zookeeper || :
     	fi
-    	used=(${schema_hosts[@]+"${schema_hosts[@]}"})
-    	if [[ -n ${restore_data} ]]; then
-    		used+=("${data_hosts[@]}")
+    	USED_HOSTS=(${SCHEMA_TARGETS[@]+"${SCHEMA_TARGETS[@]}"})
+    	if [[ -n ${RESTORE_DATA} ]]; then
+    		USED_HOSTS+=("${DATA_TARGETS[@]}")
     	fi
-    	mapfile -t used < <(printf '%s\n' "${used[@]}" | awk '!seen[$0]++')
-    	targets=(${schema_hosts[@]+"${schema_hosts[@]}"} "${data_hosts[@]}")
-    	mapfile -t targets < <(printf '%s\n' "${targets[@]}" | awk 'NF && !seen[$0]++')
-    	resolve_names "${targets[@]}"
+    	unique_into USED_HOSTS "${USED_HOSTS[@]}"
+    	unique_into TARGETS ${SCHEMA_TARGETS[@]+"${SCHEMA_TARGETS[@]}"} "${DATA_TARGETS[@]}"
+    	resolve_names HOST_BACKUP "${BACKUP_KEY}" "${TARGETS[@]}"
     	parse_hosts GUARD_HOSTS optional
-    	if [[ -z ${restore_schema} ]]; then
+    	if [[ -z ${RESTORE_SCHEMA} ]]; then
     		HOSTS=()
     	fi
-    	guarded=("${targets[@]}" ${HOSTS[@]+"${HOSTS[@]}"})
-    	mapfile -t guarded < <(printf '%s\n' "${guarded[@]}" | awk 'NF && !seen[$0]++')
-    	check_storage_paths
-    	source_paths
-    	wait_for_apis "${guarded[@]}"
+    	unique_into GUARDED "${TARGETS[@]}" ${HOSTS[@]+"${HOSTS[@]}"}
+    }
     
-    	event Normal OrchestratorRestoreStarted "restore ${BACKUP_NAME} on ${#targets[@]} host(s)"
-    	if [[ -n ${overwrite} ]]; then
-    		log "restore ${BACKUP_NAME}: preflight on ${#targets[@]} host(s)"
-    	else
-    		log "restore ${BACKUP_NAME}: preflight on ${#targets[@]} host(s), overwrite guard on ${#guarded[@]}"
-    	fi
-    	for host in "${targets[@]}"; do
+    # restore_preflight checks that every target answers, refuses what would mix up a restore from another
+    # installation, and, with VALIDATE_TOPOLOGY, that every host holds the backup: HOLDS_RBAC
+    restore_preflight() {
+    	local host where base hint
+    	for host in "${TARGETS[@]}"; do
     		call GET "${host}" /backup/version
     		if [[ ${HTTP_CODE} != 200 ]]; then
     			die "preflight failed: sidecar of ${host} answered HTTP ${HTTP_CODE}: $(error_of)"
     		fi
     	done
     	if [[ -n ${SOURCE_ENV} ]]; then
-    		for host in "${used[@]}"; do
+    		for host in "${USED_HOSTS[@]}"; do
     			refuse_local_copy "${host}"
     			if [[ -z ${SOURCE_OWN_PATH} ]]; then
     				refuse_own_backup "${host}"
     			fi
     		done
     	fi
-    	if [[ -n ${validate} ]]; then
-    		other_installation_hint
-    		hint=${REPLY}
-    		for host in "${used[@]}"; do
-    			where="the storage of ${host}"
-    			if [[ -n ${SOURCE_ENV} ]]; then
-    				where="the storage path '${SOURCE_PATH_SHOWN}' of ${host}"
-    				source_copy "${host}"
-    				if ! list_backups "${host}" local; then
-    					fail "preflight failed on ${host}"
-    				fi
-    				if ! find_backup "${HOST_BACKUP[${host}]}"; then
-    					die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in ${where}: its download left no local copy"
-    				fi
-    				base=${LIST_REQUIRED[FOUND]}
-    				if [[ -n ${base} && ${OWN_BACKUPS[${host}]:-} == *" ${base} "* ]]; then
-    					die "preflight failed: backup ${HOST_BACKUP[${host}]} is incremental from ${base}, and ${host} holds a backup ${base} at its own storage path too, which clickhouse-backup would take for the one at the storage path '${SOURCE_PATH_SHOWN}', as it tells the backups of every path apart by name alone: delete that one first"
-    				fi
-    			else
-    				if ! list_backups "${host}" remote; then
-    					fail "preflight failed on ${host}"
-    				fi
-    				if ! find_backup "${HOST_BACKUP[${host}]}"; then
-    					if [[ ${SELF_PATH} == *"{replica}"* ]]; then
-    						die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in the storage of ${host}: the storage path '${SELF_PATH}' holds {replica}, which gives every replica a path of its own, and the backup was made on the first replica of each shard only${hint}"
-    					fi
-    					die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in the storage of ${host}${hint}"
-    				fi
-    			fi
-    			if [[ ${LIST_DESC[FOUND]} == broken* ]]; then
-    				die "preflight failed: backup ${HOST_BACKUP[${host}]} is ${LIST_DESC[FOUND]} in ${where}"
-    			fi
-    			if [[ ${LIST_RBAC_SIZE[FOUND]:-0} != 0 ]]; then
-    				holds_rbac=1
-    			fi
-    		done
+    	if [[ -z ${RESTORE_VALIDATE} ]]; then
+    		return 0
     	fi
-    	if [[ -z ${restore_schema} ]]; then
+    	other_installation_hint
+    	hint=${REPLY}
+    	for host in "${USED_HOSTS[@]}"; do
+    		where="the storage of ${host}"
+    		if [[ -n ${SOURCE_ENV} ]]; then
+    			where="the storage path '${SOURCE_PATH_SHOWN}' of ${host}"
+    			source_copy "${host}"
+    			if ! list_backups "${host}" local; then
+    				fail "preflight failed on ${host}"
+    			fi
+    			if ! find_backup "${HOST_BACKUP[${host}]}"; then
+    				die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in ${where}: its download left no local copy"
+    			fi
+    			base=${LIST_REQUIRED[FOUND]}
+    			if [[ -n ${base} && ${OWN_BACKUPS[${host}]:-} == *" ${base} "* ]]; then
+    				die "preflight failed: backup ${HOST_BACKUP[${host}]} is incremental from ${base}, and ${host} holds a backup ${base} at its own storage path too, which clickhouse-backup would take for the one at the storage path '${SOURCE_PATH_SHOWN}', as it tells the backups of every path apart by name alone: delete that one first"
+    			fi
+    		else
+    			if ! list_backups "${host}" remote; then
+    				fail "preflight failed on ${host}"
+    			fi
+    			if ! find_backup "${HOST_BACKUP[${host}]}"; then
+    				if [[ ${SELF_PATH} == *"{replica}"* ]]; then
+    					die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in the storage of ${host}: the storage path '${SELF_PATH}' holds {replica}, which gives every replica a path of its own, and the backup was made on the first replica of each shard only${hint}"
+    				fi
+    				die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in the storage of ${host}${hint}"
+    			fi
+    		fi
+    		if [[ ${LIST_DESC[FOUND]} == broken* ]]; then
+    			die "preflight failed: backup ${HOST_BACKUP[${host}]} is ${LIST_DESC[FOUND]} in ${where}"
+    		fi
+    		if [[ ${LIST_RBAC_SIZE[FOUND]:-0} != 0 ]]; then
+    			HOLDS_RBAC=1
+    		fi
+    	done
+    }
+    
+    # restore_guard refuses a restore over existing tables, or, with OVERWRITE, plans the drops: ON_CLUSTER
+    restore_guard() {
+    	local -a shards
+    	if [[ -z ${RESTORE_SCHEMA} ]]; then
     		log "restore ${BACKUP_NAME}: restores the partitions ${PARTITIONS} into the tables as they are, without the schema, as the Altinity Cloud Manager does: each of them is dropped first where a table holds it"
-    	elif [[ -z ${overwrite} ]]; then
-    		guard_tables "${used[*]}" "${guarded[@]}"
-    	elif [[ -n ${replicas} ]]; then
-    		shards=("${schema_hosts[0]}" "${data_hosts[@]}")
-    		mapfile -t shards < <(printf '%s\n' "${shards[@]}" | awk '!seen[$0]++')
-    		plan_overwrite "${shards[*]}" "${guarded[@]}"
+    	elif [[ -z ${RESTORE_OVERWRITE} ]]; then
+    		guard_tables "${USED_HOSTS[*]}" "${GUARDED[@]}"
+    	elif [[ -n ${SCHEMA_REPLICAS} ]]; then
+    		unique_into shards "${SCHEMA_TARGETS[0]}" "${DATA_TARGETS[@]}"
+    		plan_overwrite "${shards[*]}" "${GUARDED[@]}"
     	else
     		log "restore ${BACKUP_NAME}: every shard of cluster ${CLUSTER} has one replica, which drops the tables of the backup on its own"
     		if drop_size_limited; then
-    			declare -gA BACKUP_TABLES=() BACKUP_DBS=()
-    			BACKUP_TABLES_UNREADABLE=
-    			live_tables "${schema_hosts[@]}"
-    			refuse_database_drops "${schema_hosts[*]}" "${schema_hosts[@]}"
+    			reset_backup_tables
+    			live_tables "${SCHEMA_TARGETS[@]}"
+    			refuse_database_drops "${SCHEMA_TARGETS[*]}" "${SCHEMA_TARGETS[@]}"
     		fi
     	fi
-    	if [[ -z ${SOURCE_ENV} ]]; then
-    		for host in "${used[@]}"; do
-    			if ! list_backups "${host}" local || ! find_backup "${HOST_BACKUP[${host}]}"; then
-    				continue
-    			fi
-    			if [[ ${LIST_DESC[FOUND]} == broken* ]]; then
-    				log "${host}: holds an incomplete local copy of ${HOST_BACKUP[${host}]}, whose download the restore resumes"
-    				resumed+=("${host}")
-    			else
-    				had_local+=("${host}")
-    			fi
-    		done
-    	else
-    		drop_source_copies strict
-    		SOURCE_COPIES=("${used[@]}")
+    }
+    
+    # restore_local_copies sets HAD_LOCAL, the hosts whose copy of the backup the restore keeps, and RESUMED_LOCAL,
+    # those whose incomplete copy it resumes; from another installation it deletes the copies of the preflight
+    restore_local_copies() {
+    	local host
+    	HAD_LOCAL=() RESUMED_LOCAL=()
+    	if [[ -n ${SOURCE_ENV} ]]; then
+    		delete_source_copies
+    		SOURCE_COPIES=("${USED_HOSTS[@]}")
+    		return 0
     	fi
+    	for host in "${USED_HOSTS[@]}"; do
+    		if ! list_backups "${host}" local || ! find_backup "${HOST_BACKUP[${host}]}"; then
+    			continue
+    		fi
+    		if [[ ${LIST_DESC[FOUND]} == broken* ]]; then
+    			log "${host}: holds an incomplete local copy of ${HOST_BACKUP[${host}]}, whose download the restore resumes"
+    			RESUMED_LOCAL+=("${host}")
+    		else
+    			HAD_LOCAL+=("${host}")
+    		fi
+    	done
+    }
+    
+    restore_downloads() {
+    	local host
+    	local -a downloads=() drop=()
+    	for host in "${USED_HOSTS[@]}"; do
+    		if ! listed "${host}" ${HAD_LOCAL[@]+"${HAD_LOCAL[@]}"}; then
+    			downloads+=("${host}")
+    		fi
+    	done
+    	DATA_DOWNLOADS=
+    	if [[ -n ${RESTORE_DATA} ]]; then
+    		DATA_DOWNLOADS=${DATA_TARGETS[*]}
+    	fi
+    	if ((${#downloads[@]} == 0)); then
+    		return 0
+    	fi
+    	READ_ONLY=1
+    	if ! run_all "${RESTORE_KIND}" download_args download "${BACKUP_NAME}" "${downloads[@]}"; then
+    		READ_ONLY=
+    		if [[ -z ${SOURCE_ENV} ]]; then
+    			for host in "${downloads[@]}"; do
+    				if ! listed "${host}" ${RESUMED_LOCAL[@]+"${RESUMED_LOCAL[@]}"}; then
+    					drop+=("${host}")
+    				fi
+    			done
+    			drop_downloads ${drop[@]+"${drop[@]}"}
+    		fi
+    		fail_all "download of ${BACKUP_NAME}"
+    	fi
+    	READ_ONLY=
+    }
+    
+    do_restore() {
+    	local host
+    	restore_settings
+    	check_storage_paths
+    	source_paths
+    	wait_for_apis "${GUARDED[@]}"
+    
+    	event Normal OrchestratorRestoreStarted "restore ${BACKUP_NAME} on ${#TARGETS[@]} host(s)"
+    	if [[ -n ${RESTORE_OVERWRITE} ]]; then
+    		log "restore ${BACKUP_NAME}: preflight on ${#TARGETS[@]} host(s)"
+    	else
+    		log "restore ${BACKUP_NAME}: preflight on ${#TARGETS[@]} host(s), overwrite guard on ${#GUARDED[@]}"
+    	fi
+    	restore_preflight
+    	restore_guard
+    	restore_local_copies
     	restore_env
     	RESTORE_KIND=op
     	if [[ -n ${ACTION_ENV} ]]; then
     		RESTORE_KIND=action
     	fi
+    	restore_downloads
     
-    	downloads=()
-    	for host in "${used[@]}"; do
-    		if ! listed "${host}" ${had_local[@]+"${had_local[@]}"}; then
-    			downloads+=("${host}")
-    		fi
-    	done
-    	DATA_DOWNLOADS=
-    	if [[ -n ${restore_data} ]]; then
-    		DATA_DOWNLOADS=${data_hosts[*]}
+    	if [[ -n ${ON_CLUSTER} ]] && ! restore_step "${SCHEMA_TARGETS[0]}" "restore schema on cluster ${CLUSTER}" schema_on_cluster; then
+    		fail "schema restore of ${BACKUP_NAME} on cluster ${CLUSTER} failed on ${SCHEMA_TARGETS[0]}"
     	fi
-    	if ((${#downloads[@]} > 0)); then
-    		READ_ONLY=1
-    		if ! run_all "${RESTORE_KIND}" "${downloads[*]}" download_args download "${BACKUP_NAME}"; then
-    			READ_ONLY=
-    			if [[ -z ${SOURCE_ENV} ]]; then
-    				drop=()
-    				for host in "${downloads[@]}"; do
-    					if ! listed "${host}" ${resumed[@]+"${resumed[@]}"}; then
-    						drop+=("${host}")
-    					fi
-    				done
-    				drop_downloads ${drop[@]+"${drop[@]}"}
-    			fi
-    			fail_all "download of ${BACKUP_NAME}"
-    		fi
-    		READ_ONLY=
-    	fi
-    
-    	if [[ -n ${ON_CLUSTER} ]]; then
-    		if ! restore_step "${schema_hosts[0]}" "restore schema on cluster ${CLUSTER}" schema_on_cluster; then
-    			fail "schema restore of ${BACKUP_NAME} on cluster ${CLUSTER} failed on ${schema_hosts[0]}"
-    		fi
-    	fi
-    	RESTORE_RBAC_WITH_SCHEMA=${restore_rbac}
-    	for host in ${schema_hosts[@]+"${schema_hosts[@]}"}; do
+    	for host in ${SCHEMA_TARGETS[@]+"${SCHEMA_TARGETS[@]}"}; do
     		if ! restore_step "${host}" "restore schema" schema; then
     			fail "schema restore of ${BACKUP_NAME} failed on ${host}"
     		fi
     	done
-    	if [[ -n ${restore_data} ]]; then
-    		if ! run_all "${RESTORE_KIND}" "${data_hosts[*]}" data_args "restore data" "${BACKUP_NAME}"; then
-    			fail_all "data restore of ${BACKUP_NAME}"
-    		fi
+    	if [[ -n ${RESTORE_DATA} ]] && ! run_all "${RESTORE_KIND}" data_args "restore data" "${BACKUP_NAME}" "${DATA_TARGETS[@]}"; then
+    		fail_all "data restore of ${BACKUP_NAME}"
     	fi
-    	for host in "${used[@]}"; do
-    		if [[ " ${had_local[*]} " == *" ${host} "* ]]; then
-    			continue
-    		fi
-    		if list_backups "${host}" local && find_backup "${HOST_BACKUP[${host}]}" && ! delete_local "${host}" "${HOST_BACKUP[${host}]}"; then
+    	for host in "${USED_HOSTS[@]}"; do
+    		if ! listed "${host}" ${HAD_LOCAL[@]+"${HAD_LOCAL[@]}"} && ! drop_local "${host}" "${HOST_BACKUP[${host}]}"; then
     			warn "${host}: the downloaded copy of ${HOST_BACKUP[${host}]} is left on local disk"
     		fi
     	done
-    	log "restore ${BACKUP_NAME} completed"
-    	event Normal OrchestratorRestoreCompleted "restore ${BACKUP_NAME} completed"
-    	report_rbac "${restore_rbac}" "${holds_rbac}" "${validate}"
-    }
-    
-    report_rbac() {
-    	if [[ -n $1 ]]; then
+    	notice OrchestratorRestoreCompleted "restore ${BACKUP_NAME} completed"
+    	if [[ -n ${RESTORE_RBAC_WITH_SCHEMA} ]]; then
     		return 0
     	fi
-    	if [[ -z $3 ]]; then
+    	if [[ -z ${RESTORE_VALIDATE} ]]; then
     		log "whether ${BACKUP_NAME} holds access entities is unknown: its copies in the storage were not listed"
-    		return 0
-    	fi
-    	if [[ -z $2 ]]; then
-    		return 0
-    	fi
-    	warn "${BACKUP_NAME} holds access entities - users, roles, grants - which this restore did not restore"
-    	event Warning OrchestratorRBACNotRestored "${LAST_WARNING}"
-    	if [[ -n ${RBAC_NOT_RESTORED_MESSAGE:-} ]]; then
-    		report_message "${RBAC_NOT_RESTORED_MESSAGE}"
+    	elif [[ -n ${HOLDS_RBAC} ]]; then
+    		alert OrchestratorRBACNotRestored "${BACKUP_NAME} holds access entities - users, roles, grants - which this restore did not restore"
+    		report "${RBAC_NOT_RESTORED_MESSAGE:-}"
     	fi
     }
-    
-    declare -A LAST_OP=() LAST_ACTION_START=() LAST_ACTION_COMMAND=() OWN_BACKUPS=()
-    declare -A OP_ID=() ACTION_COMMAND=() ACTION_BEFORE=()
-    declare -A COMPLETE=() WITH_DATA=() EMPTY=() SIZED=() BROKEN=() ALL_NAMES=()
-    declare -A DB_SOURCE=() DB_TARGET=()
-    FAILED_HOSTS=()
-    PREFERRED_HOSTS=()
-    FAILURES=()
-    STEP_FAILED_HOSTS=()
-    STEP_ARGS=()
-    RESTORE_KIND=op
-    ACTION_ENV=
-    DATA_DOWNLOADS=
-    CREATE_KIND=op
-    CREATE_FLAGS=
-    CREATE_ENV=
-    RESTORE_RBAC_WITH_SCHEMA=
     
     main() {
     	if ((BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 4))); then
@@ -12080,8 +12047,6 @@ metadata:
     clickhouse.altinity.com/chop: 0.28.0
     app: clickhouse-operator
 data:
-  __pycache__: |
-
   backup-orchestrator.py: |
     # backup-orchestrator.py is the Python orchestrator of a backup Job, the twin of backup-orchestrator.sh: the same
     # environment, the same REST calls in the same order, the same Events, termination message lines and exit codes. It
