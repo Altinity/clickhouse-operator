@@ -88,6 +88,10 @@ type ClusterBackup struct {
 	// on the sidecar of that replica, or on that of the first replica when the shard has fewer replicas or the
 	// preferred one does not answer when the Job starts. Empty means 0, the first replica.
 	PreferredReplica *types.Int32 `json:"preferredReplica,omitempty" yaml:"preferredReplica,omitempty"`
+	// Naming is the template the backups of the cluster are named by, one name for the backup of each shard, e.g.
+	// "shard{shard}-{YYYYMMDDHHIISS}" as the Altinity Cloud Manager names them, see type_backup_naming.go. Empty, the
+	// default, names a backup "<prefix>-<YYYYMMDDHHMMSS>" alike on every shard, each at a storage path of its own.
+	Naming *types.String `json:"naming,omitempty" yaml:"naming,omitempty"`
 	// Recovery names the backup a new installation restores the cluster from once it has
 	// completed its first reconcile. It configures the operator, not the sidecar: it never changes a
 	// pod. It is never taken from a ClickHouseInstallationTemplate.
@@ -211,7 +215,18 @@ func (b *ClusterBackup) Validate() error {
 		return fmt.Errorf("%w: backup.mode %q is not one of %s, %s", ErrInvalidBackupSpec, b.Mode.Value(),
 			BackupModeSidecar, BackupModePod)
 	}
+	if err := ValidateBackupNaming(b.Naming.Value()); err != nil {
+		return err
+	}
 	return validateStringBool("backup.enabled", b.Enabled)
+}
+
+// GetNaming returns the naming template of the backups of the cluster, "" for the default naming, nil-safe.
+func (b *ClusterBackup) GetNaming() string {
+	if b == nil {
+		return ""
+	}
+	return b.Naming.Value()
 }
 
 // GetPodTemplate returns the name of the pod template the sidecar is built on, nil-safe.
@@ -323,6 +338,7 @@ func (b *ClusterBackup) MergeFrom(from *ClusterBackup, _type MergeType) *Cluster
 	// clusters read
 	b.ConfigSecretRef = MergePointer(b.ConfigSecretRef, from.ConfigSecretRef.DeepCopy(), _type)
 	b.PreferredReplica = MergeScalar(b.PreferredReplica, from.PreferredReplica, _type)
+	b.Naming = MergeScalar(b.Naming, from.Naming, _type)
 	b.Recovery = b.Recovery.MergeFrom(from.Recovery, _type)
 
 	return b

@@ -180,12 +180,42 @@ func (c *BackupController) validate(ctx context.Context, chb *api.ClickHouseBack
 		op.wait(api.BackupConditionValidated, wait.reason, wait.message)
 		return ctrl.Result{RequeueAfter: untilStartingDeadline(chb, now, wait.requeue)}, false, nil
 	}
+	// A naming template names the backup by its time, which the name of the backup of the first shard tells
+	name, err := templateBackupName(chb, target.topology)
+	if err != nil {
+		op.wait(api.BackupConditionValidated, api.BackupReasonInvalidSpec, err.Error())
+		return ctrl.Result{RequeueAfter: untilStartingDeadline(chb, now, 0)}, false, nil
+	}
+	if (chb.Status.BackupName == "") && (name != "") {
+		chb.Status.BackupName = name
+	}
 	op.pin(target.topology.ClusterNames())
 	retainRequestedClusters(chb.GetNamespace(), chb.TargetInstallation(), target.chi)
 	if leftOut := leftOutWithoutStorage(target, chb.TargetCluster()); leftOut != "" {
 		out.add(c.warning(chb, a.EventActionReconcile, api.BackupReasonNoBackupStorage, "backup %s", leftOut))
 	}
 	return ctrl.Result{}, true, nil
+}
+
+// templateBackupName returns the name of a backup of clusters with a naming template, "" for clusters without one: the
+// name the template gives the backup of the first shard, which tells the backup of every shard. One backup of several
+// clusters has one name, so their template has to be one, and to name the backups of every cluster alike, without
+// {cluster}.
+func templateBackupName(chb *api.ClickHouseBackup, topology *model.Topology) (string, error) {
+	namings := topology.ClusterNamings()
+	templates := map[string]bool{}
+	for _, template := range namings {
+		templates[template] = true
+	}
+	naming := topology.BackupNaming()
+	if (len(templates) == 1) && templates[""] {
+		return "", nil
+	}
+	if (len(templates) > 1) || ((len(namings) > 1) && api.BackupNamingHolds(naming.Template, api.BackupNamingCluster)) {
+		return "", fmt.Errorf("the clusters %s name their backups by naming templates that differ between them, or hold {cluster}: "+
+			"back up each of them in a ClickHouseBackup of its own (spec.cluster)", strings.Join(topology.ClusterNames(), ", "))
+	}
+	return model.ResolveTemplateBackupName(chb, naming)
 }
 
 // recordSchedule records what a backup that runs a schedule takes from it, the schedule as it is now: until the

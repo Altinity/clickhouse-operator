@@ -975,7 +975,8 @@ func TestJobScriptReadsDeclaredEnv(t *testing.T) {
 		envRestoreRBAC, envRBACNotRestoredMessage, envUnchangedExitCode, envReplicated, envMaxTableSizeToDrop,
 		envPathClusters, envPathSelf, envPathInstallation, envPathNamespace, envPathReplicaSelection,
 		envDefaultPath, envDefaultObjectDiskPath, envSourceInstallation, envSourceNamespace, envSkipTables, envSkipTableEngines,
-		envDatabaseMapping, envBackupFallbackHosts,
+		envDatabaseMapping, envBackupFallbackHosts, envHostsUsedMessage, envBackupNaming, envShardNumbers, envNamingInstallation,
+		envNamingNamespace,
 	} {
 		require.Regexp(t, regexp.MustCompile(`\$\{!?`+name+`\b|\b(parse_hosts|is_true|check_name|default_path "\$\{index\}") `+name+`\b`), orchestratorScript, name)
 	}
@@ -4935,8 +4936,8 @@ func TestJobScriptRetentionPlan(t *testing.T) {
 		// incomplete and empty name the backups not every host lists complete, and those listed of size 0;
 		// sizeless those no host lists a size above 0 of, broken those a host lists broken
 		incomplete, empty, sizeless, broken []string
-		made                        string
-		keep, obsolete              []string
+		made                                string
+		keep, obsolete                      []string
 	}{
 		"the newest of a daily entry": {
 			schedules: "period=daily time=00:00 keep=2",

@@ -1270,6 +1270,17 @@ spec:
                               is not ready, falls back to its next ready replica. With mode sidecar a backup of one replica per shard
                               (FirstPerShard) runs on the sidecar of that replica, or on that of the first replica when the shard has fewer
                               replicas or the preferred one does not answer when the Job starts. Empty means 0, the first replica
+                          naming:
+                            type: string
+                            maxLength: 128
+                            pattern: '^([A-Za-z0-9._-]|\{[A-Za-z]+\})+$'
+                            description: |
+                              Template the backups of the cluster are named by, one name for the backup of each shard, e.g.
+                              "shard{shard}-{YYYYMMDDHHIISS}" as the Altinity Cloud Manager names them. Placeholders: {shard}, the number
+                              of the shard from 1, required; {cluster}, {chi}, {namespace}; {prefix}, the backupNamePrefix of the schedule;
+                              the time by the tokens YYYY, MM, DD, HH, II (minutes) and SS, all required, in braces, e.g. {YYYYMMDDHHIISS}.
+                              A backup made at once has a T before the hour. Empty, the default, names a backup "<prefix>-<YYYYMMDDHHMMSS>"
+                              alike on every shard. See docs/backup.md
                           recovery:
                             type: object
                             description: |
@@ -3207,6 +3218,17 @@ spec:
                               is not ready, falls back to its next ready replica. With mode sidecar a backup of one replica per shard
                               (FirstPerShard) runs on the sidecar of that replica, or on that of the first replica when the shard has fewer
                               replicas or the preferred one does not answer when the Job starts. Empty means 0, the first replica
+                          naming:
+                            type: string
+                            maxLength: 128
+                            pattern: '^([A-Za-z0-9._-]|\{[A-Za-z]+\})+$'
+                            description: |
+                              Template the backups of the cluster are named by, one name for the backup of each shard, e.g.
+                              "shard{shard}-{YYYYMMDDHHIISS}" as the Altinity Cloud Manager names them. Placeholders: {shard}, the number
+                              of the shard from 1, required; {cluster}, {chi}, {namespace}; {prefix}, the backupNamePrefix of the schedule;
+                              the time by the tokens YYYY, MM, DD, HH, II (minutes) and SS, all required, in braces, e.g. {YYYYMMDDHHIISS}.
+                              A backup made at once has a T before the hour. Empty, the default, names a backup "<prefix>-<YYYYMMDDHHMMSS>"
+                              alike on every shard. See docs/backup.md
                           recovery:
                             type: object
                             description: |
@@ -8386,6 +8408,15 @@ data:
     SOURCE_PATH_RE='^[A-Za-z0-9_./{}-]+$'
     # The time a scheduled backup is named after, "<prefix>-<YYYYMMDDHHMMSS>": the wall time of its slot in SCHEDULE_TIMEZONE
     TAG_RE='^[0-9]{14}$'
+    # A naming template, BACKUP_NAMING, as backupNamingRegexp in type_backup_naming.go bounds it, and its longest length;
+    # the time a name of a backup of a cluster with a naming template may be given by alone, with a T before the hour for a
+    # backup made at once, as BackupTagRegexp there; and the tolerance of the slots of a schedule of such a cluster, in
+    # seconds: the Altinity Cloud Manager names a scheduled backup after the time its run started, up to 30 minutes after
+    # its slot (the refresh rate of its background tasks times 1.5)
+    NAMING_RE='^([A-Za-z0-9._-]|\{[A-Za-z]+\})+$'
+    NAMING_MAX_LENGTH=128
+    NAMING_TAG_RE='^[0-9]{8}T?[0-9]{6}$'
+    NAMING_SLOT_TOLERANCE=1800
     # The number the CronJob controller ends the name of a scheduled Job with, the minutes since the epoch of its slot,
     # bounded as in builder.go
     SLOT_RE='^[0-9]{1,10}$'
@@ -8442,6 +8473,15 @@ data:
     # heaviest schedule entry whose slot it is, empty when none is
     SLOT_TAG=
     WINNER=
+    # NAMING_PARTS are the parts of the naming template BACKUP_NAMING, as naming_init reads them, none without one;
+    # SHARD_OF the number of the shard of every host; SLOT_TOLERANCE how long after its slot a backup still is one of it, in
+    # seconds. BACKUP_KEY is the key of the backup the Job works on, its name, or with a naming template the time it is
+    # named after, NAMING_PREFIX the value of {prefix} in its names, and HOST_BACKUP the name of the backup on every host
+    NAMING_PARTS=()
+    declare -A SHARD_OF=() HOST_BACKUP=()
+    SLOT_TOLERANCE=0
+    BACKUP_KEY=
+    NAMING_PREFIX=
     # BACKUP_NAME_GIVEN is set when BACKUP_NAME names the backup: a backup with schedule entries that is no scheduled run
     # runs the schedule now
     BACKUP_NAME_GIVEN=
@@ -9153,14 +9193,16 @@ data:
     # run_all KIND HOSTS CHECK WHAT NAME ARGS... runs a step on every host of the space-separated HOSTS at once: an
     # operation, KIND op, as run_op runs it with the arguments ARGS, or an action, KIND action, as run_action runs the
     # command ARGS. It submits the step to one host after the other, each once the function CHECK, unless empty, has
-    # passed for it - CHECK may set STEP_ARGS, which hold ARGS until then, to the arguments of the host -, then polls every
-    # host it was submitted to until it runs on none. A host whose CHECK or submission fails
+    # passed for it - CHECK may set STEP_ARGS, which hold ARGS until then, to the arguments of the host, and STEP_NAME, which
+    # holds NAME until then, to the name of the backup there -, then polls every host it was submitted to until it runs on
+    # none. A host whose CHECK or submission fails
     # gets the step submitted to no other host after it, and those it was submitted to are waited for all the same.
     # FAILED_HOSTS and FAILURES list the hosts that failed and the warning of each, STEP_FAILED_HOSTS those of them the step
     # itself failed on, whose CHECK passed; it returns 1 when any did
     run_all() {
     	local kind=$1 check=$3 what=$4 name=$5 host rc
     	local -a hosts pending=() running
+    	local -A names=()
     	read -r -a hosts <<<"$2"
     	shift 5
     	FAILED_HOSTS=()
@@ -9169,12 +9211,14 @@ data:
     	for host in "${hosts[@]}"; do
     		LAST_WARNING=
     		STEP_ARGS=("$@")
+    		STEP_NAME=${name}
     		if [[ -n ${check} ]] && ! "${check}" "${host}"; then
-    			step_failed "${kind}" "${host}" "${what}" "${name}"
+    			step_failed "${kind}" "${host}" "${what}" "${STEP_NAME}"
     			break
     		fi
-    		if ! "${kind}_start" "${host}" "${what}" "${name}" "${STEP_ARGS[@]}"; then
-    			step_failed "${kind}" "${host}" "${what}" "${name}"
+    		names[${host}]=${STEP_NAME}
+    		if ! "${kind}_start" "${host}" "${what}" "${STEP_NAME}" "${STEP_ARGS[@]}"; then
+    			step_failed "${kind}" "${host}" "${what}" "${STEP_NAME}"
     			STEP_FAILED_HOSTS+=("${host}")
     			break
     		fi
@@ -9186,12 +9230,12 @@ data:
     		for host in "${pending[@]}"; do
     			rc=0
     			LAST_WARNING=
-    			"${kind}_poll" "${host}" "${what}" "${name}" || rc=$?
+    			"${kind}_poll" "${host}" "${what}" "${names[${host}]}" || rc=$?
     			case ${rc} in
     			0) ;;
     			2) running+=("${host}") ;;
     			*)
-    				step_failed "${kind}" "${host}" "${what}" "${name}"
+    				step_failed "${kind}" "${host}" "${what}" "${names[${host}]}"
     				STEP_FAILED_HOSTS+=("${host}")
     				;;
     			esac
@@ -9363,15 +9407,17 @@ data:
     	[[ -z ${LIST_METADATA_SIZE[$1]} ]] || [[ ${LIST_DATA_SIZE[$1]:-0} != 0 ]] || [[ ${LIST_OBJECT_DISK_SIZE[$1]:-0} != 0 ]]
     }
     
-    # list_all PATTERN HOST... lists the backups of every HOST and fills the sets COMPLETE, with the names matching
-    # PATTERN of the backups every HOST lists complete, WITH_DATA, with those of the backups that hold data on any HOST,
+    # list_all FILTER HOST... lists the backups of every HOST and fills the sets COMPLETE, with the keys of the backups
+    # every HOST lists complete, the function FILTER HOST NAME setting REPLY to the key of a backup NAME on HOST, or
+    # returning 1 for a backup left out - one name on every host, or the names of the shards of one backup with a naming
+    # template -, WITH_DATA, with those of the backups that hold data on any HOST,
     # EMPTY, with those of the backups a HOST lists complete with a size of 0, nothing at all, SIZED, with those of the
     # backups any HOST lists, broken or not, with a size above 0 of anything, BROKEN, with those any HOST lists broken, and
     # ALL_NAMES, with those of every backup any
     # HOST lists, broken ones too, and UNLISTED with the hosts that cannot be listed. A run that failed on one host leaves copies on the others that cannot be restored on their own, and the copies
     # of one backup on a host whose tables hold no data are as much part of it as those that do
     list_all() {
-    	local pattern=$1 host first=1 i name
+    	local filter=$1 host first=1 i name key
     	local -A listed both
     	declare -gA COMPLETE=() WITH_DATA=() EMPTY=() SIZED=() BROKEN=() ALL_NAMES=()
     	UNLISTED=()
@@ -9386,27 +9432,28 @@ data:
     		fi
     		listed=()
     		for i in "${!LIST_NAMES[@]}"; do
-    			if [[ ! ${LIST_NAMES[i]} =~ ${pattern} ]]; then
+    			if [[ -z ${LIST_NAMES[i]} ]] || ! "${filter}" "${host}" "${LIST_NAMES[i]}"; then
     				continue
     			fi
-    			ALL_NAMES[${LIST_NAMES[i]}]=1
+    			key=${REPLY}
+    			ALL_NAMES[${key}]=1
     			# Sizes are compared as text, as holds_data does; a sidecar older than 2.6.6 lists none
     			if [[ -n ${LIST_METADATA_SIZE[i]} ]] && [[ ${LIST_DATA_SIZE[i]:-0} != 0 || ${LIST_OBJECT_DISK_SIZE[i]:-0} != 0 ||
     				${LIST_METADATA_SIZE[i]} != 0 || ${LIST_RBAC_SIZE[i]:-0} != 0 ]]; then
-    				SIZED[${LIST_NAMES[i]}]=1
+    				SIZED[${key}]=1
     			fi
     			if [[ ${LIST_DESC[i]} == broken* ]]; then
-    				BROKEN[${LIST_NAMES[i]}]=1
+    				BROKEN[${key}]=1
     				continue
     			fi
-    			listed[${LIST_NAMES[i]}]=1
+    			listed[${key}]=1
     			if holds_data "${i}"; then
-    				WITH_DATA[${LIST_NAMES[i]}]=1
+    				WITH_DATA[${key}]=1
     			fi
     			# A sidecar older than 2.6.6 lists no sizes, which leaves the size unknown rather than 0
     			if [[ -n ${LIST_METADATA_SIZE[i]} && ${LIST_DATA_SIZE[i]:-0} == 0 && ${LIST_OBJECT_DISK_SIZE[i]:-0} == 0 &&
     				${LIST_METADATA_SIZE[i]} == 0 && ${LIST_RBAC_SIZE[i]:-0} == 0 ]]; then
-    				EMPTY[${LIST_NAMES[i]}]=1
+    				EMPTY[${key}]=1
     			fi
     		done
     		both=()
@@ -9423,29 +9470,17 @@ data:
     	done
     }
     
-    # series_pattern sets REPLY to the regex of the names of the backups an incremental backup of the schedule may be
-    # made from: the scheduled ones, "<prefix>-<YYYYMMDDHHMMSS>", and those made at once from the schedule,
-    # "<prefix>-<YYYYMMDD>T<HHMMSS>", as the Altinity Cloud Manager makes a backup from any backup of the cluster
-    series_pattern() {
-    	REPLY="^${BACKUP_NAME_PREFIX//./[.]}-[0-9]{8}T?[0-9]{6}$"
-    }
-    
-    # series_time NAME sets REPLY to the time a backup of the series_pattern is named after, YYYYMMDDHHMMSS, which orders
-    # the backups made at once among the scheduled ones
-    series_time() {
-    	REPLY=${1:${#BACKUP_NAME_PREFIX}+1}
-    	REPLY=${REPLY/T/}
-    }
-    
-    # retention_pattern sets REPLY to the regex of the names retention looks at: those of the scheduled backups, and those
-    # of the backups made at once from the schedule, "<prefix>-<YYYYMMDD>T<HHMMSS>"
+    # retention_pattern sets REPLY to the regex of the names of the series of the schedule without a naming template, which
+    # retention prunes and an incremental backup of the schedule is made from: those of the scheduled backups, and those of
+    # the backups made at once from the schedule, "<prefix>-<YYYYMMDD>T<HHMMSS>", as the Altinity Cloud Manager makes a
+    # backup from any backup of the cluster
     retention_pattern() {
     	REPLY="^${BACKUP_NAME_PREFIX//./[.]}-[0-9]{8}T?[0-9]{6}$"
     }
     
     # retention_plan decides, as the cleanup of remote backups of the Altinity Cloud Manager does, which backups of the
-    # schedule retention keeps, KEEP, and which it deletes, OBSOLETE, newest first, of NAMES, the backups of the
-    # retention_pattern any retention host lists, as list_all classified them:
+    # schedule retention keeps, KEEP, and which it deletes, OBSOLETE, newest first, of NAMES, the keys of the backups of
+    # the series any retention host lists, as series_key tells them and list_all classified them:
     #  - a backup not every host lists complete - failed, or in progress - never counts: it is deleted, on every host that
     #    holds it, once it is older than the newest backup every host lists complete, if a host lists a size above 0 of it,
     #    as the Altinity Cloud Manager deletes none of size 0, or lists it broken - an upload that failed, whatever its
@@ -9461,18 +9496,18 @@ data:
     #    base, and clickhouse-backup rebases the dependents of a base it deletes (rebase_during_delete), so the kept
     #    incremental backups stay restorable
     retention_plan() {
-    	local name tag key i oldest= first=1 newest=
+    	local name tag key i oldest= first=1 newest= made=${BACKUP_KEY:-${BACKUP_NAME:-}}
     	local -a ordered=() manual=() counts=() incomplete=() obsolete=()
     	declare -gA KEEP=()
     	OBSOLETE=()
-    	for name in "${NAMES[@]}"; do
-    		tag=${name:${#BACKUP_NAME_PREFIX}+1}
-    		key=${tag/T/}
+    	for name in ${NAMES[@]+"${NAMES[@]}"}; do
+    		key_time "${name}"
+    		key=${REPLY}
     		if ! tag_valid "${key}"; then
     			continue
     		fi
     		if [[ -z ${COMPLETE[${name}]:-} ]]; then
-    			if [[ -n ${SIZED[${name}]:-}${BROKEN[${name}]:-} && ${name} != "${BACKUP_NAME:-}" ]]; then
+    			if [[ -n ${SIZED[${name}]:-}${BROKEN[${name}]:-} && ${name} != "${made}" ]]; then
     				incomplete+=("${key} ${name}")
     			fi
     		elif [[ -z ${EMPTY[${name}]:-} ]]; then
@@ -9489,11 +9524,12 @@ data:
     	for tag in "${ordered[@]}"; do
     		key=${tag%% *}
     		name=${tag#* }
-    		if [[ -n ${first} || ${name} == "${BACKUP_NAME:-}" ]]; then
+    		if [[ -n ${first} || ${name} == "${made}" ]]; then
     			KEEP[${name}]=1
     			first=
     		fi
-    		if [[ ${name:${#BACKUP_NAME_PREFIX}+1} == *T* ]]; then
+    		key_time "${name}"
+    		if [[ -n ${KEY_AT_ONCE} ]]; then
     			manual+=("${tag}")
     			continue
     		fi
@@ -9533,9 +9569,10 @@ data:
     	fi
     }
     
-    # retention_on_host HOST deletes on HOST the backups of OBSOLETE it lists, newest first
+    # retention_on_host HOST deletes on HOST the backups of OBSOLETE it lists, newest first: with a naming template, the
+    # names of the backups of its own shard alone, which are the only ones it lists at a storage path of its own
     retention_on_host() {
-    	local host=$1 name
+    	local host=$1 name key
     	local -A held=()
     	if ! list_backups "${host}" remote; then
     		return 1
@@ -9545,7 +9582,9 @@ data:
     			held[${name}]=1
     		fi
     	done
-    	for name in "${OBSOLETE[@]}"; do
+    	for key in ${OBSOLETE[@]+"${OBSOLETE[@]}"}; do
+    		host_name "${host}" "${key}"
+    		name=${REPLY}
     		if [[ -z ${held[${name}]:-} ]]; then
     			continue
     		fi
@@ -9582,8 +9621,7 @@ data:
     	log "retention: keeping the newest ${BACKUP_NAME_PREFIX}-* backup, the newest backups of the slots of every schedule entry it keeps, and the backups made at once no older than the oldest of those"
     	# An unreachable host skips retention until the next run instead of holding the Job until its deadline
     	BEST_EFFORT=1
-    	retention_pattern
-    	list_all "${REPLY}" "${HOSTS[@]}"
+    	list_all series_key "${HOSTS[@]}"
     	# Every host keeps and deletes the same backups, which takes knowing what each of them holds
     	if ((${#UNLISTED[@]} > 0)); then
     		warn "retention skipped: ${UNLISTED[*]} cannot be listed, backups are left as they are"
@@ -9601,6 +9639,12 @@ data:
     	done
     }
     
+    # this_backup HOST NAME sets REPLY to BACKUP_KEY when NAME is the name of the backup the Job works on on HOST
+    this_backup() {
+    	REPLY=${BACKUP_KEY}
+    	[[ $2 == "${HOST_BACKUP[$1]:-}" ]]
+    }
+    
     # report_data HOST... tells when the backup just made holds no data, of tables that match nothing or an installation
     # recreated empty: it then writes NO_DATA_MESSAGE to the termination message, which the operator reports on the
     # backup's resource after the Job and its log are gone. The backup holds data when any HOST's copy of it does; a HOST
@@ -9609,12 +9653,12 @@ data:
     report_data() {
     	# The backup is made: a host that does not answer is asked once rather than waited for
     	local BEST_EFFORT=1
-    	list_all "^${BACKUP_NAME//./[.]}$" "$@"
+    	list_all this_backup "$@"
     	if ((${#UNLISTED[@]} > 0)); then
     		log "whether ${BACKUP_NAME} holds data is unknown: ${UNLISTED[*]} cannot be listed"
     		return 0
     	fi
-    	if [[ -z ${COMPLETE[${BACKUP_NAME}]:-} || -n ${WITH_DATA[${BACKUP_NAME}]:-} ]]; then
+    	if [[ -z ${COMPLETE[${BACKUP_KEY}]:-} || -n ${WITH_DATA[${BACKUP_KEY}]:-} ]]; then
     		return 0
     	fi
     	warn "${BACKUP_NAME} holds no data"
@@ -9761,14 +9805,15 @@ data:
     # check_storage_paths refuses, before anything changes, a storage path the target cluster shares. Every shard of
     # every backup-enabled cluster of the installation keeps its backups, and the object disk data of them, at a path of its
     # own in its storage: two shards that share one find each other's backups as their own, restore the wrong data
-    # and prune it. A backup of the first replica of each shard has to be at a path without {replica}, as every replica of
-    # the shard restores its schema from its own path; one of every replica needs {replica}, which gives each a path of its
-    # own. Another cluster whose storage or path macros the check does not know - a configuration file of its
+    # and prune it - but the shards of the target cluster with a naming template, which names the backup of each shard
+    # apart, may share one. A backup of the first replica of each shard has to be at a path without {replica}, as every
+    # replica of the shard restores its schema from its own path; one of every replica needs {replica}, which gives each a
+    # path of its own. Another cluster whose storage or path macros the check does not know - a configuration file of its
     # sidecar other than the one the operator generates, say - is left out of it with a warning: only a path proven shared
     # is refused.
     # The target cluster's own unknown paths fail the Job, unless it is the only backup-enabled cluster.
     check_storage_paths() {
-    	local index storage prefix identity key template object shard name what value self=${PATH_SELF:-} self_name=
+    	local index storage prefix identity key template object shard name what value self=${PATH_SELF:-} self_name= shared=
     	local selection=${PATH_REPLICA_SELECTION:-}
     	local -a indexes others=() shards
     	local -A owners=() self_owned=()
@@ -9904,6 +9949,12 @@ data:
     				clean_path "${REPLY}"
     				printf -v key '%s %q %q' "${identity}" "${what}" "${REPLY}"
     				if [[ -n ${owners[${key}]:-} ]]; then
+    					# The naming template of the target cluster names the backup of each of its shards apart, which may
+    					# then share a path, as the Altinity Cloud Manager keeps them
+    					if [[ ${index} == "${self}" && ${#NAMING_PARTS[@]} -gt 0 ]]; then
+    						shared=1
+    						continue
+    					fi
     					if [[ -n ${self_owned[${key}]:-} ]]; then
     						# The root of the storage, which clean_path makes empty, reads as path.Clean writes it
     						die "the ${what} '${REPLY:-.}' of shard ${shard} of cluster ${name} is that of ${owners[${key}]} too, in the same ${storage} storage: every shard of every cluster needs a path of its own, as {cluster} and {shard} give it"
@@ -9917,6 +9968,10 @@ data:
     			done
     		done
     	done
+    	if [[ -n ${shared} ]]; then
+    		log "storage path check: the shards of cluster ${self_name} share a path, where the naming template '${BACKUP_NAMING}' names the backup of each apart, and no other cluster has it"
+    		return 0
+    	fi
     	log "storage path check: every shard of cluster ${self_name} has a path of its own"
     }
     
@@ -9960,6 +10015,287 @@ data:
     	fi
     	month_days "${y}" "${m}"
     	((d >= 1 && d <= REPLY && 10#${tag:8:2} < 24 && 10#${tag:10:2} < 60 && 10#${tag:12:2} < 60))
+    }
+    
+    # naming_init reads the naming template of the backups of the cluster, BACKUP_NAMING, into NAMING_PARTS, and the
+    # number of the shard of every host, SHARD_NUMBERS, into SHARD_OF: a template names the backup of each shard, one name
+    # per shard, which differ by {shard} alone, see type_backup_naming.go. Without a template a backup has one name on
+    # every host. A template also gives the slots of the schedule a tolerance, SLOT_TOLERANCE, as the Altinity Cloud
+    # Manager names a scheduled backup after the time its run started, up to 30 minutes after its slot
+    naming_init() {
+    	local rest=${BACKUP_NAMING:-} macro name tokens token pair
+    	local -A seen=()
+    	NAMING_PARTS=()
+    	SLOT_TOLERANCE=0
+    	declare -gA SHARD_OF=()
+    	if [[ -z ${rest} ]]; then
+    		return 0
+    	fi
+    	if [[ ! ${rest} =~ ${NAMING_RE} ]] || ((${#rest} > NAMING_MAX_LENGTH)); then
+    		die "BACKUP_NAMING is not a valid naming template"
+    	fi
+    	while [[ ${rest} =~ \{([A-Za-z]+)\} ]]; do
+    		macro=${BASH_REMATCH[0]}
+    		name=${BASH_REMATCH[1]}
+    		if [[ -n ${rest%%"${macro}"*} ]]; then
+    			NAMING_PARTS+=("l:${rest%%"${macro}"*}")
+    		fi
+    		rest=${rest#*"${macro}"}
+    		case ${name} in
+    		shard | cluster | chi | namespace | prefix)
+    			NAMING_PARTS+=("p:${name}")
+    			seen[${name}]=$((${seen[${name}]:-0} + 1))
+    			continue
+    			;;
+    		esac
+    		tokens=${name}
+    		while [[ -n ${tokens} ]]; do
+    			case ${tokens} in
+    			YYYY*) token=YYYY ;;
+    			MM*) token=MM ;;
+    			DD*) token=DD ;;
+    			HH*) token=HH ;;
+    			II*) token=II ;;
+    			SS*) token=SS ;;
+    			*) die "BACKUP_NAMING holds {${name}}, which is no placeholder" ;;
+    			esac
+    			NAMING_PARTS+=("t:${token}")
+    			seen[${token}]=$((${seen[${token}]:-0} + 1))
+    			tokens=${tokens:${#token}}
+    		done
+    	done
+    	if [[ -n ${rest} ]]; then
+    		NAMING_PARTS+=("l:${rest}")
+    	fi
+    	for name in shard YYYY MM DD HH II SS; do
+    		if [[ ${seen[${name}]:-0} != 1 ]]; then
+    			die "BACKUP_NAMING must hold {shard} and every token of the time, YYYY, MM, DD, HH, II and SS, once"
+    		fi
+    	done
+    	for name in cluster chi namespace prefix; do
+    		if ((${seen[${name}]:-0} > 1)); then
+    			die "BACKUP_NAMING holds {${name}} twice"
+    		fi
+    	done
+    	for pair in ${SHARD_NUMBERS:-}; do
+    		if [[ ! ${pair} =~ ^[^=]+=[1-9][0-9]{0,4}$ || ! ${pair%%=*} =~ ${HOST_RE} ]]; then
+    			die "SHARD_NUMBERS must list host=number pairs"
+    		fi
+    		SHARD_OF[${pair%%=*}]=${pair#*=}
+    	done
+    	SLOT_TOLERANCE=${NAMING_SLOT_TOLERANCE}
+    	unset NAMING_CACHED
+    }
+    
+    # naming_value PLACEHOLDER sets REPLY to the value of {cluster}, {chi} or {namespace} in the names of the backups of the
+    # cluster: those of the installation that made them, the one a restore names when it restores the backup of another
+    naming_value() {
+    	case $1 in
+    	cluster) REPLY=${CLUSTER:-} ;;
+    	chi) REPLY=${SOURCE_INSTALLATION:-${NAMING_INSTALLATION:-}} ;;
+    	namespace) REPLY=${SOURCE_NAMESPACE:-${NAMING_NAMESPACE:-}} ;;
+    	esac
+    }
+    
+    # naming_regex PREFIX sets REPLY to the regex of the names the naming template makes on the cluster, with PREFIX for
+    # {prefix}, or any prefix for an empty PREFIX, and NAMING_GROUP to the groups of the regex: that of {shard}, of
+    # {prefix}, of the T before the hour and of each token of the time
+    naming_regex() {
+    	local part group=0 regex='^'
+    	declare -gA NAMING_GROUP=()
+    	for part in "${NAMING_PARTS[@]}"; do
+    		case ${part} in
+    		l:*)
+    			part=${part#l:}
+    			regex+=${part//./[.]}
+    			;;
+    		p:shard)
+    			group=$((group + 1))
+    			NAMING_GROUP[shard]=${group}
+    			regex+='([1-9][0-9]*)'
+    			;;
+    		p:prefix)
+    			if [[ -n $1 ]]; then
+    				regex+=${1//./[.]}
+    			else
+    				group=$((group + 1))
+    				NAMING_GROUP[prefix]=${group}
+    				regex+='([A-Za-z0-9._-]+)'
+    			fi
+    			;;
+    		p:*)
+    			naming_value "${part#p:}"
+    			regex+=${REPLY//./[.]}
+    			;;
+    		t:*)
+    			if [[ ${part} == t:HH ]]; then
+    				group=$((group + 1))
+    				NAMING_GROUP[T]=${group}
+    				regex+='(T?)'
+    			fi
+    			group=$((group + 1))
+    			NAMING_GROUP[${part#t:}]=${group}
+    			if [[ ${part} == t:YYYY ]]; then
+    				regex+='([0-9]{4})'
+    			else
+    				regex+='([0-9]{2})'
+    			fi
+    			;;
+    		esac
+    	done
+    	# Every literal and value is of letters, digits and . _ -, of which the dot alone means something in a regex, and is
+    	# escaped above
+    	REPLY=${regex}'$'
+    }
+    
+    # naming_parse NAME [PREFIX] reports whether the naming template makes NAME on the cluster, with PREFIX for {prefix},
+    # any prefix when empty, setting N_SHARD to its shard, N_PREFIX to its prefix and N_KEY to its key: the time it is
+    # named after, YYYYMMDDHHMMSS, with a T before the hour for a backup made at once, which has to be a valid time
+    naming_parse() {
+    	local name=$1
+    	# The regex is the same for every name of one prefix
+    	if [[ -z ${NAMING_CACHED+set} || ${NAMING_CACHED} != "p:${2:-}" ]]; then
+    		naming_regex "${2:-}"
+    		NAMING_CACHED_REGEX=${REPLY}
+    		NAMING_CACHED=p:${2:-}
+    	fi
+    	if [[ ! ${name} =~ ${NAMING_CACHED_REGEX} ]]; then
+    		return 1
+    	fi
+    	N_SHARD=${BASH_REMATCH[NAMING_GROUP[shard]]}
+    	N_PREFIX=${2:-}
+    	if [[ -n ${NAMING_GROUP[prefix]:-} ]]; then
+    		N_PREFIX=${BASH_REMATCH[NAMING_GROUP[prefix]]}
+    	fi
+    	N_KEY=${BASH_REMATCH[NAMING_GROUP[YYYY]]}${BASH_REMATCH[NAMING_GROUP[MM]]}${BASH_REMATCH[NAMING_GROUP[DD]]}
+    	N_KEY+=${BASH_REMATCH[NAMING_GROUP[T]]}${BASH_REMATCH[NAMING_GROUP[HH]]}${BASH_REMATCH[NAMING_GROUP[II]]}${BASH_REMATCH[NAMING_GROUP[SS]]}
+    	tag_valid "${N_KEY/T/}"
+    }
+    
+    # naming_render SHARD KEY PREFIX sets REPLY to the name the naming template gives the backup KEY of the shard SHARD,
+    # with PREFIX for {prefix}, failing unless it is a valid backup name
+    naming_render() {
+    	local part digits=${2/T/} name=
+    	for part in "${NAMING_PARTS[@]}"; do
+    		case ${part} in
+    		l:*) name+=${part#l:} ;;
+    		p:shard) name+=$1 ;;
+    		p:prefix) name+=$3 ;;
+    		p:*)
+    			naming_value "${part#p:}"
+    			name+=${REPLY}
+    			;;
+    		t:YYYY) name+=${digits:0:4} ;;
+    		t:MM) name+=${digits:4:2} ;;
+    		t:DD) name+=${digits:6:2} ;;
+    		t:HH)
+    			if [[ $2 == *T* ]]; then
+    				name+=T
+    			fi
+    			name+=${digits:8:2}
+    			;;
+    		t:II) name+=${digits:10:2} ;;
+    		t:SS) name+=${digits:12:2} ;;
+    		esac
+    	done
+    	REPLY=${name}
+    	[[ ${REPLY} =~ ${NAME_RE} ]]
+    }
+    
+    # naming_holds PLACEHOLDER reports whether the naming template holds the placeholder
+    naming_holds() {
+    	listed "p:$1" ${NAMING_PARTS[@]+"${NAMING_PARTS[@]}"}
+    }
+    
+    # series_key HOST NAME sets REPLY to the key of the backup NAME of the series of the schedule that HOST lists: the name
+    # itself, "<prefix>-<YYYYMMDDHHMMSS>" of a scheduled backup or "<prefix>-<YYYYMMDD>T<HHMMSS>" of one made at once from
+    # the schedule, or, with a naming template, the time it is named after, of a name of the shard of HOST with the values
+    # of the cluster and the prefix of the schedule; it returns 1 for any other name. A storage path the shards share
+    # lists the backups of every shard, of which each host takes those of its own
+    series_key() {
+    	local prefix=
+    	if ((${#NAMING_PARTS[@]} == 0)); then
+    		retention_pattern
+    		if [[ ! $2 =~ ${REPLY} ]]; then
+    			return 1
+    		fi
+    		REPLY=$2
+    		return 0
+    	fi
+    	if naming_holds prefix; then
+    		prefix=${BACKUP_NAME_PREFIX:-}
+    		if [[ -z ${prefix} ]]; then
+    			return 1
+    		fi
+    	fi
+    	if ! naming_parse "$2" "${prefix}" || [[ ${N_SHARD} != "${SHARD_OF[$1]:-}" ]]; then
+    		return 1
+    	fi
+    	REPLY=${N_KEY}
+    }
+    
+    # key_time KEY sets REPLY to the time the backup of the key KEY, as series_key tells it, is named after, YYYYMMDDHHMMSS,
+    # and KEY_AT_ONCE when it was made at once: its name has a T before the hour
+    key_time() {
+    	REPLY=$1
+    	if ((${#NAMING_PARTS[@]} == 0)); then
+    		REPLY=${1:${#BACKUP_NAME_PREFIX}+1}
+    	fi
+    	KEY_AT_ONCE=
+    	if [[ ${REPLY} == *T* ]]; then
+    		KEY_AT_ONCE=1
+    	fi
+    	REPLY=${REPLY/T/}
+    }
+    
+    # host_name HOST KEY sets REPLY to the name of the backup of the key KEY on HOST: KEY itself, or, with a naming template,
+    # the name it gives the backup of the shard of HOST, with the prefix NAMING_PREFIX; it fails for a host of no shard
+    host_name() {
+    	if ((${#NAMING_PARTS[@]} == 0)); then
+    		REPLY=$2
+    		return 0
+    	fi
+    	if [[ -z ${SHARD_OF[$1]:-} ]]; then
+    		die "SHARD_NUMBERS tells no shard of $1, whose backup the naming template names by its shard"
+    	fi
+    	if ! naming_render "${SHARD_OF[$1]}" "$2" "${NAMING_PREFIX}"; then
+    		die "the naming template '${BACKUP_NAMING}' makes '${REPLY}' of the backup $2 of $1, which is no valid backup name"
+    	fi
+    }
+    
+    # naming_key VAR_NAME [PREFIX] sets REPLY to the key of the backup the env var VAR_NAME names, of a backup of the
+    # cluster, and NAMING_PREFIX to its prefix: without a naming template, the name itself; with one, the time of a name it
+    # makes of any shard, with PREFIX for {prefix} or any prefix when empty, or that time itself, a tag YYYYMMDDHHMMSS or,
+    # of a backup made at once, YYYYMMDDTHHMMSS, unless the template holds {prefix}, which the tag does not tell. Any other
+    # value fails
+    naming_key() {
+    	local value=${!1}
+    	NAMING_PREFIX=${2:-}
+    	if ((${#NAMING_PARTS[@]} == 0)); then
+    		REPLY=${value}
+    		return 0
+    	fi
+    	if [[ ${value} =~ ${NAMING_TAG_RE} ]] && tag_valid "${value/T/}"; then
+    		if naming_holds prefix && [[ -z ${NAMING_PREFIX} ]]; then
+    			die "$1 ${value} tells the time of the backup alone, while the naming template '${BACKUP_NAMING}' holds {prefix}: name the backup in full, as the name of the backup of any shard"
+    		fi
+    		REPLY=${value}
+    		return 0
+    	fi
+    	if ! naming_parse "${value}" "${NAMING_PREFIX}"; then
+    		die "$1 ${value} is no name the naming template '${BACKUP_NAMING}' makes on cluster ${CLUSTER:-}, nor the time of one, YYYYMMDDHHMMSS"
+    	fi
+    	NAMING_PREFIX=${N_PREFIX}
+    	REPLY=${N_KEY}
+    }
+    
+    # resolve_names HOST... fills HOST_BACKUP with the name of the backup BACKUP_KEY on every HOST
+    resolve_names() {
+    	local host
+    	for host in "$@"; do
+    		host_name "${host}" "${BACKUP_KEY}"
+    		HOST_BACKUP[${host}]=${REPLY}
+    	done
     }
     
     # period_weight PERIOD sets REPLY to the weight of a schedule period: the longer the period, the heavier
@@ -10063,15 +10399,26 @@ data:
     }
     
     # slot_matches INDEX TAG reports whether the wall time TAG, YYYYMMDDHHMMSS, is a slot of the schedule entry INDEX, to the
-    # minute: a minute entry at every minute, an hour entry at the minute of its time, a 6hours one at that minute every 6 hours from its hour, a daily one
+    # minute, or, with a SLOT_TOLERANCE, at most that many seconds after one: a minute entry at every minute, an hour entry at the minute of its time, a 6hours one at that minute every 6 hours from its hour, a daily one
     # at its time, a weekly one on its day of the week at its time, a monthly one on its day of the month, clamped to the last
     # day of a shorter month, at its time
     slot_matches() {
-    	local i=$1 tag=$2 y m d hour minute day
-    	y=$((10#${tag:0:4})) m=$((10#${tag:4:2})) d=$((10#${tag:6:2})) hour=$((10#${tag:8:2})) minute=$((10#${tag:10:2}))
+    	local i=$1 tag=$2 y m d hour minute day back
     	if [[ ${SCHED_PERIOD[i]} == minute ]]; then
     		return 0
     	fi
+    	# With a tolerance, the time of a backup is that of the slot of its minute before it, within the tolerance
+    	if ((SLOT_TOLERANCE > 0)); then
+    		minute=$((10#${tag:10:2}))
+    		back=$((((minute - SCHED_MINUTE[i] + 60) % 60) * 60 + 10#${tag:12:2}))
+    		if ((back >= SLOT_TOLERANCE)); then
+    			return 1
+    		fi
+    		days_from_civil "$((10#${tag:0:4}))" "$((10#${tag:4:2}))" "$((10#${tag:6:2}))"
+    		TZ=UTC0 printf -v tag '%(%Y%m%d%H%M%S)T' \
+    			"$((REPLY * 86400 + 10#${tag:8:2} * 3600 + 10#${tag:10:2} * 60 + 10#${tag:12:2} - back))"
+    	fi
+    	y=$((10#${tag:0:4})) m=$((10#${tag:4:2})) d=$((10#${tag:6:2})) hour=$((10#${tag:8:2})) minute=$((10#${tag:10:2}))
     	if ((minute != SCHED_MINUTE[i])); then
     		return 1
     	fi
@@ -10181,15 +10528,14 @@ data:
     	SLOT_TAG=${REPLY}
     }
     
-    # record_series HOST adds to SERIES_REQUIRED, as "<host> <name>", the backup each complete backup of the series of
+    # record_series HOST adds to SERIES_REQUIRED, as "<host> <key>", the backup each complete backup of the series of
     # the last list of HOST is incremental from, empty for a full one; the backup this run makes is none of them
     record_series() {
-    	local host=$1 i pattern
-    	series_pattern
-    	pattern=${REPLY}
+    	local host=$1 i
     	for i in "${!LIST_NAMES[@]}"; do
-    		if [[ ${LIST_NAMES[i]} =~ ${pattern} && ${LIST_NAMES[i]} != "${BACKUP_NAME}" && ${LIST_DESC[i]} != broken* ]]; then
-    			SERIES_REQUIRED["${host} ${LIST_NAMES[i]}"]=${LIST_REQUIRED[i]}
+    		if [[ -n ${LIST_NAMES[i]} && ${LIST_DESC[i]} != broken* ]] && series_key "${host}" "${LIST_NAMES[i]}" &&
+    			[[ ${REPLY} != "${BACKUP_KEY}" ]]; then
+    			SERIES_REQUIRED["${host} ${REPLY}"]=${LIST_REQUIRED[i]}
     		fi
     	done
     }
@@ -10215,7 +10561,7 @@ data:
     	done
     	for name in "${!held[@]}"; do
     		n=${held[${name}]}
-    		series_time "${name}"
+    		key_time "${name}"
     		if ((n == ${#hosts[@]})) && [[ ${REPLY} > ${newest_time} || (${REPLY} == "${newest_time}" && ${name} > ${newest}) ]]; then
     			newest=${name}
     			newest_time=${REPLY}
@@ -10230,7 +10576,7 @@ data:
     		names=()
     		for key in "${!SERIES_REQUIRED[@]}"; do
     			if [[ ${key%% *} == "${host}" ]]; then
-    				series_time "${key#* }"
+    				key_time "${key#* }"
     				names+=("${REPLY} ${key#* }")
     			fi
     		done
@@ -10351,38 +10697,47 @@ data:
     # failure; a host that does not answer is asked once. A host whose backup only appeared in its storage, made by another
     # host, is no HOST
     drop_failed_backup() {
-    	local host where BEST_EFFORT=1
+    	local host where name BEST_EFFORT=1
     	for host in "$@"; do
+    		name=${HOST_BACKUP[${host}]}
     		for where in local remote; do
-    			if submit "${host}" "delete ${where} ${BACKUP_NAME}" "/backup/delete/${where}/${BACKUP_NAME}" -G --data-urlencode "force=true" \
+    			if submit "${host}" "delete ${where} ${name}" "/backup/delete/${where}/${name}" -G --data-urlencode "force=true" \
     				--max-time "${DELETE_TIMEOUT}"; then
-    				log "${host}: the ${where} copy of the failed backup ${BACKUP_NAME} deleted"
-    				event Normal OrchestratorFailedBackupDeleted "${host}: the ${where} copy of the failed backup ${BACKUP_NAME} deleted"
+    				log "${host}: the ${where} copy of the failed backup ${name} deleted"
+    				event Normal OrchestratorFailedBackupDeleted "${host}: the ${where} copy of the failed backup ${name} deleted"
     			elif [[ ${LAST_WARNING} == *"not found"* ]]; then
-    				log "${host}: no ${where} copy of the failed backup ${BACKUP_NAME} to delete"
+    				log "${host}: no ${where} copy of the failed backup ${name} to delete"
     			else
-    				advise "${host}: the ${where} copy of the failed backup ${BACKUP_NAME} is left: ${LAST_WARNING}"
-    				event Warning OrchestratorFailedBackupLeft "${host}: the ${where} copy of the failed backup ${BACKUP_NAME} is left: ${LAST_WARNING}"
+    				advise "${host}: the ${where} copy of the failed backup ${name} is left: ${LAST_WARNING}"
+    				event Warning OrchestratorFailedBackupLeft "${host}: the ${where} copy of the failed backup ${name} is left: ${LAST_WARNING}"
     			fi
     		done
     	done
     }
     
-    # backup_unseen HOST reports whether the storage of HOST does not hold the backup this run makes yet, as before it
-    # submits it there: one that does was made by another host of this run, at the same storage path
+    # backup_unseen HOST reports whether the storage of HOST does not hold the backup this run makes there yet, as before it
+    # submits it there: one that does was made by another host of this run, at the same storage path. It sets STEP_NAME and
+    # STEP_ARGS to the name of the backup on HOST and the request that makes it there, from CREATE_PARAMS and the base
+    # BASE_OF names on HOST
     backup_unseen() {
+    	local name=${HOST_BACKUP[$1]}
     	if ! list_backups "$1" remote; then
     		return 1
     	fi
-    	if find_backup "${BACKUP_NAME}"; then
-    		warn "backup ${BACKUP_NAME} appeared in the storage of $1 during this run: hosts of one backup must not share a storage path"
+    	if find_backup "${name}"; then
+    		warn "backup ${name} appeared in the storage of $1 during this run: hosts of one backup must not share a storage path"
     		return 1
+    	fi
+    	STEP_NAME=${name}
+    	STEP_ARGS=(/backup/create_remote -G --data-urlencode "name=${name}" ${CREATE_PARAMS[@]+"${CREATE_PARAMS[@]}"})
+    	if [[ -n ${BASE_OF[$1]:-} ]]; then
+    		STEP_ARGS+=(--data-urlencode "diff-from-remote=${BASE_OF[$1]}")
     	fi
     }
     
     do_backup() {
     	local host incremental= keep i
-    	local -a backup_hosts params
+    	local -a backup_hosts
     	parse_hosts BACKUP_HOSTS
     	fall_back_hosts
     	backup_hosts=("${HOSTS[@]}")
@@ -10401,32 +10756,60 @@ data:
     	if ((${#SCHED_PERIOD[@]} > 0)) || [[ -z ${BACKUP_NAME:-} ]]; then
     		schedule_slot
     	fi
+    	if [[ -n ${CLUSTER:-} ]]; then
+    		check_cluster
+    	fi
+    	naming_init
     	if [[ -n ${BACKUP_NAME:-} ]]; then
     		check_name BACKUP_NAME
     		BACKUP_NAME_GIVEN=1
+    		naming_key BACKUP_NAME "${BACKUP_NAME_PREFIX:-}"
+    		BACKUP_KEY=${REPLY}
+    	elif ((${#NAMING_PARTS[@]} > 0)); then
+    		# A scheduled backup is named after its slot, as the naming template makes it on each shard
+    		if naming_holds prefix && [[ -z ${BACKUP_NAME_PREFIX:-} ]]; then
+    			die "BACKUP_NAME_PREFIX must be set for the naming template '${BACKUP_NAMING}', which holds {prefix}"
+    		fi
+    		NAMING_PREFIX=${BACKUP_NAME_PREFIX:-}
+    		BACKUP_KEY=${SLOT_TAG}
     	elif [[ -n ${BACKUP_NAME_PREFIX:-} ]]; then
     		BACKUP_NAME="${BACKUP_NAME_PREFIX}-${SLOT_TAG}"
     		if [[ ! ${BACKUP_NAME} =~ ${NAME_RE} ]]; then
     			die "BACKUP_NAME_PREFIX is too long for a backup name"
     		fi
+    		BACKUP_KEY=${BACKUP_NAME}
     	else
     		die "either BACKUP_NAME or BACKUP_NAME_PREFIX must be set"
     	fi
-    	params=(-G --data-urlencode "name=${BACKUP_NAME}")
+    	resolve_names "${backup_hosts[@]}"
+    	if ((${#NAMING_PARTS[@]} > 0)); then
+    		# The backup is told by the name of the backup of its first shard, as the operator records it
+    		naming_render 1 "${BACKUP_KEY}" "${NAMING_PREFIX}" || :
+    		BACKUP_NAME=${REPLY}
+    		log "backup ${BACKUP_NAME}: named by the naming template '${BACKUP_NAMING}', $(for host in "${backup_hosts[@]}"; do printf '%s ' "${host}=${HOST_BACKUP[${host}]}"; done)"
+    	fi
+    	CREATE_PARAMS=()
     	if is_true SCHEMA_ONLY; then
-    		params+=(--data-urlencode "schema=")
+    		CREATE_PARAMS+=(--data-urlencode "schema=")
     	fi
     	if [[ -n ${TABLES:-} ]]; then
-    		params+=(--data-urlencode "table=${TABLES}")
+    		CREATE_PARAMS+=(--data-urlencode "table=${TABLES}")
     	fi
     	if [[ -n ${PARTITIONS:-} ]]; then
-    		params+=(--data-urlencode "partitions=${PARTITIONS}")
+    		CREATE_PARAMS+=(--data-urlencode "partitions=${PARTITIONS}")
     	fi
+    	declare -gA BASE_OF=()
     	if [[ -n ${DIFF_FROM_REMOTE:-} ]]; then
     		check_name DIFF_FROM_REMOTE
-    	fi
-    	if [[ -n ${CLUSTER:-} ]]; then
-    		check_cluster
+    		# The base of a backup of a naming template is named by it alike, the backup of the shard of every host
+    		local key=${BACKUP_KEY} prefix=${NAMING_PREFIX}
+    		naming_key DIFF_FROM_REMOTE "${BACKUP_NAME_PREFIX:-}"
+    		BACKUP_KEY=${REPLY}
+    		for host in "${backup_hosts[@]}"; do
+    			host_name "${host}" "${BACKUP_KEY}"
+    			BASE_OF[${host}]=${REPLY}
+    		done
+    		BACKUP_KEY=${key} NAMING_PREFIX=${prefix}
     	fi
     	if ((${#SCHED_PERIOD[@]} > 0)) && [[ -n ${BACKUP_NAME_GIVEN} ]]; then
     		# A backup that runs the schedule now has no slot: as the Altinity Cloud Manager makes a backup by hand, it is
@@ -10462,24 +10845,35 @@ data:
     			fail "preflight failed on ${host}"
     		fi
     		# create_remote "resumes" into an existing backup of the same name and overwrites its manifest
-    		if find_backup "${BACKUP_NAME}"; then
-    			die "backup ${BACKUP_NAME} already exists in the storage of ${host}"
+    		if find_backup "${HOST_BACKUP[${host}]}"; then
+    			die "backup ${HOST_BACKUP[${host}]} already exists in the storage of ${host}"
     		fi
-    		if [[ -n ${DIFF_FROM_REMOTE:-} ]] && ! find_backup "${DIFF_FROM_REMOTE}"; then
-    			die "base backup ${DIFF_FROM_REMOTE} is missing in the storage of ${host}"
+    		# A storage path the shards share lists the backups of every shard: another shard's backup of the same time is
+    		# a backup of a run of this slot as well
+    		if ((${#NAMING_PARTS[@]} > 0)); then
+    			for i in "${!LIST_NAMES[@]}"; do
+    				if naming_parse "${LIST_NAMES[i]}" "${NAMING_PREFIX}" && [[ ${N_KEY} == "${BACKUP_KEY}" ]]; then
+    					die "backup ${LIST_NAMES[i]}, of the same time as ${BACKUP_NAME}, already exists in the storage of ${host}"
+    				fi
+    			done
+    		fi
+    		if [[ -n ${DIFF_FROM_REMOTE:-} ]] && ! find_backup "${BASE_OF[${host}]}"; then
+    			die "base backup ${BASE_OF[${host}]} is missing in the storage of ${host}"
     		fi
     		if [[ -n ${incremental} ]]; then
     			record_series "${host}"
     		fi
     	done
-    	if [[ -n ${DIFF_FROM_REMOTE:-} ]]; then
-    		params+=(--data-urlencode "diff-from-remote=${DIFF_FROM_REMOTE}")
-    	elif [[ -n ${incremental} ]]; then
+    	if [[ -n ${incremental} && -z ${DIFF_FROM_REMOTE:-} ]]; then
     		incremental_base "${keep}" "${backup_hosts[@]}"
     		if [[ -n ${REPLY} ]]; then
-    			log "backup ${BACKUP_NAME}: incremental from ${REPLY}, which ends a chain of ${CHAIN} incremental backups"
-    			event Normal OrchestratorIncrementalBase "${BACKUP_NAME} is incremental from ${REPLY}"
-    			params+=(--data-urlencode "diff-from-remote=${REPLY}")
+    			local base=${REPLY}
+    			for host in "${backup_hosts[@]}"; do
+    				host_name "${host}" "${base}"
+    				BASE_OF[${host}]=${REPLY}
+    			done
+    			log "backup ${BACKUP_NAME}: incremental from ${BASE_OF[${backup_hosts[0]}]}, which ends a chain of ${CHAIN} incremental backups"
+    			event Normal OrchestratorIncrementalBase "${BACKUP_NAME} is incremental from ${BASE_OF[${backup_hosts[0]}]}"
     		else
     			log "backup ${BACKUP_NAME}: full, as the chain of incremental backups is ${CHAIN} long, of ${keep} at most, or there is no base every host holds"
     			event Normal OrchestratorIncrementalFull "${BACKUP_NAME} is a full backup"
@@ -10488,7 +10882,7 @@ data:
     
     	# Every host makes its part of the backup at the same time, as the Altinity Cloud Manager has every shard make its own;
     	# one that fails leaves the others to finish, which the Job waits for before it fails
-    	if ! run_all op "${backup_hosts[*]}" backup_unseen create_remote "${BACKUP_NAME}" /backup/create_remote "${params[@]}"; then
+    	if ! run_all op "${backup_hosts[*]}" backup_unseen create_remote "${BACKUP_NAME}"; then
     		drop_failed_backup ${STEP_FAILED_HOSTS[@]+"${STEP_FAILED_HOSTS[@]}"}
     		fail_all "backup ${BACKUP_NAME}"
     	fi
@@ -10509,29 +10903,37 @@ data:
     }
     
     do_verify() {
-    	local host
+    	local host name
     	local -a verify_hosts
     	check_name BACKUP_NAME
     	parse_hosts VERIFY_HOSTS
     	verify_hosts=("${HOSTS[@]}")
+    	if [[ -n ${CLUSTER:-} ]]; then
+    		check_cluster
+    	fi
+    	naming_init
+    	naming_key BACKUP_NAME "${BACKUP_NAME_PREFIX:-}"
+    	BACKUP_KEY=${REPLY}
+    	resolve_names "${verify_hosts[@]}"
     	wait_for_apis "${verify_hosts[@]}"
     	event Normal OrchestratorVerifyStarted "verify ${BACKUP_NAME} on ${#verify_hosts[@]} host(s)"
     	for host in "${verify_hosts[@]}"; do
-    		log "${host}: verifying ${BACKUP_NAME}"
+    		name=${HOST_BACKUP[${host}]}
+    		log "${host}: verifying ${name}"
     		# Drop any local copy so the download really pulls the backup from the storage
-    		if list_backups "${host}" local && find_backup "${BACKUP_NAME}"; then
-    			if ! delete_local "${host}" "${BACKUP_NAME}"; then
-    				fail "verify failed on ${host}: cannot drop the local copy of ${BACKUP_NAME}"
+    		if list_backups "${host}" local && find_backup "${name}"; then
+    			if ! delete_local "${host}" "${name}"; then
+    				fail "verify failed on ${host}: cannot drop the local copy of ${name}"
     			fi
     		fi
-    		if ! run_op "${host}" download "${BACKUP_NAME}" "/backup/download/${BACKUP_NAME}"; then
-    			fail "verify failed on ${host}: ${BACKUP_NAME} cannot be downloaded"
+    		if ! run_op "${host}" download "${name}" "/backup/download/${name}"; then
+    			fail "verify failed on ${host}: ${name} cannot be downloaded"
     		fi
-    		if ! has_usable_backup "${host}" local "${BACKUP_NAME}"; then
-    			die "verify failed on ${host}: ${BACKUP_NAME} is not present locally after the download"
+    		if ! has_usable_backup "${host}" local "${name}"; then
+    			die "verify failed on ${host}: ${name} is not present locally after the download"
     		fi
-    		if ! delete_local "${host}" "${BACKUP_NAME}"; then
-    			warn "${host}: the downloaded copy of ${BACKUP_NAME} is left on local disk"
+    		if ! delete_local "${host}" "${name}"; then
+    			warn "${host}: the downloaded copy of ${name} is left on local disk"
     		fi
     	done
     	log "backup ${BACKUP_NAME} verified on ${#verify_hosts[@]} host(s)"
@@ -10589,10 +10991,10 @@ data:
     	local host=$1 line where="the storage of $1"
     	local -a params
     	declare -gA HOST_TABLES=() HOST_DBS=()
-    	params=(-G --data-urlencode "remote_backup=${BACKUP_NAME}")
+    	params=(-G --data-urlencode "remote_backup=${HOST_BACKUP[${host}]}")
     	if [[ -n ${SOURCE_ENV} ]]; then
     		source_copy "${host}"
-    		params=(-G --data-urlencode "local_backup=${BACKUP_NAME}")
+    		params=(-G --data-urlencode "local_backup=${HOST_BACKUP[${host}]}")
     		where="the copy ${host} downloaded from the storage path '${SOURCE_PATH_SHOWN}'"
     	fi
     	if [[ -n ${TABLES:-} ]]; then
@@ -10600,7 +11002,7 @@ data:
     	fi
     	call GET "${host}" /backup/tables "${params[@]}"
     	if [[ ${HTTP_CODE} != 200 ]]; then
-    		die "preflight failed: cannot list the tables of ${BACKUP_NAME} in ${where} (HTTP ${HTTP_CODE}): $(error_of)"
+    		die "preflight failed: cannot list the tables of ${HOST_BACKUP[${host}]} in ${where} (HTTP ${HTTP_CODE}): $(error_of)"
     	fi
     	while IFS= read -r line; do
     		if [[ -z ${line} ]]; then
@@ -11053,8 +11455,8 @@ data:
     	if ! list_backups "${host}" local; then
     		fail "preflight failed on ${host}"
     	fi
-    	if find_backup "${BACKUP_NAME}"; then
-    		die "preflight failed: ${host} holds a local copy of ${BACKUP_NAME}, which a restore from the storage paths of another installation would restore in place of the backup there; delete it (clickhouse-backup delete local ${BACKUP_NAME}) and restore again"
+    	if find_backup "${HOST_BACKUP[${host}]}"; then
+    		die "preflight failed: ${host} holds a local copy of ${HOST_BACKUP[${host}]}, which a restore from the storage paths of another installation would restore in place of the backup there; delete it (clickhouse-backup delete local ${HOST_BACKUP[${host}]}) and restore again"
     	fi
     	NO_LOCAL_COPY+=("${host}")
     }
@@ -11074,8 +11476,8 @@ data:
     		fail "preflight failed on ${host}"
     	fi
     	OWN_BACKUPS[${host}]=" ${LIST_NAMES[*]} "
-    	if [[ ${OWN_BACKUPS[${host}]} == *" ${BACKUP_NAME} "* ]]; then
-    		die "preflight failed: ${host} holds a backup ${BACKUP_NAME} at its own storage path too, which clickhouse-backup would take for the one at the storage path '${SOURCE_PATH_SHOWN}', as it tells the backups of every path apart by name alone: restore a backup of another name, or delete that one first"
+    	if [[ ${OWN_BACKUPS[${host}]} == *" ${HOST_BACKUP[${host}]} "* ]]; then
+    		die "preflight failed: ${host} holds a backup ${HOST_BACKUP[${host}]} at its own storage path too, which clickhouse-backup would take for the one at the storage path '${SOURCE_PATH_SHOWN}', as it tells the backups of every path apart by name alone: restore a backup of another name, or delete that one first"
     	fi
     }
     
@@ -11094,8 +11496,8 @@ data:
     	refuse_local_copy "${host}"
     	# Recorded ahead of the download, which may leave a copy in part when it fails
     	SOURCE_COPIES+=("${host}")
-    	if ! run_action "${host}" download "${BACKUP_NAME}" "download --schema --rbac ${SOURCE_ENV} ${BACKUP_NAME}"; then
-    		die "preflight failed: backup ${BACKUP_NAME} is missing in the storage path '${SOURCE_PATH_SHOWN}' of ${host}, or cannot be read there${LAST_WARNING:+: ${LAST_WARNING}}${SOURCE_HINT}"
+    	if ! run_action "${host}" download "${HOST_BACKUP[${host}]}" "download --schema --rbac ${SOURCE_ENV} ${HOST_BACKUP[${host}]}"; then
+    		die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in the storage path '${SOURCE_PATH_SHOWN}' of ${host}, or cannot be read there${LAST_WARNING:+: ${LAST_WARNING}}${SOURCE_HINT}"
     	fi
     }
     
@@ -11114,20 +11516,20 @@ data:
     	fi
     	for host in "${hosts[@]}"; do
     		if [[ -n ${strict} ]]; then
-    			if ! delete_local "${host}" "${BACKUP_NAME}"; then
-    				fail "${host}: cannot delete the copy of ${BACKUP_NAME} the preflight downloaded, which the restore would take for its own"
+    			if ! delete_local "${host}" "${HOST_BACKUP[${host}]}"; then
+    				fail "${host}: cannot delete the copy of ${HOST_BACKUP[${host}]} the preflight downloaded, which the restore would take for its own"
     			fi
     			SOURCE_COPIES=("${SOURCE_COPIES[@]:1}")
-    		elif list_backups "${host}" local && ! find_backup "${BACKUP_NAME}"; then
+    		elif list_backups "${host}" local && ! find_backup "${HOST_BACKUP[${host}]}"; then
     			continue
-    		elif ! delete_local "${host}" "${BACKUP_NAME}"; then
-    			advise "${host}: the copy of ${BACKUP_NAME} the restore downloaded is left on local disk, which refuses a restore of ${BACKUP_NAME} from another installation until it is deleted"
+    		elif ! delete_local "${host}" "${HOST_BACKUP[${host}]}"; then
+    			advise "${host}: the copy of ${HOST_BACKUP[${host}]} the restore downloaded is left on local disk, which refuses a restore of ${HOST_BACKUP[${host}]} from another installation until it is deleted"
     		fi
     	done
     }
     
-    # restore_command STEP sets STEP_ARGS to the arguments of run_op, or of run_action, that run the step STEP of the
-    # restore of the backup: download, the backup with the data, every file of it already on the disks of the host
+    # restore_command STEP HOST sets STEP_ARGS to the arguments of run_op, or of run_action, that run the step STEP of the
+    # restore of the backup on HOST, by its name there: download, the backup with the data, every file of it already on the disks of the host
     # hard-linked rather than downloaded again; download_schema, the backup without the data; schema, which drops the tables
     # of the backup first, and restores the access entities too when RESTORE_RBAC_WITH_SCHEMA is set; schema_on_cluster,
     # which drops and creates them ON CLUSTER; or data.
@@ -11177,11 +11579,11 @@ data:
     		flags+=("--restore-database-mapping=${DATABASE_MAPPING}")
     	fi
     	if [[ ${RESTORE_KIND} == action || $1 == schema_on_cluster ]]; then
-    		command="${flags[*]}${ACTION_ENV:+ ${ACTION_ENV}} ${BACKUP_NAME}"
+    		command="${flags[*]}${ACTION_ENV:+ ${ACTION_ENV}} ${HOST_BACKUP[$2]}"
     		STEP_ARGS=("${command}")
     		return 0
     	fi
-    	STEP_ARGS=("/backup/${endpoint}/${BACKUP_NAME}" -G)
+    	STEP_ARGS=("/backup/${endpoint}/${HOST_BACKUP[$2]}" -G)
     	for command in "${params[@]}"; do
     		STEP_ARGS+=(--data-urlencode "${command}")
     	done
@@ -11190,11 +11592,11 @@ data:
     # restore_step HOST WHAT STEP runs the step STEP of the restore, as restore_command makes it, on HOST
     restore_step() {
     	local kind=${RESTORE_KIND}
-    	restore_command "$3"
+    	restore_command "$3" "$1"
     	if [[ $3 == schema_on_cluster ]]; then
     		kind=action
     	fi
-    	"run_${kind}" "$1" "$2" "${BACKUP_NAME}" "${STEP_ARGS[@]}"
+    	"run_${kind}" "$1" "$2" "${HOST_BACKUP[$1]}" "${STEP_ARGS[@]}"
     }
     
     # check_filter VAR_NAME REGEX MAX_LENGTH WHAT fails unless the env var VAR_NAME is unset, empty, or a value of at most
@@ -11248,14 +11650,21 @@ data:
     	fi
     }
     
-    # download_args HOST sets STEP_ARGS to the download of the backup to HOST: with the data on a host of DATA_DOWNLOADS,
-    # which restores the data, the schema alone on another
+    # download_args HOST sets STEP_NAME and STEP_ARGS to the name of the backup on HOST and its download to HOST: with the
+    # data on a host of DATA_DOWNLOADS, which restores the data, the schema alone on another
     download_args() {
+    	STEP_NAME=${HOST_BACKUP[$1]}
     	if [[ " ${DATA_DOWNLOADS} " == *" $1 "* ]]; then
-    		restore_command download
+    		restore_command download "$1"
     	else
-    		restore_command download_schema
+    		restore_command download_schema "$1"
     	fi
+    }
+    
+    # data_args HOST sets STEP_NAME and STEP_ARGS to the name of the backup on HOST and the restore of its data there
+    data_args() {
+    	STEP_NAME=${HOST_BACKUP[$1]}
+    	restore_command data "$1"
     }
     
     # drop_downloads HOST... deletes, as well as it can, the copies of the backup the download step of a restore made on
@@ -11263,8 +11672,8 @@ data:
     drop_downloads() {
     	local host BEST_EFFORT=1 READ_ONLY=1
     	for host in "$@"; do
-    		if list_backups "${host}" local && find_backup "${BACKUP_NAME}" && ! delete_local "${host}" "${BACKUP_NAME}"; then
-    			advise "${host}: the copy of ${BACKUP_NAME} the restore downloaded is left on local disk"
+    		if list_backups "${host}" local && find_backup "${HOST_BACKUP[${host}]}" && ! delete_local "${host}" "${HOST_BACKUP[${host}]}"; then
+    			advise "${host}: the copy of ${HOST_BACKUP[${host}]} the restore downloaded is left on local disk"
     		fi
     	done
     }
@@ -11314,14 +11723,19 @@ data:
     	if [[ -n ${CLUSTER:-} || -n ${overwrite} ]]; then
     		check_cluster
     	fi
+    	check_source_name SOURCE_INSTALLATION "${SOURCE_INSTALLATION_MAX_LENGTH}" "installation name"
+    	check_source_name SOURCE_NAMESPACE "${SOURCE_NAMESPACE_MAX_LENGTH}" namespace
+    	# With a naming template the backup of every shard has a name of its own, which its time and prefix give, of the
+    	# names of the installation that made it
+    	naming_init
+    	naming_key BACKUP_NAME
+    	BACKUP_KEY=${REPLY}
     	if [[ -n ${TABLES:-} ]]; then
     		if [[ ! ${TABLES} =~ ${TABLES_RE} ]] || ((${#TABLES} > TABLES_MAX_LENGTH)); then
     			die "TABLES is not a valid table pattern"
     		fi
     	fi
     	check_restore_filters
-    	check_source_name SOURCE_INSTALLATION "${SOURCE_INSTALLATION_MAX_LENGTH}" "installation name"
-    	check_source_name SOURCE_NAMESPACE "${SOURCE_NAMESPACE_MAX_LENGTH}" namespace
     	# As the Altinity Cloud Manager restores partitions, a restore of partitions attaches their data into the tables as
     	# they are: no schema step, which would drop and recreate the tables, and with it no access entities. clickhouse-backup
     	# drops each of those partitions before it attaches it, and nothing else; the tables must exist
@@ -11359,6 +11773,7 @@ data:
     	mapfile -t used < <(printf '%s\n' "${used[@]}" | awk '!seen[$0]++')
     	targets=(${schema_hosts[@]+"${schema_hosts[@]}"} "${data_hosts[@]}")
     	mapfile -t targets < <(printf '%s\n' "${targets[@]}" | awk 'NF && !seen[$0]++')
+    	resolve_names "${targets[@]}"
     	# The schema restore drops the tables of the backup on every replica, so the guard checks them all; a restore of
     	# partitions has neither
     	parse_hosts GUARD_HOSTS optional
@@ -11406,26 +11821,26 @@ data:
     				if ! list_backups "${host}" local; then
     					fail "preflight failed on ${host}"
     				fi
-    				if ! find_backup "${BACKUP_NAME}"; then
-    					die "preflight failed: backup ${BACKUP_NAME} is missing in ${where}: its download left no local copy"
+    				if ! find_backup "${HOST_BACKUP[${host}]}"; then
+    					die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in ${where}: its download left no local copy"
     				fi
     				base=${LIST_REQUIRED[FOUND]}
     				if [[ -n ${base} && ${OWN_BACKUPS[${host}]:-} == *" ${base} "* ]]; then
-    					die "preflight failed: backup ${BACKUP_NAME} is incremental from ${base}, and ${host} holds a backup ${base} at its own storage path too, which clickhouse-backup would take for the one at the storage path '${SOURCE_PATH_SHOWN}', as it tells the backups of every path apart by name alone: delete that one first"
+    					die "preflight failed: backup ${HOST_BACKUP[${host}]} is incremental from ${base}, and ${host} holds a backup ${base} at its own storage path too, which clickhouse-backup would take for the one at the storage path '${SOURCE_PATH_SHOWN}', as it tells the backups of every path apart by name alone: delete that one first"
     				fi
     			else
     				if ! list_backups "${host}" remote; then
     					fail "preflight failed on ${host}"
     				fi
-    				if ! find_backup "${BACKUP_NAME}"; then
+    				if ! find_backup "${HOST_BACKUP[${host}]}"; then
     					if [[ ${SELF_PATH} == *"{replica}"* ]]; then
-    						die "preflight failed: backup ${BACKUP_NAME} is missing in the storage of ${host}: the storage path '${SELF_PATH}' holds {replica}, which gives every replica a path of its own, and the backup was made on the first replica of each shard only${hint}"
+    						die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in the storage of ${host}: the storage path '${SELF_PATH}' holds {replica}, which gives every replica a path of its own, and the backup was made on the first replica of each shard only${hint}"
     					fi
-    					die "preflight failed: backup ${BACKUP_NAME} is missing in the storage of ${host}${hint}"
+    					die "preflight failed: backup ${HOST_BACKUP[${host}]} is missing in the storage of ${host}${hint}"
     				fi
     			fi
     			if [[ ${LIST_DESC[FOUND]} == broken* ]]; then
-    				die "preflight failed: backup ${BACKUP_NAME} is ${LIST_DESC[FOUND]} in ${where}"
+    				die "preflight failed: backup ${HOST_BACKUP[${host}]} is ${LIST_DESC[FOUND]} in ${where}"
     			fi
     			# Sizes are compared as text, as holds_data does
     			if [[ ${LIST_RBAC_SIZE[FOUND]:-0} != 0 ]]; then
@@ -11452,14 +11867,14 @@ data:
     	fi
     	if [[ -z ${SOURCE_ENV} ]]; then
     		for host in "${used[@]}"; do
-    			if ! list_backups "${host}" local || ! find_backup "${BACKUP_NAME}"; then
+    			if ! list_backups "${host}" local || ! find_backup "${HOST_BACKUP[${host}]}"; then
     				continue
     			fi
     			# An incomplete copy, as a download that failed or was stopped leaves it, is downloaded again, which
     			# clickhouse-backup resumes from its resumable state (use_resumable_state) rather than starting over; it is
     			# never deleted before that
     			if [[ ${LIST_DESC[FOUND]} == broken* ]]; then
-    				log "${host}: holds an incomplete local copy of ${BACKUP_NAME}, whose download the restore resumes"
+    				log "${host}: holds an incomplete local copy of ${HOST_BACKUP[${host}]}, whose download the restore resumes"
     				resumed+=("${host}")
     			else
     				had_local+=("${host}")
@@ -11531,8 +11946,7 @@ data:
     	done
     	# Every host that restores data restores it at once
     	if [[ -n ${restore_data} ]]; then
-    		restore_command data
-    		if ! run_all "${RESTORE_KIND}" "${data_hosts[*]}" "" "restore data" "${BACKUP_NAME}" "${STEP_ARGS[@]}"; then
+    		if ! run_all "${RESTORE_KIND}" "${data_hosts[*]}" data_args "restore data" "${BACKUP_NAME}"; then
     			fail_all "data restore of ${BACKUP_NAME}"
     		fi
     	fi
@@ -11541,8 +11955,8 @@ data:
     		if [[ " ${had_local[*]} " == *" ${host} "* ]]; then
     			continue
     		fi
-    		if list_backups "${host}" local && find_backup "${BACKUP_NAME}" && ! delete_local "${host}" "${BACKUP_NAME}"; then
-    			warn "${host}: the downloaded copy of ${BACKUP_NAME} is left on local disk"
+    		if list_backups "${host}" local && find_backup "${HOST_BACKUP[${host}]}" && ! delete_local "${host}" "${HOST_BACKUP[${host}]}"; then
+    			warn "${host}: the downloaded copy of ${HOST_BACKUP[${host}]} is left on local disk"
     		fi
     	done
     	log "restore ${BACKUP_NAME} completed"

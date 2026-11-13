@@ -454,3 +454,27 @@ func TestJobScriptSourcePatternMatchesTheTypes(t *testing.T) {
 		require.Equal(t, strconv.Itoa(want), maxLength[1], name)
 	}
 }
+
+// The naming template of a cluster is bounded alike by the CRD schema, the spec validation and the Job script, which
+// reads it again, and a name given by its time alone alike by the operator and the script.
+func TestNamingTemplateMatchesTheTypes(t *testing.T) {
+	schema := loadCRDSchema(t, chiCRDTemplatePath, "${PLURAL}.clickhouse.altinity.com")
+	for _, path := range []string{"spec.backup.naming", "spec.configuration.clusters.backup.naming"} {
+		naming := schemaProperty(schema, path)
+		require.NotNil(t, naming, path)
+		require.Equal(t, backupNamingRegexp.String(), naming["pattern"], path)
+		require.Equal(t, backupNamingMaxLength, naming["maxLength"], path)
+	}
+	raw, err := os.ReadFile(jobScriptPath)
+	require.NoError(t, err)
+	script := string(raw)
+	for name, want := range map[string]string{
+		"NAMING_RE":         backupNamingRegexp.String(),
+		"NAMING_TAG_RE":     BackupTagRegexp.String(),
+		"NAMING_MAX_LENGTH": strconv.Itoa(backupNamingMaxLength),
+	} {
+		value := regexp.MustCompile(`(?m)^` + name + `='?([^'\n]*)'?$`).FindStringSubmatch(script)
+		require.NotNil(t, value, "the script no longer defines %s", name)
+		require.Equal(t, want, value[1], name)
+	}
+}

@@ -178,6 +178,7 @@ spec:
 | `configSecretRef`        | Secret in the CHI namespace whose key `config.yml` holds the `clickhouse-backup` configuration of the sidecar, see [Backup storage](#backup-storage). Required where backup is enabled. `name: ""` on a cluster: none.                                     |
 | `mode`                   | How the operator reaches `clickhouse-backup` on the hosts of the cluster: `sidecar` (default), a sidecar in every ClickHouse Pod; `pod`, no sidecar, a backup Pod per shard only while a backup or restore of the cluster runs, see [Backup modes](#backup-modes). |
 | `preferredReplica`       | Index, from 0, of the replica of each shard a backup works on, as the `backupReplica` of ACM; empty is 0, the first replica. With `mode: sidecar` a `FirstPerShard` backup runs on that replica's sidecar, or on the first replica's when the shard has fewer replicas or the preferred one's ClickHouse does not answer when the Job starts (`OrchestratorReplicaFallback` event); with `mode: pod` the backup Pod of the shard runs next to it, see [Which hosts are involved](#which-hosts-are-involved). |
+| `naming`                 | Template the backups of the cluster are named by, one name per shard, e.g. `shard{shard}-{YYYYMMDDHHIISS}` as ACM names them; empty, the default, names a backup `<prefix>-YYYYMMDDHHMMSS` alike on every shard. See [Backup naming](#backup-naming). |
 | `recovery`               | `backupName`: the backup a new CHI starts from, see [Recover a new CHI from a backup](#recover-a-new-chi-from-a-backup). `""` on a cluster: nothing to recover there. `sourceInstallation`, `sourceNamespace`: the CHI that made the backup, when another; `""` on a cluster: this CHI. `orchestratorConfigMapRef`: the ConfigMap of the [orchestrator script](#the-orchestrator-script) the recovery restore runs, copied into it; `name: ""` on a cluster: the operator's. |
 
 Inheritance follows `spec.security`: a cluster inherits every field it leaves empty from
@@ -637,7 +638,8 @@ anything unless:
 
 * **every shard of its cluster has a storage path of its own**, which no other shard uses, of its
   cluster or of another one on the same storage (the same storage type and bucket, container,
-  endpoint or address). Without `{shard}` the shards of a cluster would write over each other's part
+  endpoint or address) - but the shards of a cluster with a [naming template](#backup-naming), which
+  names the backup of each apart, may share one path, which still no other cluster may use. Without `{shard}` the shards of a cluster would write over each other's part
   of a backup, and without `{cluster}` two clusters on one bucket would mix theirs: as they share the
   backup name, a restore of one cluster could restore the other's data. One cluster with one shard
   needs no macro at all, and clusters on different buckets need no `{cluster}`. A path that two other
@@ -755,6 +757,68 @@ choose it deliberately. Before the recovery is recorded,
 [giving the recovery up](#recover-a-new-chi-from-a-backup) ends it for every schedule; after that,
 only `backupNamePrefix` does. Any other schedule of a recovered CHI reports the possibly shared path
 as a warning event and in its `Validated` condition (reason `CHIRecovered`).
+
+### Backup naming
+
+By default a backup has one name on every shard - `<backupNamePrefix>-YYYYMMDDHHMMSS` for a scheduled
+one, the name of a `ClickHouseBackup` otherwise - and each shard keeps its part under a storage path
+of its own. `backup.naming`, on the CHI and on a cluster, inherited like `mode`, names the backup of
+every shard by a template instead, as ACM does: `shard{shard}-{YYYYMMDDHHIISS}` names the backup made at
+02:00:37 on 13 November 2026 `shard1-20261113020037` on the first shard and `shard2-20261113020037` on
+the second. As the names differ by shard, the shards of the cluster may keep their backups at one
+storage path, ACM's layout.
+
+| Placeholder | Value |
+|---|---|
+| `{shard}` | The number of the shard in the cluster, from 1, as `shard_num` of `system.clusters` and the `shard<N>` of ACM. **Required**, and kept apart from a digit or another placeholder by a literal that is no digit. |
+| `{cluster}`, `{chi}`, `{namespace}` | The names of the cluster, of the CHI and of its namespace; a restore of the backup of [another CHI](#storage-paths) takes those of `sourceInstallation` and `sourceNamespace`. |
+| `{prefix}` | The `backupNamePrefix` of the schedule that makes the backup, or the name of a `ClickHouseBackup` made without one. |
+| `YYYY` `MM` `DD` `HH` `II` `SS` | The time the backup is named after - year, month, day, hour, minutes, seconds - in braces, alone or several in one, e.g. `{YYYYMMDDHHIISS}` or `{YYYY}-{MM}-{DD}_{HH}{II}{SS}`. **All six are required**: retention and incremental backups order the backups by it. |
+
+Literals are letters, digits, `.`, `_` and `-`. Empty `naming` leaves the names exactly as before. The
+time is that of the slot of a scheduled run, in the schedule's `timeZone`; a backup made at once - a
+`ClickHouseBackup`, of a [schedule](#run-a-schedule-now) or not - is named after the time it is due, in
+UTC, with a `T` before the hour (`shard1-20261113T101500`), which keeps it out of the slots of the
+schedule, as the `<prefix>-YYYYMMDDTHHMMSS` of the default naming does.
+
+* **One name per backup.** A backup is told by the name of the backup of its first shard, which
+  `status.backupName` of a `ClickHouseBackup`, `LAST-BACKUP` of a schedule and the
+  recovered-from annotation show; a `ClickHouseRestore`, a `recovery` and `diffFromRemote` take it, or
+  the name of the backup of any other shard, and restore on every host the backup of its own shard.
+  When the template holds no `{prefix}` they also take the time alone, `20261113020037`, as ACM tells a
+  backup. The `backupName` of a `ClickHouseBackup` of such a cluster may only be such a time. One
+  `ClickHouseBackup` of several clusters needs one template that holds no `{cluster}`; back up the
+  clusters one by one otherwise.
+* **One storage path for the shards.** The storage path check lets the shards of a cluster with a
+  template share a path, e.g. `s3.path: backup/{namespace}/{installation}/{cluster}` without
+  `{shard}`, and the object disk path likewise; it still refuses a path two clusters share. A template
+  without `{shard}` is refused, as the shards would overwrite each other's backups there. Each host
+  lists, prunes and restores the backups of its own shard, whatever the others at the path.
+* **A slot tolerance of 30 minutes.** ACM names a scheduled backup after the time its run started,
+  up to 30 minutes after the slot (its refresh rate times 1.5). With a template a backup belongs to
+  the slot of an entry when its time is from the slot to 30 minutes after it, so retention counts the
+  backups ACM made for the entries of the same times.
+* **Retention prunes the whole template.** Without `{prefix}` in the template, retention of a schedule
+  takes every name the template makes on its cluster as the schedule's, as ACM's cleanup does: run one
+  schedule per cluster.
+
+Changing `naming` on a cluster with backups leaves the backups of the former naming where they are:
+retention no longer finds them, and restores name them by the names they have.
+
+#### Migrating from ACM
+
+1. Stop the backups of the cluster in ACM (its schedule), so that two cleaners never prune one path.
+2. Create the storage Secret with ACM's storage settings and **its path, shared by the shards**: ACM
+   keeps the backups of a cluster at `<environment path>/<cluster>`, or `<kubeNamespace>/<cluster>`
+   when the environment sets no path, and the object disk data at `object_disks/<that path>`. Set
+   `s3.path` (or `gcs.path`, ...) and the object disk path to those, without `{shard}`.
+3. Set `backup.naming: "shard{shard}-{YYYYMMDDHHIISS}"` on the CHI or the cluster, and
+   `preferredReplica` to ACM's `backupReplica`.
+4. Create a `ClickHouseBackupSchedule` with ACM's entries, the same `time`s, and `timeZone` set to the
+   zone of the ACM backend, as its tags are wall times there. Keep the `keep`s: retention then counts
+   the backups ACM made, with the 30-minute tolerance, as ACM would have.
+5. Check with `kubectl get chbs` and `clickhouse-backup list remote` on a sidecar that the first runs
+   keep what you expect; restore an ACM backup by its time (`backupName: "20261112021503"`).
 
 ### Secret changes
 
@@ -1546,7 +1610,9 @@ schedule's backups on the cluster it ran on, newest first, as the cleanup of ACM
 
 * **Only the schedule's own backups count.** Retention looks at the backups named
   `<backupNamePrefix>-YYYYMMDDHHMMSS` - the scheduled ones, the time being their slot in `timeZone` -
-  and `<backupNamePrefix>-YYYYMMDDTHHMMSS` - those that [run the schedule now](#run-a-schedule-now).
+  and `<backupNamePrefix>-YYYYMMDDTHHMMSS` - those that [run the schedule now](#run-a-schedule-now) -
+  or, with a [naming template](#backup-naming), at every name the template makes of the shard of each
+  host, with the schedule's prefix when it holds `{prefix}`, keyed by their time.
   Nothing else is ever touched: backups of other schedules, one-off backups, and any other name. Give
   each schedule its own prefix. The default prefix, `<namespace>-<chi>-<schedule>`, differs between
   the schedules of one Kubernetes cluster, even across CHIs that share a storage path, unless their

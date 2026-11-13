@@ -1028,3 +1028,52 @@ func TestBackupVerifiesEveryCluster(t *testing.T) {
 		require.Equal(t, api.BackupReasonClusterNotFound, condition(t, got.Status.Conditions, api.BackupConditionVerified).Reason)
 	})
 }
+
+// A backup of a cluster with a naming template is named as the template names the backup of its first shard, which
+// the Job names the backup of every other shard after: by the time it is due, or the time its backupName gives, which
+// is all its backupName may be. One backup of several clusters needs one template that names their backups alike.
+func TestBackupOfANamingTemplate(t *testing.T) {
+	acm := func(cluster *api.Cluster) *api.Cluster {
+		cluster.Backup.Naming = types.NewString(api.BackupNamingACM)
+		return cluster
+	}
+	f := newBackupFixture(t, newFakeCR(installation(t, api.StatusCompleted, acm(backupCluster("main", 2, true)))), nil, newBackupCR("b1"))
+	f.reconcile("b1")
+	got := f.backup("b1")
+	require.Regexp(t, `^shard1-[0-9]{8}T[0-9]{6}$`, got.Status.BackupName)
+	require.Equal(t, got.Status.BackupName, jobEnv(t, f.client, "b1-main-backup", "BACKUP_NAME"))
+	require.Equal(t, api.BackupNamingACM, jobEnv(t, f.client, "b1-main-backup", "BACKUP_NAMING"))
+
+	named := newBackupCR("b2")
+	named.Spec.BackupName = "20261113020000"
+	f = newBackupFixture(t, newFakeCR(installation(t, api.StatusCompleted, acm(backupCluster("main", 2, true)))), nil, named)
+	f.reconcile("b2")
+	require.Equal(t, "shard1-20261113020000", f.backup("b2").Status.BackupName)
+
+	for name, tc := range map[string]struct {
+		chi    *api.ClickHouseInstallation
+		backup string
+		reason string
+	}{
+		"a backupName that is no time": {
+			chi: installation(t, api.StatusCompleted, acm(backupCluster("main", 2, true))), backup: "nightly",
+			reason: `backupName "nightly" is no time a backup is named after`,
+		},
+		"clusters of different namings": {
+			chi:    installation(t, api.StatusCompleted, acm(backupCluster("hot", 2, true)), backupCluster("cold", 1, true)),
+			reason: "name their backups by naming templates that differ between them",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			chb := newBackupCR("b3")
+			chb.Spec.BackupName = tc.backup
+			f := newBackupFixture(t, newFakeCR(tc.chi), nil, chb)
+			f.reconcile("b3")
+			got := f.backup("b3")
+			validated := condition(t, got.Status.Conditions, api.BackupConditionValidated)
+			require.Equal(t, api.BackupReasonInvalidSpec, validated.Reason)
+			require.Contains(t, validated.Message, tc.reason)
+			require.Empty(t, got.Status.Clusters, "no Job runs")
+		})
+	}
+}

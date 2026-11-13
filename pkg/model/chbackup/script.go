@@ -51,8 +51,25 @@ const (
 	// envBackupName is the backup to create, verify or restore
 	envBackupName = "BACKUP_NAME"
 	// envBackupNamePrefix names a scheduled backup "<prefix>-<YYYYMMDDHHMMSS>", the wall time of its slot in
-	// envScheduleTimezone, when envBackupName is empty, and scopes retention to the backups named that way
+	// envScheduleTimezone, when envBackupName is empty, and scopes retention to the backups named that way; with
+	// envBackupNaming it is the value of {prefix}
 	envBackupNamePrefix = "BACKUP_NAME_PREFIX"
+	// envBackupNaming is the naming template of the backups of the cluster, backup.naming, see
+	// api.RenderBackupName: it names the backup of every shard apart, which the shards may then keep at one
+	// storage path, as the Altinity Cloud Manager does, and gives the slots of a schedule a tolerance of 30
+	// minutes. Unset or empty, a backup has one name on every host. envBackupName then is the name of the backup
+	// of any shard, the operator giving that of the first one, or for a restore or the base of a backup the
+	// time it is named after alone, YYYYMMDDHHMMSS - YYYYMMDDTHHMMSS for a backup made at once - unless the
+	// template holds {prefix}
+	envBackupNaming = "BACKUP_NAMING"
+	// envShardNumbers lists the number of the shard, from 1, of every host of the cluster a Job may reach - every
+	// replica, or the backup Pod of every shard -, as space-separated "host=number" pairs, with envBackupNaming
+	envShardNumbers = "SHARD_NUMBERS"
+	// envNamingInstallation and envNamingNamespace are the values of {chi} and {namespace} in the names of the
+	// backups of the cluster, with envBackupNaming; a restore of the backup of another installation takes those
+	// of envSourceInstallation and envSourceNamespace in their place
+	envNamingInstallation = "NAMING_INSTALLATION"
+	envNamingNamespace    = "NAMING_NAMESPACE"
 	// envSchedules (schedule.go) are the entries of the schedule of a scheduled backup, as EntriesEnv formats
 	// them: the heaviest entry whose slot the run is decides whether the backup is incremental; after the
 	// backup, every entry keeps its newest keep backups of its slots, and retention deletes the rest of the

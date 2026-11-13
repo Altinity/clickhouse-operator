@@ -291,6 +291,58 @@ func ResolveBackupName(chb *api.ClickHouseBackup) string {
 	return boundedName(chb.GetName(), strconv.FormatInt(due.Unix(), 10), api.BackupNameMaxLength)
 }
 
+// BackupNaming tells how the backups of a cluster are named: by its naming template, backup.naming, with the values the
+// template takes on the cluster. A zero BackupNaming is the default naming.
+type BackupNaming struct {
+	Template     string
+	Cluster      string
+	Installation string
+	Namespace    string
+}
+
+// BackupNaming returns how the backups of the cluster a Job built from the topology targets are named.
+func (t *Topology) BackupNaming() BackupNaming {
+	if t.Naming() == "" {
+		return BackupNaming{}
+	}
+	return BackupNaming{Template: t.Naming(), Cluster: t.cluster(), Installation: t.installation, Namespace: t.namespace}
+}
+
+// Name returns the name a naming template gives the backup of the first shard of the cluster, named after tag, which
+// tells the backup of every shard: the Job names those of the others alike.
+func (n BackupNaming) Name(prefix, tag string) (string, error) {
+	return api.RenderBackupName(n.Template, api.BackupNameValues{
+		Shard: 1, Cluster: n.Cluster, Chi: n.Installation, Namespace: n.Namespace, Prefix: prefix, Tag: tag,
+	})
+}
+
+// ResolveTemplateBackupName returns the backup name of a one-off backup of a cluster with a naming template, as
+// ResolveBackupName does without one: the name the template gives the backup of the first shard, which tells the
+// backup of every shard. A backup is named after the time it is due, in UTC, with a T before the hour, as it is made at
+// once, or after the time its spec.backupName gives, YYYYMMDDHHMMSS or YYYYMMDDTHHMMSS, which is all a backup name of
+// such a cluster may be; its {prefix} is the backup name prefix of the schedule it runs, or its own name. It fails for
+// any other backupName, and a name the template cannot make, as of a prefix too long.
+func ResolveTemplateBackupName(chb *api.ClickHouseBackup, naming BackupNaming) (string, error) {
+	tag := api.BackupTag(chb.DueTime().UTC(), true)
+	if chb.Spec.BackupName != "" {
+		if !api.BackupTagRegexp.MatchString(chb.Spec.BackupName) {
+			return "", fmt.Errorf("backupName %q is no time a backup is named after, YYYYMMDDHHMMSS or YYYYMMDDTHHMMSS, as "+
+				"the naming template %q of cluster %s names the backup of every shard by it", chb.Spec.BackupName, naming.Template, naming.Cluster)
+		}
+		tag = chb.Spec.BackupName
+	}
+	prefix := boundedName(chb.GetName(), "", api.BackupNamePrefixMaxLength)
+	if record := chb.Status.Schedule; (chb.Spec.ScheduleRef != nil) && (record != nil) && (record.BackupNamePrefix != "") {
+		prefix = record.BackupNamePrefix
+	}
+	name, err := naming.Name(prefix, tag)
+	if err != nil {
+		return "", fmt.Errorf("the naming template %q of cluster %s names no backup of backupName %q: %w", naming.Template,
+			naming.Cluster, chb.Spec.BackupName, err)
+	}
+	return name, nil
+}
+
 // BackupNamePrefix returns the prefix of the backups a schedule makes, which also scopes its
 // retention. It defaults to the namespace, installation and schedule names: two installations may
 // share a storage path, a restored one with the one its backup came from above all, which
@@ -328,7 +380,7 @@ func JobBackupName(job *batch.Job) string {
 }
 
 // ScheduledBackupName returns the name of the backup a scheduled run makes, as its Job script
-// derives it: the CronJob controller names each Job after the minute its run was due, which the
+// derives it, with a naming template the name of the backup of the first shard: the CronJob controller names each Job after the minute its run was due, which the
 // script reads from the Job name label of its pod and writes in the schedule's time zone,
 // SCHEDULE_TIMEZONE, so every run of one slot makes the same backup. It returns "" for a run named otherwise, such as a Job created by hand from the
 // CronJob, and for a Job the API server did not label with its name: the script then names the
@@ -343,6 +395,16 @@ func ScheduledBackupName(job *batch.Job) string {
 	// A year past 9999 would not fit the layout, and the script falls back to the time it runs
 	if len(timestamp) != len(scheduleTimestampLayout) {
 		return ""
+	}
+	// A naming template names the backup of every shard, which that of the first one tells
+	if template := jobEnv(job, envBackupNaming); template != "" {
+		naming := BackupNaming{Template: template, Cluster: jobEnv(job, envCluster), Installation: jobEnv(job, envNamingInstallation),
+			Namespace: jobEnv(job, envNamingNamespace)}
+		name, err := naming.Name(prefix, timestamp)
+		if err != nil {
+			return ""
+		}
+		return name
 	}
 	return joinName(prefix, timestamp)
 }
@@ -451,6 +513,7 @@ func BuildBackupJob(chb *api.ClickHouseBackup, chi api.ICustomResource, topology
 	)
 	options := chb.GetBackupOptions()
 	env = append(env, backupOptionsEnv(options, topology, orchestrator)...)
+	env = append(env, namingEnv(topology, orchestrator)...)
 	// A backup that runs a schedule now runs as its CronJob does - incremental as the schedule says, retention after
 	// it - but for its name, which keeps it out of the series of the scheduled runs
 	if record := chb.Status.Schedule; (chb.Spec.ScheduleRef != nil) && (record != nil) && (len(record.Schedules) > 0) &&
@@ -477,6 +540,7 @@ func BuildVerifyJob(chb *api.ClickHouseBackup, chi api.ICustomResource, topology
 		envVar(envBackupName, backupName),
 		envVar(envVerifyHosts, joinHosts(orchestrator.hosts(topology.firstPerShard()))),
 	)
+	env = append(env, namingEnv(topology, orchestrator)...)
 	labels := Labels(api.ClickHouseBackupCRDResourceKind, chb.GetName(), chb.TargetInstallation(), cluster)
 	return newJob(VerifyJobName(chb, cluster), chb.GetNamespace(), labels, chb.GetBackupOptions().GetActiveDeadlineSeconds(), topology,
 		orchestrator, env)
@@ -518,6 +582,7 @@ func BuildRestoreJob(chr *api.ClickHouseRestore, chi api.ICustomResource, topolo
 	// A restore checks every replica holds the backup of its shard under its own path, whatever the
 	// replicas the backup was made on
 	env = append(env, pathCheckEnv(topology, "")...)
+	env = append(env, namingEnv(topology, orchestrator)...)
 	labels := Labels(api.ClickHouseRestoreCRDResourceKind, chr.GetName(), chr.Spec.ClickHouseInstallation, cluster)
 	return newJob(RestoreJobName(chr, cluster), chr.GetNamespace(), labels, chr.Spec.GetActiveDeadlineSeconds(), topology, orchestrator, env)
 }
@@ -692,6 +757,7 @@ func BuildBackupCronJob(
 		envVar(envRestoreInProgress, strconv.FormatBool(orchestrator.RestoreInProgress)),
 	)
 	env = append(env, backupOptionsEnv(options, topology, orchestrator)...)
+	env = append(env, namingEnv(topology, orchestrator)...)
 	labels := Labels(api.ClickHouseBackupScheduleCRDResourceKind, chbs.GetName(), chbs.Spec.ClickHouseInstallation, cluster)
 
 	concurrencyPolicy := batch.ForbidConcurrent
@@ -723,6 +789,21 @@ func BuildBackupCronJob(
 		AnnotationBackupObjectVersion: util.Fingerprint(cronJob.Spec),
 	})
 	return cronJob
+}
+
+// namingEnv returns the environment that tells a Job how the backups of its cluster are named: none for the default
+// naming, else the naming template, the number of the shard of every host and the values of {chi} and {namespace}.
+func namingEnv(topology *Topology, orchestrator Orchestrator) []core.EnvVar {
+	naming := topology.BackupNaming()
+	if naming.Template == "" {
+		return nil
+	}
+	return []core.EnvVar{
+		envVar(envBackupNaming, naming.Template),
+		envVar(envShardNumbers, strings.Join(topology.shardNumbers(orchestrator), hostListSeparator)),
+		envVar(envNamingInstallation, naming.Installation),
+		envVar(envNamingNamespace, naming.Namespace),
+	}
 }
 
 // backupOptionsEnv returns the environment of the options one-off and scheduled backups share, the hosts the backup

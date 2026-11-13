@@ -1485,6 +1485,11 @@ func (in *ClusterBackup) DeepCopyInto(out *ClusterBackup) {
 		*out = new(types.Int32)
 		**out = **in
 	}
+	if in.Naming != nil {
+		in, out := &in.Naming, &out.Naming
+		*out = new(types.String)
+		**out = **in
+	}
 	if in.Recovery != nil {
 		in, out := &in.Recovery, &out.Recovery
 		*out = new(BackupRecovery)

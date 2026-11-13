@@ -307,9 +307,9 @@ func TestValidateRestoreFilters(t *testing.T) {
 		set   func(*ClickHouseRestoreSpec)
 		valid bool
 	}{
-		"partitions":                     {func(s *ClickHouseRestoreSpec) { s.Partitions = []string{"202601", "all"} }, true},
-		"a partition with a quote":       {func(s *ClickHouseRestoreSpec) { s.Partitions = []string{"'a'"} }, false},
-		"an empty partition":             {func(s *ClickHouseRestoreSpec) { s.Partitions = []string{""} }, false},
+		"partitions":               {func(s *ClickHouseRestoreSpec) { s.Partitions = []string{"202601", "all"} }, true},
+		"a partition with a quote": {func(s *ClickHouseRestoreSpec) { s.Partitions = []string{"'a'"} }, false},
+		"an empty partition":       {func(s *ClickHouseRestoreSpec) { s.Partitions = []string{""} }, false},
 		"partitions of the schema alone": {func(s *ClickHouseRestoreSpec) {
 			s.Partitions, s.SchemaOnly = []string{"202601"}, types.NewStringBool(true)
 		}, false},
