@@ -15,7 +15,7 @@
 package v1
 
 import (
-	"github.com/imdario/mergo"
+	"github.com/altinity/clickhouse-operator/pkg/util/mergo"
 
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"

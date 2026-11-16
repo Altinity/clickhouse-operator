@@ -22,7 +22,7 @@ import (
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 
-	"github.com/imdario/mergo"
+	"github.com/altinity/clickhouse-operator/pkg/util/mergo"
 	"gopkg.in/yaml.v3"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
