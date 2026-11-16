@@ -945,6 +945,56 @@ def test_010011_6(self):
 
 
 @TestScenario
+@Name("test_010011_7. SSL certificate SAN user gets no injected default password (#2155)")
+@Requirements(RQ_SRS_026_ClickHouseOperator_DefaultUsers("1.0"))
+def test_010011_7(self):
+    """A SAN-authenticated user must not get a password_sha256_hex from the operator.
+
+    Before #2156, the injected password made ClickHouse reject users.xml with
+    "More than one field ... used to specify authentication info" and the pod
+    would never become Ready. This exercises the real generated ConfigMap and
+    ClickHouse startup, not only the user normalizer.
+    """
+    create_shell_namespace_clickhouse_template()
+    chi = "test-011-cert-auth"
+
+    with Given("a CHI with a certificate SAN user and an ordinary password-less user"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-011-cert-auth.yaml",
+            check={"pod_count": 1, "do_not_delete": 1},
+        )
+
+    with Then("ClickHouse starts successfully with the generated users.xml"):
+        result = clickhouse.query_with_error(chi, "SELECT 'OK'")
+        assert result == "OK", error(f"ClickHouse did not start or load its users: {result}")
+
+    with And("the certificate SAN user has no injected password fields"):
+        certuser = get_user_xml_from_configmap(chi, "certuser")
+        assert certuser is not None, error("certuser is missing from generated users.xml")
+        certificates = certuser.find("ssl_certificates")
+        assert certificates is not None, error("certuser's ssl_certificates auth was lost")
+        assert "URI:spiffe://example.org/ns/x/sa/y" in etree.tostring(certificates, encoding="unicode"), error(
+            "the configured certificate subjectAltName was not rendered"
+        )
+        for field in ("password", "password_sha256_hex", "password_double_sha1_hex"):
+            assert certuser.find(field) is None, error(
+                f"certuser has both ssl_certificates and {field} authentication"
+            )
+
+    with And("an ordinary user still receives the default password"):
+        ordinary = get_user_xml_from_configmap(chi, "ordinaryuser")
+        assert ordinary is not None, error("ordinaryuser is missing from generated users.xml")
+        assert ordinary.find("password_sha256_hex") is not None, error(
+            "ordinaryuser did not receive the template default password"
+        )
+        result = clickhouse.query_with_error(chi, "SELECT 'OK'", user="ordinaryuser", pwd="default")
+        assert result == "OK", error(f"ordinaryuser cannot use the default password: {result}")
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
 @Name("test_010011_1. Test user security and network isolation")
 @Requirements(RQ_SRS_026_ClickHouseOperator_DefaultUsers("1.0"))
 def test_010011_1(self):

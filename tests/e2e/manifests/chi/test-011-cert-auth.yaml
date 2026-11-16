@@ -1,0 +1,24 @@
+# Regression for #2155: the operator must not inject its default password
+# into a user authenticated by an SSL client certificate subjectAltName.
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: test-011-cert-auth
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    users:
+      certuser/networks/ip:
+        - 127.0.0.1
+      certuser/ssl_certificates/subject_alt_name:
+        - "URI:spiffe://example.org/ns/x/sa/y"
+      # Control: a user without any explicit auth method must still get the
+      # operator's normal default password.
+      ordinaryuser/networks/ip:
+        - 127.0.0.1
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicasCount: 1
