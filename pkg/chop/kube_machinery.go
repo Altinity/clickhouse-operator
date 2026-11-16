@@ -31,6 +31,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
+	chopconfig "github.com/altinity/clickhouse-operator/pkg/chop/config"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/util/tlsutil"
 )
@@ -162,8 +163,8 @@ func GetClientset(kubeConfigFile, masterURL, chopConfigFile string) (
 // visible here and will not floor the K8s transport. Declare fips.enforced / policy in
 // the file-based chopconf for the K8s-API floor to apply.
 func resolveK8sTLSMinVersion(chopConfigFile string) (minVersion string, hardened bool) {
-	cm := newConfigManager(nil, nil, chopConfigFile)
-	fileConfig, err := cm.getFileBasedConfig(chopConfigFile)
+	cm := chopconfig.NewManager(nil, nil, lastKubeConfigInsecure, chopConfigFile)
+	fileConfig, err := cm.GetFileBasedConfig(chopConfigFile)
 	if err != nil || fileConfig == nil {
 		return "", false
 	}

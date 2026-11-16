@@ -16,6 +16,7 @@ package chop
 
 import (
 	"flag"
+	chopconfig "github.com/altinity/clickhouse-operator/pkg/chop/config"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -45,7 +46,7 @@ func restoreFlags(t *testing.T, names ...string) {
 func TestSetupLogAppliesVModuleAndLogBacktraceAt(t *testing.T) {
 	restoreFlags(t, "vmodule", "log_backtrace_at")
 
-	c := &CHOp{ConfigManager: &ConfigManager{config: &api.OperatorConfig{}}}
+	c := &CHOp{ConfigManager: chopconfig.NewWithConfig(&api.OperatorConfig{})}
 	c.Config().Logger.VModule = "worker=3"
 	c.Config().Logger.LogBacktraceAt = "worker.go:42"
 
@@ -64,7 +65,7 @@ func TestSetupLogLeavesUnsetOptionsAlone(t *testing.T) {
 
 	require.NoError(t, flag.Set("vmodule", "preset=1"))
 
-	c := &CHOp{ConfigManager: &ConfigManager{config: &api.OperatorConfig{}}}
+	c := &CHOp{ConfigManager: chopconfig.NewWithConfig(&api.OperatorConfig{})}
 	c.SetupLog()
 
 	require.Equal(t, "preset=1", flag.Lookup("vmodule").Value.String(),

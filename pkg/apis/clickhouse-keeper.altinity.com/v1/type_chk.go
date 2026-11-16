@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 
-	"github.com/imdario/mergo"
+	"github.com/altinity/clickhouse-operator/pkg/util/mergo"
 	"gopkg.in/yaml.v3"
 
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"

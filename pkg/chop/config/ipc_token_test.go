@@ -35,14 +35,14 @@ func TestProvisionIPCTokenPlainModeIsNoop(t *testing.T) {
 	dir := t.TempDir()
 	tokenPath := filepath.Join(dir, "token")
 
-	require.NoError(t, provisionIPCToken(ipcCfg(api.IPCModePlain, tokenPath)))
+	require.NoError(t, ProvisionIPCToken(ipcCfg(api.IPCModePlain, tokenPath)))
 
 	_, err := os.Stat(tokenPath)
 	require.True(t, os.IsNotExist(err), "Plain mode must not write any token file")
 }
 
 func TestProvisionIPCTokenNilIPCIsNoop(t *testing.T) {
-	require.NoError(t, provisionIPCToken(nil))
+	require.NoError(t, ProvisionIPCToken(nil))
 }
 
 func TestProvisionIPCTokenSecureModeWritesToken(t *testing.T) {
@@ -50,7 +50,7 @@ func TestProvisionIPCTokenSecureModeWritesToken(t *testing.T) {
 	// Path under a subdirectory that doesn't exist yet — exercises MkdirAll.
 	tokenPath := filepath.Join(dir, "subdir", "token")
 
-	require.NoError(t, provisionIPCToken(ipcCfg(api.IPCModeSecure, tokenPath)))
+	require.NoError(t, ProvisionIPCToken(ipcCfg(api.IPCModeSecure, tokenPath)))
 
 	data, err := os.ReadFile(tokenPath)
 	require.NoError(t, err)
@@ -71,7 +71,7 @@ func TestProvisionIPCTokenReuseExisting(t *testing.T) {
 	tokenPath := filepath.Join(dir, "token")
 	require.NoError(t, os.WriteFile(tokenPath, []byte("preexisting-token-value"), 0o400))
 
-	require.NoError(t, provisionIPCToken(ipcCfg(api.IPCModeSecure, tokenPath)))
+	require.NoError(t, ProvisionIPCToken(ipcCfg(api.IPCModeSecure, tokenPath)))
 
 	data, err := os.ReadFile(tokenPath)
 	require.NoError(t, err)
@@ -86,12 +86,12 @@ func TestProvisionIPCTokenTwoCallsSameToken(t *testing.T) {
 	tokenPath := filepath.Join(dir, "token")
 	cfg := ipcCfg(api.IPCModeSecure, tokenPath)
 
-	require.NoError(t, provisionIPCToken(cfg))
+	require.NoError(t, ProvisionIPCToken(cfg))
 	first, err := os.ReadFile(tokenPath)
 	require.NoError(t, err)
 	require.NotEmpty(t, first)
 
-	require.NoError(t, provisionIPCToken(cfg))
+	require.NoError(t, ProvisionIPCToken(cfg))
 	second, err := os.ReadFile(tokenPath)
 	require.NoError(t, err)
 	require.Equal(t, first, second, "second call must reuse the existing token")

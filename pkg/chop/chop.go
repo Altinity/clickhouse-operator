@@ -18,11 +18,15 @@ import (
 	"flag"
 	"fmt"
 
+	"context"
+
 	kube "k8s.io/client-go/kubernetes"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	chopconfig "github.com/altinity/clickhouse-operator/pkg/chop/config"
+	"github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 )
 
 // CHOp defines ClickHouse Operator
@@ -34,7 +38,7 @@ type CHOp struct {
 	// Date specified date when operator was built
 	Date string
 	// ConfigManager specifies configuration manager in charge of operator's configuration
-	ConfigManager *ConfigManager
+	ConfigManager *chopconfig.ConfigManager
 }
 
 // newCHOp creates new CHOp
@@ -43,14 +47,58 @@ func newCHOp(
 	commit string,
 	date string,
 	kubeClient *kube.Clientset,
-	chopClient *chopclientset.Clientset,
+	chopClient *versioned.Clientset,
 	initConfigFilePath string,
 ) *CHOp {
 	return &CHOp{
-		Version:       version,
-		Commit:        commit,
-		Date:          date,
-		ConfigManager: newConfigManager(kubeClient, chopClient, initConfigFilePath),
+		Version: version,
+		Commit:  commit,
+		Date:    date,
+		ConfigManager: chopconfig.NewManager(
+			crConfigListerFrom(chopClient),
+			secretGetterFrom(kubeClient),
+			lastKubeConfigInsecure,
+			initConfigFilePath,
+		),
+	}
+}
+
+// crConfigListerFrom adapts the operator's custom-resource clientset to
+// the config package's CRConfigLister seam — the only place the CR
+// listing touches the k8s wire.
+func crConfigListerFrom(chopClient *versioned.Clientset) chopconfig.CRConfigLister {
+	if chopClient == nil {
+		return nil
+	}
+	return func(namespace string) ([]*api.OperatorConfig, map[string]string, error) {
+		list, err := chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(context.TODO(), controller.NewListOptions())
+		if err != nil {
+			return nil, nil, err
+		}
+		configs := make([]*api.OperatorConfig, 0, len(list.Items))
+		versions := make(map[string]string, len(list.Items))
+		for i := range list.Items {
+			cr := &list.Items[i]
+			cr.Spec.Runtime.ConfigCRName = cr.Name
+			configs = append(configs, &cr.Spec)
+			versions[cr.Namespace+"/"+cr.Name] = cr.ResourceVersion
+		}
+		return configs, versions, nil
+	}
+}
+
+// secretGetterFrom adapts the operator's kube clientset to the config
+// package's secretDataGetter seam.
+func secretGetterFrom(kubeClient *kube.Clientset) func(namespace, name string) (map[string][]byte, error) {
+	if kubeClient == nil {
+		return nil
+	}
+	return func(namespace, name string) (map[string][]byte, error) {
+		secret, err := kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
+		if err != nil {
+			return nil, err
+		}
+		return secret.Data, nil
 	}
 }
 

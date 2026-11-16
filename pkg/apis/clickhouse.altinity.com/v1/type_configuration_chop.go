@@ -26,8 +26,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/altinity/clickhouse-operator/pkg/util/mergo"
 	log "github.com/golang/glog"
-	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
