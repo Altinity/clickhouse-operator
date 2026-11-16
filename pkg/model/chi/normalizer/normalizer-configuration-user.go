@@ -194,6 +194,28 @@ func (n *Normalizer) rejectRemovedSecretRefField(user *api.SettingsUser, name st
 	)
 }
 
+// userNonPasswordAuthMethods lists the top-level user settings that are authentication methods other than a password.
+var userNonPasswordAuthMethods = []string{
+	"no_password",
+	"ssl_certificates",
+	"ssh_keys",
+	"ldap",
+	"kerberos",
+	"http_authentication",
+}
+
+// userHasNonPasswordAuth checks whether the user has an authentication method other than a password.
+func userHasNonPasswordAuth(user *api.SettingsUser) bool {
+	found := false
+	user.Walk(func(name string, _ *api.Setting) {
+		method, _, _ := strings.Cut(name, "/")
+		if slices.Contains(userNonPasswordAuthMethods, method) {
+			found = true
+		}
+	})
+	return found
+}
+
 // normalizeConfigurationUserPassword deals with user passwords
 func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) {
 	// A hotReload credential stays a Secret reference on the CR. Hashing it here would
@@ -232,6 +254,12 @@ func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) 
 	// From now on we either have plaintext password specified as an explicit string, or no password at all
 
 	passwordPlaintext := user.Get(userFieldPassword).String()
+
+	// ClickHouse accepts only one authentication method per user.
+	// A user that already has a non-password method must not get a default password.
+	if passwordPlaintext == "" && userHasNonPasswordAuth(user) {
+		return
+	}
 
 	// Apply default password for password-less non-default users
 	// 1. NB "default" user keeps empty password in here.
