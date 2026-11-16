@@ -15,7 +15,6 @@
 package chop
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -24,14 +23,21 @@ import (
 	"sort"
 
 	"github.com/kubernetes-sigs/yaml"
-	kube "k8s.io/client-go/kubernetes"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
-	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 )
+
+// CRConfigLister reads every ClickHouseOperatorConfiguration in a
+// namespace, answering the config specs (location info filled) and
+// each CR's ResourceVersion by "namespace/name" (IsConfigListed
+// compares it to detect a changed config). The kube clientset wiring
+// behind this seam lives in the operator binary's path (pkg/chop wires
+// it from its chopclientset) — this package stays free of k8s client
+// imports so library consumers of the config machinery do not inherit
+// the client-go surface.
+type CRConfigLister func(namespace string) ([]*api.OperatorConfig, map[string]string, error)
 
 // ErrInsecureKubeconfigRejected is returned by ConfigManager.Init when the loaded
 // kubeconfig has TLSClientConfig.Insecure=true but the file-based chopconf has
@@ -41,14 +47,27 @@ var ErrInsecureKubeconfigRejected = errors.New("kubeconfig declares TLSClientCon
 
 // ConfigManager specifies configuration manager in charge of operator's configuration
 type ConfigManager struct {
-	// kubeClient is a k8s client
-	kubeClient *kube.Clientset
+	// listCRConfigs reads operator-configuration Custom Resources
+	// through the caller's seam (nil = no CR-based configs, the
+	// library-consumer and pre-client shapes).
+	listCRConfigs CRConfigLister
 
-	// chopClient is a k8s client able to communicate with operator's Custom Resources
-	chopClient *chopClientSet.Clientset
+	// getSecret reads Kubernetes Secret data through the caller's
+	// seam (nil = secret references log a warning and stay
+	// unresolved; the secretDataGetter seam shape).
+	getSecret secretDataGetter
 
-	// chopConfigList is a list of available operator configurations
-	chopConfigList *api.ClickHouseOperatorConfigurationList
+	// kubeConfigInsecure records whether the caller's kubeconfig
+	// declared TLSClientConfig.Insecure=true — the caller (pkg/chop's
+	// client machinery) sets it at load time; the strict-TLS startup
+	// gate below reads it before any CR-based wire call.
+	kubeConfigInsecure bool
+
+	// crVersions maps "namespace/name" of a listed operator-config
+	// CR to its ResourceVersion — the raw CR metadata the lister
+	// seam cannot carry through the spec-only OperatorConfig, but
+	// IsConfigListed compares it to detect a changed config.
+	crVersions map[string]string
 
 	// initConfigFilePath is a path to the configuration file, which will be used as initial/seed
 	// to build final config, which will be used/consumed by users
@@ -69,14 +88,21 @@ type ConfigManager struct {
 }
 
 // newConfigManager creates new ConfigManager
-func newConfigManager(
-	kubeClient *kube.Clientset,
-	chopClient *chopClientSet.Clientset,
+// NewManager creates the kube-free ConfigManager. The seams are the
+// caller's wire adapters (the operator binary passes its clientsets
+// through pkg/chop's adapters); nil seams load file/env-only config —
+// the library-consumer shape. kubeConfigInsecure records the caller's
+// kubeconfig TLSClientConfig.Insecure for the strict-TLS startup gate.
+func NewManager(
+	listCRConfigs CRConfigLister,
+	getSecret secretDataGetter,
+	kubeConfigInsecure bool,
 	initConfigFilePath string,
 ) *ConfigManager {
 	return &ConfigManager{
-		kubeClient:         kubeClient,
-		chopClient:         chopClient,
+		listCRConfigs:      listCRConfigs,
+		getSecret:          getSecret,
+		kubeConfigInsecure: kubeConfigInsecure,
 		initConfigFilePath: initConfigFilePath,
 	}
 }
@@ -90,7 +116,7 @@ func (cm *ConfigManager) Init() error {
 	cm.logEnvVarParams()
 
 	// Get initial config from the file
-	cm.fileConfig, err = cm.getFileBasedConfig(cm.initConfigFilePath)
+	cm.fileConfig, err = cm.GetFileBasedConfig(cm.initConfigFilePath)
 	if err != nil {
 		return err
 	}
@@ -105,7 +131,7 @@ func (cm *ConfigManager) Init() error {
 	// (or security.policy=Enforced, which one-way coerces verify to Strict) in a
 	// CR-based ChOpConfig accept that the file-based config still wins for the
 	// startup gate.
-	if lastKubeConfigInsecure && cm.fileConfig.RequiresStrictK8sTLS() {
+	if cm.kubeConfigInsecure && cm.fileConfig.RequiresStrictK8sTLS() {
 		return ErrInsecureKubeconfigRejected
 	}
 
@@ -143,48 +169,29 @@ func (cm *ConfigManager) Config() *api.OperatorConfig {
 
 // getAllCRBasedConfigs reads all ClickHouseOperatorConfiguration objects in specified namespace
 func (cm *ConfigManager) getAllCRBasedConfigs(namespace string) {
-	// We need to have chop kube client available in order to fetch ClickHouseOperatorConfiguration objects
-	if cm.chopClient == nil {
+	// The caller wires the CR listing seam (the operator binary's kube
+	// path); a nil seam means no CR-based configs are available — the
+	// library-consumer shape.
+	if cm.listCRConfigs == nil {
 		return
 	}
 
 	log.V(1).F().Info("Looking for ClickHouseOperatorConfigurations in namespace '%s'.", namespace)
 
-	// Get list of ClickHouseOperatorConfiguration objects
-	var err error
-	if cm.chopConfigList, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(context.TODO(), controller.NewListOptions()); err != nil {
+	crConfigs, versions, err := cm.listCRConfigs(namespace)
+	if err != nil {
 		log.V(1).F().Error("Error read ClickHouseOperatorConfigurations in namespace '%s'. Err: %v", namespace, err)
 		return
 	}
+	cm.crVersions = versions
 
-	if cm.chopConfigList == nil {
-		return
-	}
+	// Save location info into OperatorConfig itself
+	for _, crConfig := range crConfigs {
+		crConfig.Runtime.ConfigCRNamespace = namespace
 
-	// Get sorted list of names of ClickHouseOperatorConfiguration objects located in specified namespace
-	var names []string
-	for i := range cm.chopConfigList.Items {
-		chOperatorConfiguration := &cm.chopConfigList.Items[i]
-		names = append(names, chOperatorConfiguration.Name)
-	}
-	sort.Strings(names)
+		cm.crConfigs = append(cm.crConfigs, crConfig)
 
-	// Build sorted list of configs
-	for _, name := range names {
-		for i := range cm.chopConfigList.Items {
-			// Convenience wrapper
-			chOperatorConfiguration := &cm.chopConfigList.Items[i]
-			if chOperatorConfiguration.Name == name {
-				// Save location info into OperatorConfig itself
-				chOperatorConfiguration.Spec.Runtime.ConfigCRNamespace = namespace
-				chOperatorConfiguration.Spec.Runtime.ConfigCRName = name
-
-				cm.crConfigs = append(cm.crConfigs, &chOperatorConfiguration.Spec)
-
-				log.V(1).F().Info("Append ClickHouseOperatorConfigurations '%s/%s'.", namespace, name)
-				continue
-			}
-		}
+		log.V(1).F().Info("Append ClickHouseOperatorConfigurations '%s/%s'.", namespace, crConfig.Runtime.ConfigCRName)
 	}
 }
 
@@ -214,18 +221,8 @@ func (cm *ConfigManager) buildUnifiedConfig() {
 
 // IsConfigListed checks whether specified ClickHouseOperatorConfiguration is listed in list of ClickHouseOperatorConfiguration(s)
 func (cm *ConfigManager) IsConfigListed(config *api.ClickHouseOperatorConfiguration) bool {
-	for i := range cm.chopConfigList.Items {
-		chOperatorConfiguration := &cm.chopConfigList.Items[i]
-
-		if config.Namespace == chOperatorConfiguration.Namespace &&
-			config.Name == chOperatorConfiguration.Name &&
-			config.ResourceVersion == chOperatorConfiguration.ResourceVersion {
-			// Yes, this config already listed with the same resource version
-			return true
-		}
-	}
-
-	return false
+	version, ok := cm.crVersions[config.Namespace+"/"+config.Name]
+	return ok && version == config.ResourceVersion
 }
 
 const (
@@ -234,7 +231,7 @@ const (
 )
 
 // getFileBasedConfig creates one OperatorConfig object based on the first available configuration file
-func (cm *ConfigManager) getFileBasedConfig(configFilePath string) (*api.OperatorConfig, error) {
+func (cm *ConfigManager) GetFileBasedConfig(configFilePath string) (*api.OperatorConfig, error) {
 	// Check config files availability in the following order:
 	// 1. Explicitly specified config file as CLI option
 	// 2. Explicitly specified config file as ENV var
@@ -441,7 +438,11 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 		return
 	}
 
-	secret, err := cm.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
+	if cm.getSecret == nil {
+		cm.config.ClickHouse.Access.Secret.Runtime.Error = fmt.Sprintf("No secret-reading capability wired for secret '%s'", name)
+		return
+	}
+	secret, err := cm.getSecret(namespace, name)
 	if err != nil {
 		cm.config.ClickHouse.Access.Secret.Runtime.Error = err.Error()
 		log.V(1).Warning("Unable to fetch secret: '%s/%s'", namespace, name)
@@ -452,7 +453,7 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 	log.V(1).Info("Secret fetched: '%s/%s'", namespace, name)
 
 	// Find username and password from credentials
-	for key, value := range secret.Data {
+	for key, value := range secret {
 		switch key {
 		case "username":
 			cm.config.ClickHouse.Access.Secret.Runtime.Username = string(value)
@@ -486,7 +487,7 @@ type secretDataGetter func(namespace, name string) (map[string][]byte, error)
 // Secret and restarts the operator.
 func (cm *ConfigManager) fetchSecurityRootCA() {
 	ns, _ := cm.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE)
-	fetchSecurityRootCAResolve(cm.config.Security.GetClickHouse().GetTLS(), ns, cm.getSecretData)
+	fetchSecurityRootCAResolve(cm.config.Security.GetClickHouse().GetTLS(), ns, cm.getSecret)
 }
 
 // fetchAccessRootCA resolves clickhouse.access.rootCASecretRef into the inline
@@ -502,18 +503,13 @@ func (cm *ConfigManager) fetchAccessRootCA() {
 		access.RootCASecretRef.Key,
 		ns,
 		"chopconf clickhouse.access",
-		cm.getSecretData,
+		cm.getSecret,
 	)
 }
 
-// getSecretData adapts the operator's kubeClient to the secretDataGetter seam.
-func (cm *ConfigManager) getSecretData(namespace, name string) (map[string][]byte, error) {
-	secret, err := cm.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
-	if err != nil {
-		return nil, err
-	}
-	return secret.Data, nil
-}
+// getSecretData is the ConfigManager's secret-reading seam — the
+// caller wires it (the operator binary adapts its kubeClient here);
+// nil means the config loads without resolving secret references.
 
 // resolveRootCAFromSecret is the shared decision logic for inlining a CA bundle
 // from a Kubernetes Secret into an inline RootCA PEM string at config-load time.
@@ -580,4 +576,11 @@ func fetchSecurityRootCAResolve(tls *api.ClusterSecurityClickHouseTLS, operatorN
 // Postprocess performs postprocessing of the configuration
 func (cm *ConfigManager) Postprocess() {
 	cm.config.Postprocess()
+}
+
+// NewWithConfig builds a ConfigManager over a pre-built OperatorConfig —
+// the seam the chop package's own tests use to drive SetupLog without a
+// config-load cycle.
+func NewWithConfig(config *api.OperatorConfig) *ConfigManager {
+	return &ConfigManager{config: config}
 }
