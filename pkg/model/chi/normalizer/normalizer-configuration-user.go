@@ -194,7 +194,8 @@ func (n *Normalizer) rejectRemovedSecretRefField(user *api.SettingsUser, name st
 	)
 }
 
-// userNonPasswordAuthMethods lists the top-level user settings that are authentication methods other than a password.
+// userNonPasswordAuthMethods lists user settings that prevent adding a flat default password,
+// including grouped auth_methods (which may themselves contain password methods).
 var userNonPasswordAuthMethods = []string{
 	"no_password",
 	"ssl_certificates",
@@ -202,6 +203,7 @@ var userNonPasswordAuthMethods = []string{
 	"ldap",
 	"kerberos",
 	"http_authentication",
+	"auth_methods",
 }
 
 // userHasNonPasswordAuth checks whether the user has an authentication method other than a password.
