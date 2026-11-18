@@ -13,7 +13,7 @@
 # of its current context, "default" unless the context names another. Apply them all to one
 # namespace, together with the ClickHouseKeeperInstallation: every reference these examples make
 # names a resource in the namespace of the one making it. The names of the schedule's backups the
-# examples quote, such as default-backup-demo-nightly-20261003-020000, start with "default", as the
+# examples quote, such as default-backup-demo-nightly-20261003023000, start with "default", as the
 # default spec.backupNamePrefix of a schedule starts with its namespace.
 ---
 apiVersion: v1
@@ -26,7 +26,7 @@ stringData:
   # configuration file. The operator generates the configuration file of the sidecars from it,
   # with the credentials of the sidecar and the default paths filled in, and the sidecars follow
   # a change of it within minutes, without a restart. Keep the whole configuration here and in the
-  # env of the sidecar's container in its pod template, where backup and restore Jobs can check the
+  # env of the sidecar's container in its pod template, where backup and restore runs can check the
   # storage paths: with several backup-enabled clusters, they refuse to run when the sidecar takes
   # settings from envFrom or from a configuration file its command names.
   config.yml: |
@@ -61,6 +61,8 @@ spec:
     # The clickhouse-backup configuration of the sidecar, kept in the Secret above
     configSecretRef:
       name: backup-demo-storage
+    # How the operator reaches clickhouse-backup: sidecar, the default, runs it in every ClickHouse Pod; pod runs no
+    # sidecar and starts one backup Pod per shard, on the volumes of a replica, only while a backup or restore runs.
   defaults:
     templates:
       dataVolumeClaimTemplate: data-volume-template
@@ -75,7 +77,7 @@ spec:
           replicasCount: 2
       # A cluster can override any field of spec.backup in its own
       # spec.configuration.clusters[].backup, e.g. opt out of backup. Every backup, schedule and
-      # restore runs one Job per backup-enabled cluster it targets, all under one backup name.
+      # restore runs one run per backup-enabled cluster it targets, all under one backup name.
       # - name: scratch
       #   backup:
       #     enabled: "no"
@@ -86,7 +88,7 @@ spec:
     #   - name: backup-sidecar
     #     spec:
     #       containers:
-    #         # The operator keeps what this container sets and fills in the rest; the Jobs run its
+    #         # The operator keeps what this container sets and fills in the rest; the runs run its
     #         # image under its identity. Only this container is taken, not volumes or pod settings.
     #         - name: clickhouse-backup
     #           env:
@@ -103,5 +105,5 @@ spec:
             - ReadWriteOnce
           resources:
             requests:
-              # Room for the data plus one downloaded copy of a backup (verify, restore)
+              # Room for the data plus one downloaded copy of a backup, which a restore needs
               storage: 10Gi

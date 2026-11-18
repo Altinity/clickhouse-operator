@@ -57,6 +57,11 @@ const (
 	// operator restart or auto-recovery - on a pod turning Ready, say - which this reason does not opt
 	// out of, as the Secret may well be readable by then.
 	StatusReasonBackupSecretUnresolved = "BackupSecretUnresolved"
+	// StatusReasonBackupConfigInvalid: the backup of a cluster cannot be configured - its backup block holds a value
+	// out of range, or the Secret its configSecretRef names is missing, unreadable, or holds a config.yml that is no
+	// YAML mapping of the sections of clickhouse-backup. Recoverable without a spec edit: the operator reconciles
+	// the installation anew once the Secret can be used.
+	StatusReasonBackupConfigInvalid = "BackupConfigInvalid"
 	// StatusReasonFIPSImagePolicyViolation: security.images.policy=Required
 	// rejected this CR because a ClickHouse/Keeper container image lacks the
 	// "fips" tag substring (admission gate) or the running binary's

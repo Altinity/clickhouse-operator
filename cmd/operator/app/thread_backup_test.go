@@ -30,7 +30,6 @@ import (
 	ctrlCache "sigs.k8s.io/controller-runtime/pkg/cache"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chbackup"
 )
 
 // stagedDiscovery serves the backup group version without the restore kind for the first
@@ -104,19 +103,13 @@ func TestMissingBackupKindsWhenGroupVersionIsNotServed(t *testing.T) {
 	require.Equal(t, backupKinds, missing)
 }
 
-// TestBackupCacheOptionsNarrowsJobsAndCronJobs pins the backup cache wiring. Jobs and CronJobs are
-// narrowed to the ones the backup controllers build, by a key of their own - the CHI key would
-// hide every backup Job. The custom resources and installations must stay readable: they carry no
-// operator label, and a cache-wide selector would turn every read of them into a silent NotFound.
-// Installations are trimmed instead, so the cache holds no second full copy of each of them.
-func TestBackupCacheOptionsNarrowsJobsAndCronJobs(t *testing.T) {
-	var logged []string
-	log := funcr.New(func(prefix, args string) { logged = append(logged, args) }, funcr.Options{})
+// TestBackupCacheOptions pins the backup cache wiring. The custom resources and installations must stay readable: they
+// carry no operator label, and a cache-wide selector would turn every read of them into a silent NotFound.
+// Installations are trimmed instead, so the cache holds no second full copy of each of them. The backup controllers
+// run no Job, CronJob or Pod, and cache none.
+func TestBackupCacheOptions(t *testing.T) {
+	opts := newBackupCacheOptions(funcr.New(func(prefix, args string) {}, funcr.Options{}), []string{"ns1", "ns2"})
 
-	opts := newBackupCacheOptions(log, []string{"ns1", "ns2"})
-
-	require.Contains(t, strings.Join(logged, "\n"), chbackup.LabelBackupCRKind,
-		"the effective selector must reach the boot log")
 	require.Nil(t, opts.DefaultLabelSelector,
 		"a cache-wide selector would hide the user-authored custom resources from the reconcilers")
 	require.Len(t, opts.DefaultNamespaces, 2, "ByObject must not replace the namespace scoping")
@@ -125,13 +118,7 @@ func TestBackupCacheOptionsNarrowsJobsAndCronJobs(t *testing.T) {
 	for obj, byObject := range opts.ByObject {
 		narrowed[fmt.Sprintf("%T", obj)] = byObject
 	}
-	require.Len(t, narrowed, 3, "narrowed set changed - update this test deliberately")
-	for _, typeName := range []string{"*v1.Job", "*v1.CronJob"} {
-		byObject, ok := narrowed[typeName]
-		require.True(t, ok, "%s must be narrowed - an unfiltered type caches every instance in scope", typeName)
-		require.Equal(t, chbackup.JobSelector().String(), byObject.Label.String())
-		require.Nil(t, byObject.Namespaces, "%s must inherit DefaultNamespaces", typeName)
-	}
+	require.Len(t, narrowed, 1, "narrowed set changed - update this test deliberately")
 
 	installations, ok := narrowed["*v1.ClickHouseInstallation"]
 	require.True(t, ok, "installations must be trimmed - the CHI controller caches them in full already")

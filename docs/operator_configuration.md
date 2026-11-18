@@ -307,6 +307,11 @@ settings of that storage set no path of their own.
 backup:
   storagePath: "backup/{namespace}/{installation}/{cluster}/{shard}"
   storageObjectDiskPath: "object_disks/{namespace}/{installation}/{cluster}/{shard}"
+  timeouts:
+    actionTimeout: "12h"
+    unreachableTimeout: "10m"
+    errorResponsesMax: 5
+    httpReceiveTimeout: "4h"
 ```
 
 | Setting | Default | Description |
@@ -316,6 +321,14 @@ backup:
 
 Changing either rolls the Pods of every backup-enabled cluster, and leaves the backups made under the
 old paths where they are. See [Storage paths](backup.md#storage-paths).
+
+`timeouts` are the defaults of `spec.timeouts` of every `ClickHouseBackup`, `ClickHouseRestore` and
+`ClickHouseBackupSchedule`, which a resource overrides field by field: how long the operator waits for
+one command on a host (`actionTimeout`), how long a host that does not answer is retried
+(`unreachableTimeout`), how many reads without the row of a command take it as lost
+(`errorResponsesMax`), and the `http_receive_timeout` of the inserts into `system.backup_actions`
+(`httpReceiveTimeout`), the timeouts as Go durations such as `"12h"` or `"90m"`. A field unset, or out of its bounds, is the built-in default. See
+[Timeouts](backup.md#timeouts).
 
 ## Security
 

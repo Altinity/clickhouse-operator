@@ -20,18 +20,17 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiMachinery "k8s.io/apimachinery/pkg/runtime"
 	kubeTypes "k8s.io/apimachinery/pkg/types"
 	clientGoScheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -40,7 +39,6 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chbackup"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 )
@@ -162,19 +160,6 @@ func twoClusters(t *testing.T, status string) *api.ClickHouseInstallation {
 	return installation(t, status, backupCluster("hot", 2, true), backupCluster("cold", 1, true), backupCluster("plain", 1, false))
 }
 
-// jobEnv returns the plain value of a variable of the container of a Job.
-func jobEnv(t *testing.T, c client.Client, name, variable string) string {
-	t.Helper()
-	job := &batch.Job{}
-	require.NoError(t, c.Get(context.Background(), key(name), job))
-	for _, e := range job.Spec.Template.Spec.Containers[0].Env {
-		if e.Name == variable {
-			return e.Value
-		}
-	}
-	return ""
-}
-
 func readyInstallation(t *testing.T) *api.ClickHouseInstallation {
 	return installation(t, api.StatusCompleted, backupCluster("main", 2, true))
 }
@@ -205,11 +190,11 @@ func newClient(t *testing.T, funcs *interceptor.Funcs, objs ...client.Object) cl
 		funcs = &interceptor.Funcs{}
 	}
 	if funcs.Create == nil {
-		created := 0
+		// The runs post their Events from goroutines of their own, concurrently with a reconcile
+		var created atomic.Int64
 		funcs.Create = func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
 			if obj.GetUID() == "" {
-				created++
-				obj.SetUID(kubeTypes.UID(fmt.Sprintf("created-%d", created)))
+				obj.SetUID(kubeTypes.UID(fmt.Sprintf("created-%d", created.Add(1))))
 			}
 			return c.Create(ctx, obj, opts...)
 		}
@@ -255,103 +240,8 @@ func newScheduleCR(name string) *api.ClickHouseBackupSchedule {
 	chbs.Namespace = testNamespace
 	chbs.UID = kubeTypes.UID(name + "-uid")
 	chbs.Spec.ClickHouseInstallation = testCHI
-	chbs.Spec.Schedule = "0 3 * * *"
+	chbs.Spec.Schedules = []api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Time: "03:00", Keep: 1}}
 	return chbs
-}
-
-// runningOn returns the status of an operation running on the main cluster of the test installation in
-// the given Job.
-func runningOn(jobName string) []api.OperationClusterStatus {
-	return []api.OperationClusterStatus{{Name: "main", Phase: api.OperationPhaseRunning, JobName: jobName}}
-}
-
-// ageSuspensions makes the suspension of every CronJob the operator suspended old enough for a restore
-// to start, as if the time a restore waits for the CronJob controller to see it had passed.
-func ageSuspensions(t *testing.T, c client.Client) {
-	t.Helper()
-	cronJobs := &batch.CronJobList{}
-	require.NoError(t, c.List(context.Background(), cronJobs, client.InNamespace(testNamespace)))
-	for i := range cronJobs.Items {
-		cronJob := &cronJobs.Items[i]
-		if _, suspended := cronJob.Annotations[model.AnnotationCronJobSuspendedAt]; !suspended {
-			continue
-		}
-		cronJob.Annotations[model.AnnotationCronJobSuspendedAt] = time.Now().Add(-2 * pendingRequeueInterval).UTC().Format(time.RFC3339)
-		require.NoError(t, c.Update(context.Background(), cronJob))
-	}
-}
-
-// jobOwnedBy returns a running Job controlled by owner, as the controllers create them.
-func jobOwnedBy(t *testing.T, name string, owner client.Object, labels map[string]string) *batch.Job {
-	t.Helper()
-	job := &batch.Job{}
-	job.Name = name
-	job.Namespace = testNamespace
-	job.Labels = labels
-	require.NoError(t, ctrl.SetControllerReference(owner, job, newScheme(t)))
-	return job
-}
-
-// finishJob marks a Job finished now with the given condition.
-func finishJob(t *testing.T, c client.Client, name string, conditionType batch.JobConditionType, reason string) {
-	t.Helper()
-	finishJobAt(t, c, name, conditionType, reason, time.Now())
-}
-
-// finishJobAt marks a Job finished at the given time with the given condition, as the Job
-// controller does.
-func finishJobAt(t *testing.T, c client.Client, name string, conditionType batch.JobConditionType, reason string, at time.Time) {
-	t.Helper()
-	job := &batch.Job{}
-	require.NoError(t, c.Get(context.Background(), key(name), job))
-	finished := meta.NewTime(at)
-	job.Status.Conditions = append(job.Status.Conditions, batch.JobCondition{
-		Type:               conditionType,
-		Status:             core.ConditionTrue,
-		Reason:             reason,
-		LastTransitionTime: finished,
-	})
-	if conditionType == batch.JobComplete {
-		job.Status.CompletionTime = &finished
-	}
-	require.NoError(t, c.Status().Update(context.Background(), job))
-}
-
-// failPodOfJob gives a Job a failed pod whose Job container terminated with the given message, as
-// kubelet reports it from the container's termination message path.
-func failPodOfJob(t *testing.T, c client.Client, jobName, message string) {
-	t.Helper()
-	failPodOfJobWithExitCode(t, c, jobName, jobName+"-pod", message, 1)
-}
-
-// failPodOfJobWithExitCode is failPodOfJob for a pod of the given name whose Job container exited
-// with the given code.
-func failPodOfJobWithExitCode(t *testing.T, c client.Client, jobName, podName, message string, exitCode int32) {
-	t.Helper()
-	job := &batch.Job{}
-	require.NoError(t, c.Get(context.Background(), key(jobName), job))
-	podOfJob(t, c, jobName, podName, core.PodStatus{
-		Phase: core.PodFailed,
-		ContainerStatuses: []core.ContainerStatus{{
-			Name:  job.Spec.Template.Spec.Containers[0].Name,
-			State: core.ContainerState{Terminated: &core.ContainerStateTerminated{ExitCode: exitCode, Message: message}},
-		}},
-	})
-}
-
-// succeedPodOfJob gives a Job a succeeded pod whose Job container terminated with the given message,
-// as kubelet reports it from the container's termination message path.
-func succeedPodOfJob(t *testing.T, c client.Client, jobName, message string) {
-	t.Helper()
-	job := &batch.Job{}
-	require.NoError(t, c.Get(context.Background(), key(jobName), job))
-	podOfJob(t, c, jobName, jobName+"-pod", core.PodStatus{
-		Phase: core.PodSucceeded,
-		ContainerStatuses: []core.ContainerStatus{{
-			Name:  job.Spec.Template.Spec.Containers[0].Name,
-			State: core.ContainerState{Terminated: &core.ContainerStateTerminated{Message: message}},
-		}},
-	})
 }
 
 // eventMessages returns the messages of the events with the given reason.
@@ -407,84 +297,6 @@ func captureOutcomes(t *testing.T) *outcomes {
 	return captured
 }
 
-// stallJob makes a Job older than jobStartTimeout, with the pod counts status sets.
-func stallJob(t *testing.T, c client.Client, name string, status func(*batch.JobStatus)) {
-	t.Helper()
-	job := &batch.Job{}
-	require.NoError(t, c.Get(context.Background(), key(name), job))
-	job.CreationTimestamp = meta.NewTime(time.Now().Add(-jobStartTimeout - time.Minute))
-	require.NoError(t, c.Update(context.Background(), job))
-	status(&job.Status)
-	require.NoError(t, c.Status().Update(context.Background(), job))
-}
-
-// neverStarted is the status of a Job whose only pod is still pending, on a cluster that reports
-// ready pods. A pod that ran and stopped being ready, on a node gone NotReady, shows the same.
-func neverStarted(status *batch.JobStatus) {
-	status.Active = 1
-	status.Ready = ptr.To(int32(0))
-}
-
-// runningReady is the status of a Job whose only pod runs and is ready.
-func runningReady(status *batch.JobStatus) {
-	status.Active = 1
-	status.Ready = ptr.To(int32(1))
-}
-
-// setJobStatus sets the pod counts of a Job, as the Job controller does.
-func setJobStatus(t *testing.T, c client.Client, name string, status func(*batch.JobStatus)) {
-	t.Helper()
-	job := &batch.Job{}
-	require.NoError(t, c.Get(context.Background(), key(name), job))
-	status(&job.Status)
-	require.NoError(t, c.Status().Update(context.Background(), job))
-}
-
-// podOfJob creates a pod of the named Job with the given status, which the Job selects by the labels
-// selectPodsOfJob gives it.
-func podOfJob(t *testing.T, c client.Client, jobName, podName string, status core.PodStatus) {
-	t.Helper()
-	labels := selectPodsOfJob(t, c, jobName)
-
-	pod := &core.Pod{}
-	pod.Name = podName
-	pod.Namespace = testNamespace
-	pod.Labels = labels
-	pod.Status = status
-	require.NoError(t, c.Create(context.Background(), pod))
-}
-
-// selectPodsOfJob gives a Job the selector the API server generates for it, which the fake client
-// leaves out, and returns the labels it selects pods by.
-func selectPodsOfJob(t *testing.T, c client.Client, jobName string) map[string]string {
-	t.Helper()
-	job := &batch.Job{}
-	require.NoError(t, c.Get(context.Background(), key(jobName), job))
-	labels := map[string]string{batch.ControllerUidLabel: string(job.GetUID())}
-	job.Spec.Selector = &meta.LabelSelector{MatchLabels: labels}
-	require.NoError(t, c.Update(context.Background(), job))
-	return labels
-}
-
-// requireRunning asserts that a Job is left running, with its start recorded.
-func requireRunning(t *testing.T, c client.Client, name string) {
-	t.Helper()
-	job := &batch.Job{}
-	require.NoError(t, c.Get(context.Background(), key(name), job))
-	require.NotContains(t, job.Annotations, model.AnnotationJobNotStarted, "a Job whose pod started is never stopped")
-	require.Contains(t, job.Annotations, model.AnnotationJobStarted, "a seen start is recorded")
-}
-
-// requireStopped asserts that the operator stopped a Job whose pod never started.
-func requireStopped(t *testing.T, c client.Client, name string) {
-	t.Helper()
-	job := &batch.Job{}
-	require.NoError(t, c.Get(context.Background(), key(name), job))
-	require.Contains(t, job.Annotations, model.AnnotationJobNotStarted)
-	require.Equal(t, jobNotStartedDeadlineSeconds, ptr.Deref(job.Spec.ActiveDeadlineSeconds, 0),
-		"the Job controller fails a Job past its deadline and deletes its pods")
-}
-
 // eventCount counts the events with the given reason.
 func eventCount(t *testing.T, c client.Client, reason string) int {
 	t.Helper()
@@ -497,22 +309,6 @@ func eventCount(t *testing.T, c client.Client, reason string) int {
 		}
 	}
 	return count
-}
-
-// envValues returns the plain values of the environment of a Job's container.
-func envValues(spec core.PodSpec) []string {
-	var values []string
-	for _, e := range spec.Containers[0].Env {
-		values = append(values, e.Value)
-	}
-	return values
-}
-
-func jobCount(t *testing.T, c client.Client) int {
-	t.Helper()
-	jobs := &batch.JobList{}
-	require.NoError(t, c.List(context.Background(), jobs, client.InNamespace(testNamespace)))
-	return len(jobs.Items)
 }
 
 func condition(t *testing.T, conditions []meta.Condition, conditionType string) meta.Condition {
@@ -535,16 +331,36 @@ func watchOnly(t *testing.T, namespace string) {
 }
 
 // conflictingStatusUpdates fails the status writes of custom resources with a conflict, as a
-// concurrent writer would, while *conflicts is positive, counting each failure down. Job status
-// writes, which the tests make themselves, always pass.
+// concurrent writer would, while *conflicts is positive, counting each failure down.
 func conflictingStatusUpdates(conflicts *int) *interceptor.Funcs {
 	return &interceptor.Funcs{
 		SubResourceUpdate: func(ctx context.Context, c client.Client, subResource string, obj client.Object, opts ...client.SubResourceUpdateOption) error {
-			if _, isJob := obj.(*batch.Job); !isJob && (*conflicts > 0) {
+			if *conflicts > 0 {
 				*conflicts--
 				return apiErrors.NewConflict(api.Resource("clickhousebackups"), obj.GetName(), nil)
 			}
 			return c.SubResource(subResource).Update(ctx, obj, opts...)
 		},
 	}
+}
+
+func getRestore(t *testing.T, c client.Client, name string) *api.ClickHouseRestore {
+	t.Helper()
+	chr := &api.ClickHouseRestore{}
+	require.NoError(t, c.Get(context.Background(), key(name), chr))
+	return chr
+}
+
+func getBackup(t *testing.T, c client.Client, name string) *api.ClickHouseBackup {
+	t.Helper()
+	chb := &api.ClickHouseBackup{}
+	require.NoError(t, c.Get(context.Background(), key(name), chb))
+	return chb
+}
+
+func getSchedule(t *testing.T, c client.Client, name string) *api.ClickHouseBackupSchedule {
+	t.Helper()
+	chbs := &api.ClickHouseBackupSchedule{}
+	require.NoError(t, c.Get(context.Background(), key(name), chbs))
+	return chbs
 }

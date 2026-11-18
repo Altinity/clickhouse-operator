@@ -22,7 +22,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
-	batch "k8s.io/api/batch/v1"
+	coordination "k8s.io/api/coordination/v1"
 	core "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 
@@ -77,34 +77,27 @@ func TestOperatorRoleGrantsBackupControllers(t *testing.T) {
 		resource string
 		verbs    []string
 	}{
-		// The cache watches the Jobs; a Job is created per operation, patched by settle and
-		// observeScheduledJob, and read past the cache by settle.
-		{batch.GroupName, "jobs", []string{"get", "list", "watch", "create", "patch"}},
-		// applyCronJob creates and updates the CronJobs of a schedule, suspendCronJob patches them, and
-		// dropLeavingClusters deletes the CronJob of a cluster the schedule no longer backs up.
-		{batch.GroupName, "cronjobs", []string{"get", "list", "watch", "create", "update", "patch", "delete"}},
-		// jobPods reads the pods of a Job past the cache.
-		{core.GroupName, "pods", []string{"list"}},
 		{core.GroupName, "events", []string{"create"}},
-		// An installation is read together with the normalized state of its last completed reconcile,
-		// which its status ConfigMap holds.
+		// An installation is read together with the normalized state of its last completed reconcile, which its
+		// status ConfigMap holds; the storage path check reads the keys of the Secrets and ConfigMaps the sidecars
+		// take their settings from.
 		{core.GroupName, "configmaps", []string{"get"}},
+		{core.GroupName, "secrets", []string{"get"}},
+		// The backup controllers are leader-elected
+		{coordination.GroupName, "leases", []string{"get", "create", "update"}},
 		// The recovery controller marks the installation it recovered.
 		{clickhouse_altinity_com.APIGroupName, "clickhouseinstallations", []string{"get", "list", "watch", "patch"}},
-		{clickhouse_altinity_com.APIGroupName, "clickhousebackups", []string{"get", "list", "watch"}},
-		{clickhouse_altinity_com.APIGroupName, "clickhousebackupschedules", []string{"get", "list", "watch"}},
+		// The controllers set and remove their finalizers by a patch.
+		{clickhouse_altinity_com.APIGroupName, "clickhousebackups", []string{"get", "list", "watch", "update", "patch"}},
+		{clickhouse_altinity_com.APIGroupName, "clickhousebackupschedules", []string{"get", "list", "watch", "update", "patch"}},
 		// The recovery controller creates the restore a recovery runs.
-		{clickhouse_altinity_com.APIGroupName, "clickhouserestores", []string{"get", "list", "watch", "create"}},
+		{clickhouse_altinity_com.APIGroupName, "clickhouserestores", []string{"get", "list", "watch", "create", "update", "patch"}},
 		{clickhouse_altinity_com.APIGroupName, "clickhousebackups/status", []string{"update"}},
 		{clickhouse_altinity_com.APIGroupName, "clickhousebackupschedules/status", []string{"update"}},
 		{clickhouse_altinity_com.APIGroupName, "clickhouserestores/status", []string{"update"}},
-		// Jobs, CronJobs and the restore a recovery runs block the deletion of the resource that controls
-		// them, which needs an update of its finalizers where the OwnerReferencesPermissionEnforcement
-		// admission plugin is on.
+		// The restore a recovery runs blocks the deletion of the installation that controls it, which needs an update
+		// of its finalizers where the OwnerReferencesPermissionEnforcement admission plugin is on.
 		{clickhouse_altinity_com.APIGroupName, "clickhouseinstallations/finalizers", []string{"update"}},
-		{clickhouse_altinity_com.APIGroupName, "clickhousebackups/finalizers", []string{"update"}},
-		{clickhouse_altinity_com.APIGroupName, "clickhousebackupschedules/finalizers", []string{"update"}},
-		{clickhouse_altinity_com.APIGroupName, "clickhouserestores/finalizers", []string{"update"}},
 	}
 
 	rules := loadOperatorRoleRules(t)
@@ -115,5 +108,25 @@ func TestOperatorRoleGrantsBackupControllers(t *testing.T) {
 			})
 			require.True(t, granted, "the operator role does not grant %q on %q in API group %q", verb, r.resource, r.group)
 		}
+	}
+}
+
+// The operator drives clickhouse-backup through SQL: it runs no Job, no CronJob and no Pod of its own, creates no
+// ServiceAccount, Role or RoleBinding, and its role grants none of that.
+func TestOperatorRoleGrantsNoBackupWorkloads(t *testing.T) {
+	rules := loadOperatorRoleRules(t)
+	for _, denied := range []struct {
+		group, resource, verb string
+	}{
+		{"batch", "jobs", "create"},
+		{"batch", "cronjobs", "create"},
+		{core.GroupName, "pods", "create"},
+		{core.GroupName, "serviceaccounts", "create"},
+		{rbac.GroupName, "roles", "create"},
+		{rbac.GroupName, "rolebindings", "create"},
+		{core.GroupName, "pods/exec", "create"},
+	} {
+		require.False(t, slices.ContainsFunc(rules, func(rule rbacRule) bool { return rule.allows(denied.group, denied.resource, denied.verb) }),
+			"the operator role grants %q on %q in API group %q", denied.verb, denied.resource, denied.group)
 	}
 }

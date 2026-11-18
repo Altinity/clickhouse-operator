@@ -4,15 +4,16 @@
 # enabled, the same storage Secret and the same cluster names and shard layout as the source
 # (e.g. a copy of docs/chb-examples/01-chi-with-backup.yaml under another name).
 #
-# Before anything is changed, the restore Job of each cluster checks the storage paths and every
-# target host: each shard must hold the backup (spec.validateTopology), and no replica may already
-# hold a table the restore would replace - without spec.tables, any table - unless spec.overwrite is
-# true. The schema is restored on every replica, the data on one replica per shard.
-# With spec.overwrite, a table larger than max_table_size_to_drop (50 GB by default) may need that
-# limit lifted for the restore: set max_table_size_to_drop: 0 wherever the target CHI's settings set
-# a limit - installation, cluster, shard, replica or host - as any of them can keep one. On a
-# cluster whose shards have replicas, a restore that drops replicated tables drops them ON CLUSTER
-# first, and every shard's backup must then hold the same tables.
+# Before anything is changed, the restore run of each cluster checks the storage paths and that
+# every target host holds the backup (spec.validateTopology). Then, as the Altinity usual backup
+# workflow restores, every host downloads the backup, every replica restores the schema - the first
+# replica of the first shard ON CLUSTER -, the other replicas of each shard copy the data into the
+# detached directories of their Replicated* tables, and the first replica of each shard restores the
+# data, which replication attaches from there on the others. The operator checks no
+# existing table: clickhouse-backup drops and recreates the tables of the backup that exist, and
+# spec.overwrite without spec.tables the whole databases of the backup (restore --rm), dropping their
+# tables the backup does not hold. ClickHouse refuses to drop a table larger than
+# max_table_size_to_drop (50 GB by default) unless that limit is lifted.
 # While the source keeps running on the same ZooKeeper or Keeper, give the copy its own
 # spec.configuration.zookeeper.root, or its Replicated* tables join the source's replication (see
 # docs/backup.md).
@@ -35,7 +36,7 @@ spec:
 
   # The backup to restore, e.g. LAST-BACKUP of kubectl get chbs -o wide; check that it still exists
   # on every cluster.
-  backupName: default-backup-demo-nightly-20261003-020000
+  backupName: default-backup-demo-nightly-20261003023000
 
   # The installation that made the backup: the default storage paths hold {namespace} and
   # {installation}, so the backup lies under those of "backup-demo", not of this one (cannot be
@@ -54,7 +55,16 @@ spec:
   # Also users, roles, grants...; only without spec.cluster
   # rbac: true
 
-  # When true, drops and recreates tables that already exist
+  # When true and spec.tables is empty, recreates the databases of the backup whole
   overwrite: false
 
   validateTopology: true
+
+  # The replicas of a shard but the first copy the data to detached before the first one restores it
+  # (default); false downloads the schema alone on them, which fetch the data by replication instead
+  # replicatedCopyToDetached: true
+
+  # A rerun by spec.taskID resumes the downloads its earlier runs left (default); false deletes them
+  # and downloads the backup again
+  # resumeDownload: true
+

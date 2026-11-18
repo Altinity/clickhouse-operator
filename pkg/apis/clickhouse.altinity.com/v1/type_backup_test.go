@@ -24,8 +24,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
-// Backup turned on is on only where the spec names where the storage settings of the sidecar come from:
-// without them the sidecar could never upload or download a backup, so backup stays off there instead.
+// Backup turned on is on only where the spec names the Secret of the clickhouse-backup configuration, the only source
+// of the storage settings and of the REST API credentials: a pod template alone only overrides the container.
 func TestClusterBackupNeedsStorage(t *testing.T) {
 	const secret = "s3-credentials"
 	for name, tc := range map[string]struct {
@@ -45,6 +45,11 @@ func TestClusterBackupNeedsStorage(t *testing.T) {
 		},
 		"with a pod template": {
 			backup:    &ClusterBackup{Enabled: types.NewStringBool(true), PodTemplate: types.NewString("backup")},
+			requested: true,
+		},
+		"with a pod template and a Secret": {
+			backup: &ClusterBackup{Enabled: types.NewStringBool(true), PodTemplate: types.NewString("backup"),
+				ConfigSecretRef: secretRef(secret)},
 			requested: true,
 			enabled:   true,
 		},

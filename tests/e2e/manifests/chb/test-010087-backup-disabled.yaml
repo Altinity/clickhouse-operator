@@ -1,5 +1,5 @@
 # test_010087
-# Aimed at the cluster that opted out of backup: must be refused without creating a Job.
+# Aimed at the cluster that opted out of backup: must be refused before it runs.
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseBackup"
 metadata:

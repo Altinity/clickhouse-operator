@@ -800,6 +800,30 @@ spec:
                         Where in its storage the clickhouse-backup sidecar of a host keeps the object disk data of its backups when
                         the settings of that storage set no object disk path. A template like storagePath.
                         Default: object_disks/{namespace}/{installation}/{cluster}/{shard}
+                    timeouts:
+                      type: object
+                      description: |
+                        Defaults of spec.timeouts of every ClickHouseBackup, ClickHouseRestore and ClickHouseBackupSchedule, which a
+                        resource overrides field by field: how the operator waits for the commands it runs on the clickhouse-backup
+                        sidecars. A field unset here is the built-in default
+                      properties:
+                        actionTimeout:
+                          type: string
+                          format: duration
+                          description: "How long the operator waits for one command on one host, a Go duration, e.g. 12h or 90m. Default 12h. At most 720h"
+                        unreachableTimeout:
+                          type: string
+                          format: duration
+                          description: "How long a host whose ClickHouse does not answer, or whose sidecar answers the URL engine with an error, is retried from the first error in a row before the host fails, a Go duration. Default 10m. At most 168h"
+                        errorResponsesMax:
+                          type: integer
+                          minimum: 1
+                          maximum: 1000
+                          description: "How many polls in a row may find no row of a submitted command before it is taken as lost. Default 5"
+                        httpReceiveTimeout:
+                          type: string
+                          format: duration
+                          description: "http_receive_timeout and http_send_timeout of every insert into system.backup_actions, a Go duration: a synchronous delete local or delete remote answers once it is done. Default 4h. At most 168h"
                 logger:
                   type: object
                   description: "allow setup clickhouse-operator logger behavior"

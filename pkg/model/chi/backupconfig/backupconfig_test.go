@@ -131,8 +131,13 @@ s3:
 sftp:
   address: sftp.example.com
   port: 2222
+clickhouse:
+  use_embedded_backup_restore: true
+  embedded_backup_disk: backups
 `), testCredentials, testDefaults)
 	require.NoError(t, err)
+	require.Equal(t, "true", built.Settings["CLICKHOUSE_USE_EMBEDDED_BACKUP_RESTORE"], "the path check sees embedded backups")
+	require.Equal(t, "backups", built.Settings["CLICKHOUSE_EMBEDDED_BACKUP_DISK"])
 	require.Equal(t, "", built.Settings["S3_PATH"])
 	require.Equal(t, testDefaults.ObjectDiskPath, built.Settings["S3_OBJECT_DISK_PATH"])
 	require.Equal(t, "2222", built.Settings["SFTP_PORT"])
@@ -250,7 +255,8 @@ func TestBuildWithoutClickHouseCredentials(t *testing.T) {
 	require.NoError(t, err)
 	file := map[string]any{}
 	require.NoError(t, yaml.Unmarshal(built.File, &file))
-	require.NotContains(t, file, "clickhouse")
+	require.NotContains(t, file["clickhouse"], "username")
+	require.NotContains(t, file["clickhouse"], "password")
 
 	built, err = Build([]byte("clickhouse:\n  username: own\n  host: 127.0.0.1\n"), credentials, testDefaults)
 	require.NoError(t, err)
@@ -304,4 +310,90 @@ func TestWithoutClickHouseCredentials(t *testing.T) {
 	require.Equal(t, map[string]any{"timeout": "5m"}, stripped["clickhouse"])
 
 	require.Equal(t, "s3: [", string(WithoutClickHouseCredentials([]byte("s3: ["))), "a file that cannot be read is left as it is")
+}
+
+// The REST API always authenticates with the credentials the operator generates: no config.yml of the user turns
+// its authentication off, whether it sets the credentials empty, null, or to its own, or leaves the api section out.
+func TestBuildCannotDisableAPIAuth(t *testing.T) {
+	for name, storageConfig := range map[string]string{
+		"empty credentials":   "api:\n  username: \"\"\n  password: \"\"\n",
+		"null credentials":    "api:\n  username: null\n  password: null\n",
+		"own credentials":     "api:\n  username: admin\n  password: admin\n",
+		"no api section":      "s3:\n  bucket: b\n",
+		"empty api section":   "api: {}\n",
+		"null api section":    "api: ~\n",
+		"env override wanted": "general:\n  disable_environment_override: true\napi:\n  username: \"\"\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			built, err := Build([]byte(storageConfig), testCredentials, testDefaults)
+			require.NoError(t, err)
+			file := parse(t, built.File)
+			apiSection := file["api"].(map[string]any)
+			require.Equal(t, testCredentials.APIUsername, apiSection["username"])
+			require.Equal(t, testCredentials.APIPassword, apiSection["password"])
+			require.Equal(t, false, file["general"].(map[string]any)["disable_environment_override"])
+		})
+	}
+	t.Run("api section that is no mapping", func(t *testing.T) {
+		_, err := Build([]byte("api: [username]\n"), testCredentials, testDefaults)
+		require.ErrorIs(t, err, ErrInvalidStorageConfig)
+	})
+}
+
+// Retention is done by the orchestrator alone, and an incremental base may be deleted: the file always keeps every
+// remote backup and rebases on delete, whatever the user's general section says
+func TestBuildForcesRetentionSettings(t *testing.T) {
+	for name, storageConfig := range map[string]string{
+		"unset":     "s3:\n  bucket: b\n",
+		"user keep": "general:\n  backups_to_keep_remote: 7\n  rebase_during_delete: false\n  rebase_before_remove_old_remote: false\n",
+		"null":      "general:\n  backups_to_keep_remote: null\n  rebase_during_delete: null\n",
+		"empty":     "general: {}\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			built, err := Build([]byte(storageConfig), testCredentials, testDefaults)
+			require.NoError(t, err)
+			general := parse(t, built.File)["general"].(map[string]any)
+			require.Equal(t, 0, general["backups_to_keep_remote"])
+			require.Equal(t, true, general["rebase_during_delete"])
+			require.Equal(t, true, general["rebase_before_remove_old_remote"])
+		})
+	}
+}
+
+// The integration tables of clickhouse-backup - system.backup_list, system.backup_actions, system.backup_version -
+// are what the operator drives the sidecar by: the file turns them on at the API of the sidecar in the pod, whatever
+// the storage Secret says, keeps every other API setting, and takes the credentials over, which clickhouse-backup puts
+// into the URL of the tables.
+func TestBuildKeepsTheIntegrationTables(t *testing.T) {
+	for name, storage := range map[string]string{
+		"off":   "api:\n  create_integration_tables: false\n  integration_tables_host: chi-demo-main-0-0\n  timeout: 5m\n",
+		"unset": "api:\n  timeout: 5m\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			built, err := Build([]byte(storage), testCredentials, testDefaults)
+			require.NoError(t, err)
+			section := parse(t, built.File)["api"].(map[string]any)
+			require.Equal(t, true, section["create_integration_tables"])
+			require.Equal(t, IntegrationTablesHost, section["integration_tables_host"])
+			require.Equal(t, "5m", section["timeout"])
+			require.Equal(t, testCredentials.APIUsername, section["username"])
+			require.Equal(t, testCredentials.APIPassword, section["password"])
+		})
+	}
+}
+
+// A Distributed table of the backup over a cluster the restored host does not have is pointed at the restored cluster,
+// unless the storage settings name another cluster, or none.
+func TestBuildRestoresDistributedTablesOnTheRestoredCluster(t *testing.T) {
+	for storage, want := range map[string]any{
+		"":                             RestoreDistributedCluster,
+		"clickhouse:\n  timeout: 5m\n": RestoreDistributedCluster,
+		"clickhouse:\n  restore_distributed_cluster: ~\n":           RestoreDistributedCluster,
+		"clickhouse:\n  restore_distributed_cluster: all-sharded\n": "all-sharded",
+		"clickhouse:\n  restore_distributed_cluster: \"\"\n":        "",
+	} {
+		built, err := Build([]byte(storage), testCredentials, testDefaults)
+		require.NoError(t, err)
+		require.Equal(t, want, parse(t, built.File)["clickhouse"].(map[string]any)["restore_distributed_cluster"], storage)
+	}
 }

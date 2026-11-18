@@ -89,9 +89,14 @@ func enabledBackup() *chi.ClusterBackup {
 	}
 }
 
-// enabledOn enables backup with the sidecar built on the clickhouse-backup container of the pod template named
+// enabledOn enables backup with a storage Secret and the sidecar built on the clickhouse-backup container of the
+// pod template named
 func enabledOn(podTemplate string) *chi.ClusterBackup {
-	return &chi.ClusterBackup{Enabled: types.NewStringBool(true), PodTemplate: types.NewString(podTemplate)}
+	return &chi.ClusterBackup{
+		Enabled:         types.NewStringBool(true),
+		PodTemplate:     types.NewString(podTemplate),
+		ConfigSecretRef: configSecretRef(backupStorageSecret),
+	}
 }
 
 func backupCluster(name string, backup *chi.ClusterBackup) *chi.Cluster {
@@ -377,6 +382,14 @@ func TestBackupUserInjected(t *testing.T) {
 	users := got.Spec.Configuration.Users
 	require.Equal(t, chop.Config().ClickHouse.Config.User.Default.Profile, users.Get(backupUser(userFieldProfile)).String())
 	require.Equal(t, chop.Config().ClickHouse.Config.User.Default.Quota, users.Get(backupUser(userFieldQuota)).String())
+}
+
+// Sidecars connect over loopback only: no host regexp.
+func TestBackupUserOfSidecarModeHasNoHostRegexp(t *testing.T) {
+	cr := &chi.ClickHouseInstallation{}
+	cr.Spec.Configuration = &chi.Configuration{Clusters: []*chi.Cluster{backupCluster("sidecars", enabledBackup())}}
+	got := normalizeBackupCR(t, cr, backupSecretGetter(t))
+	require.False(t, got.Spec.Configuration.Users.Has(backupUser(userFieldNetworksHostRegexp)))
 }
 
 // The operator manages a backup user only when the backup Secret sets both its username and its password, which are
@@ -781,6 +794,7 @@ func TestBackupPodTemplate(t *testing.T) {
 	t.Run("a cluster's empty podTemplate over the installation's, without a storage - no sidecar", func(t *testing.T) {
 		cr := newCR(&chi.ClusterBackup{PodTemplate: types.NewString("")}, podTemplate(backupTemplate, sidecar))
 		cr.Spec.Backup = enabledOn(backupTemplate)
+		cr.Spec.Backup.ConfigSecretRef = nil
 		got := normalizeBackupCR(t, cr, backupSecretGetter(t))
 		requireNotAborted(t, got)
 		require.True(t, findCluster(t, got, "c").GetBackup().LacksStorage())
@@ -980,6 +994,7 @@ func TestBackupContainerValidation(t *testing.T) {
 		clusterBackup := &chi.ClusterBackup{Enabled: types.NewStringBool(backup)}
 		if backup {
 			clusterBackup.PodTemplate = types.NewString(sharedPodTemplate)
+			clusterBackup.ConfigSecretRef = configSecretRef(backupStorageSecret)
 		}
 		cr.Spec.Configuration = &chi.Configuration{Clusters: []*chi.Cluster{backupCluster("c", clusterBackup)}}
 		return cr

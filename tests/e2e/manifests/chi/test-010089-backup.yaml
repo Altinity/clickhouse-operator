@@ -1,0 +1,34 @@
+# test_010089
+# One host with backup enabled: the retention of a schedule across a change of its entries is the same on every
+# host, so one is enough. No ZooKeeper: the scenario backs up a plain MergeTree table.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-089-backup"
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  backup:
+    enabled: "yes"
+    configSecretRef:
+      name: backup-storage
+  configuration:
+    clusters:
+      - name: main
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+  defaults:
+    templates:
+      # The sidecar freezes parts through the data directory, so the data has to live on a volume both
+      # containers mount rather than in the container filesystem.
+      dataVolumeClaimTemplate: default
+  templates:
+    volumeClaimTemplates:
+      - name: default
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi

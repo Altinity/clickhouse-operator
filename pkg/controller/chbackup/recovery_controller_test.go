@@ -80,15 +80,15 @@ func (f *recoveryFixture) setRestorePhase(name string, phase api.OperationPhase)
 	restore := f.restore(name)
 	restore.Status.Phase = phase
 	restore.Status.BackupName = restore.Spec.BackupName
-	restore.Status.Clusters = []api.OperationClusterStatus{{Name: restore.Spec.Cluster, Phase: phase, JobName: name + "-restore"}}
+	restore.Status.Clusters = []api.OperationClusterStatus{{Name: restore.Spec.Cluster, Phase: phase, Run: &api.BackupRunStatus{Operation: api.BackupRunOperationRestore}}}
 	op := newRestoreOperation(restore)
 	switch phase {
 	case api.OperationPhaseCompleted:
-		op.setCondition(api.BackupConditionReady, meta.ConditionTrue, api.BackupReasonCompleted, "Job "+name+"-restore completed")
+		op.setCondition(api.BackupConditionReady, meta.ConditionTrue, api.BackupReasonCompleted, "the restore completed")
 	case api.OperationPhaseFailed:
-		restore.Status.Clusters[0].Reason = api.BackupReasonJobFailed
-		op.setCondition(api.BackupConditionReady, meta.ConditionFalse, api.BackupReasonJobFailed,
-			"Job "+name+"-restore failed: preflight failed: backup "+recoveryBackup+" is missing in the storage of chi-demo-main-0-0")
+		restore.Status.Clusters[0].Reason = api.BackupReasonFailed
+		op.setCondition(api.BackupConditionReady, meta.ConditionFalse, api.BackupReasonFailed,
+			"preflight failed: backup "+recoveryBackup+" is missing in the storage of chi-demo-main-0-0")
 	}
 	require.NoError(f.t, f.client.Status().Update(context.Background(), restore))
 }
@@ -174,11 +174,11 @@ func TestRecoveryRunsOnce(t *testing.T) {
 	require.True(t, restore.Spec.RBAC.IsTrue(), "a recovery restores access entities too")
 	require.Empty(t, chi.Annotations[api.AnnotationRecoveredFrom], "nothing is recovered before the restore completes")
 	require.Equal(t, []string{"recovery of cluster main from backup " + recoveryBackup + " started in ClickHouseRestore demo-main-recovery"},
-		eventMessages(t, f.client, api.BackupReasonJobCreated))
+		eventMessages(t, f.client, api.BackupReasonStarted))
 
 	f.reconcile()
 	require.Equal(t, 1, f.restoreCount())
-	require.Equal(t, 1, eventCount(t, f.client, api.BackupReasonJobCreated))
+	require.Equal(t, 1, eventCount(t, f.client, api.BackupReasonStarted))
 
 	f.setRestorePhase("demo-main-recovery", api.OperationPhaseCompleted)
 	require.Equal(t, ctrl.Result{}, f.reconcile())
@@ -244,7 +244,7 @@ func TestRecoveryNeverRunsTwiceAfterARestart(t *testing.T) {
 	f.controller = NewRecoveryController(interceptor.NewClient(f.client, cold), f.client, f.client.Scheme(), f.cr)
 	f.reconcile()
 	require.Equal(t, 1, f.restoreCount())
-	require.Equal(t, 1, eventCount(t, f.client, api.BackupReasonJobCreated))
+	require.Equal(t, 1, eventCount(t, f.client, api.BackupReasonStarted))
 	require.Empty(t, f.chi().Annotations[api.AnnotationRecoveredFrom])
 }
 
@@ -259,18 +259,18 @@ func TestRecoveryWarnsAboutAFailedRestore(t *testing.T) {
 
 	require.Equal(t, ctrl.Result{}, f.reconcile())
 	require.Empty(t, f.chi().Annotations[api.AnnotationRecoveredFrom])
-	messages := eventMessages(t, f.client, api.BackupReasonJobFailed)
+	messages := eventMessages(t, f.client, api.BackupReasonFailed)
 	require.Len(t, messages, 1)
 	require.Contains(t, messages[0], "recovery of cluster main from backup "+recoveryBackup+" failed")
 	require.Contains(t, messages[0], "is missing in the storage")
-	require.Contains(t, messages[0], "stay suspended until that ClickHouseRestore is deleted", "a restore that may have changed something holds the schedules")
-	require.Contains(t, messages[0], "Scheduled backups of ClickHouseInstallation demo stay suspended",
+	require.Contains(t, messages[0], "stay held until that ClickHouseRestore is deleted", "a restore that may have changed something holds the schedules")
+	require.Contains(t, messages[0], "Scheduled backups of ClickHouseInstallation demo stay held",
 		"a recovery restores access entities, which belong to every cluster")
 	require.Contains(t, messages[0], "deleting that ClickHouseRestore starts the recovery of the cluster anew")
 	events := &core.EventList{}
 	require.NoError(t, f.client.List(context.Background(), events, client.InNamespace(testNamespace)))
 	for _, event := range events.Items {
-		if event.Reason == api.BackupReasonJobFailed {
+		if event.Reason == api.BackupReasonFailed {
 			require.Equal(t, api.ClickHouseInstallationCRDResourceKind, event.InvolvedObject.Kind)
 			require.Equal(t, testCHI, event.InvolvedObject.Name)
 		}
@@ -280,7 +280,7 @@ func TestRecoveryWarnsAboutAFailedRestore(t *testing.T) {
 	f.reconcile()
 	require.Equal(t, 1, f.restoreCount())
 	require.Empty(t, f.restore("demo-main-recovery").Status.Phase, "a new restore recovers again")
-	require.Equal(t, 2, eventCount(t, f.client, api.BackupReasonJobCreated))
+	require.Equal(t, 2, eventCount(t, f.client, api.BackupReasonStarted))
 }
 
 // A recovery restore that failed before it changed anything, a backup name mistyped above all, holds
@@ -292,17 +292,17 @@ func TestRecoveryWarnsAboutARestoreThatChangedNothing(t *testing.T) {
 	f.reconcile()
 	f.setRestorePhase("demo-main-recovery", api.OperationPhaseFailed)
 	restore := f.restore("demo-main-recovery")
-	restore.Status.Clusters[0].Reason = api.BackupReasonJobFailedUnchanged
+	restore.Status.Clusters[0].Reason = api.BackupReasonFailedUnchanged
 	op := newRestoreOperation(restore)
-	op.setCondition(api.BackupConditionReady, meta.ConditionFalse, api.BackupReasonJobFailedUnchanged, "Job demo-main-recovery-restore failed: refusing")
+	op.setCondition(api.BackupConditionReady, meta.ConditionFalse, api.BackupReasonFailedUnchanged, "refusing")
 	require.NoError(t, f.client.Status().Update(context.Background(), restore))
 
 	f.reconcile()
-	messages := eventMessages(t, f.client, api.BackupReasonJobFailedUnchanged)
+	messages := eventMessages(t, f.client, api.BackupReasonFailedUnchanged)
 	require.Len(t, messages, 1)
 	require.Contains(t, messages[0], "Scheduled backups of the cluster run on, except those of schedules that leave their backup "+
 		"name prefix to default, which stay held as SharesSourcePrefix tells")
-	require.NotContains(t, messages[0], "stay suspended")
+	require.NotContains(t, messages[0], "stay held until")
 }
 
 // A recovery that cannot start is warned about on the installation rather than only logged.

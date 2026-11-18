@@ -643,7 +643,7 @@ func TestBackupSidecarSettingsForJobs(t *testing.T) {
 
 	for name, want := range map[string]string{
 		config.ClickHouseBackupEnvRestoreSchemaOnCluster:   "",
-		config.ClickHouseBackupEnvClickHouseRestartCommand: "sql:SYSTEM RELOAD USERS",
+		config.ClickHouseBackupEnvClickHouseRestartCommand: "sql:SYSTEM RELOAD USERS; sql:SYSTEM RELOAD CONFIG",
 		config.ClickHouseBackupEnvAPIAllowParallel:         "false",
 		config.ClickHouseBackupEnvRestoreDatabaseMapping:   "",
 		config.ClickHouseBackupEnvRestoreTableMapping:      "",
@@ -736,12 +736,14 @@ func TestBackupSidecarPinsWhatTheJobsRelyOn(t *testing.T) {
 		}}},
 		{Name: config.ClickHouseBackupSecretKeyAPIUsername, Value: "admin"},
 		{Name: config.ClickHouseBackupSecretKeyAPIPassword, Value: "admin"},
+		{Name: config.ClickHouseBackupEnvTZ, Value: "Europe/Berlin"},
 	}
 	pinned := map[string]string{
+		config.ClickHouseBackupEnvTZ:                       "UTC",
 		config.ClickHouseBackupEnvAPIListen:                "0.0.0.0:" + strconv.Itoa(config.ClickHouseBackupAPIPortNumber),
 		config.ClickHouseBackupEnvAPISecure:                "false",
 		config.ClickHouseBackupEnvRestoreSchemaOnCluster:   "",
-		config.ClickHouseBackupEnvClickHouseRestartCommand: config.ClickHouseBackupRestartCommandReloadUsers,
+		config.ClickHouseBackupEnvClickHouseRestartCommand: config.ClickHouseBackupRestartCommandReload,
 		config.ClickHouseBackupEnvAPIAllowParallel:         "false",
 		config.ClickHouseBackupEnvRestoreDatabaseMapping:   "",
 		config.ClickHouseBackupEnvRestoreTableMapping:      "",

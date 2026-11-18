@@ -57,7 +57,7 @@ spec:
                 # that loads them.
                 - name: CLICKHOUSE_RESTART_COMMAND
                   value: "exec:systemctl restart clickhouse-server"
-                # An API the Jobs could not reach, with credentials they do not have: the operator pins
+                # An API the integration tables could not reach, with credentials they do not have: the operator pins
                 # its own, so the recovery restore still drives every sidecar.
                 - name: API_LISTEN
                   value: "127.0.0.1:7171"

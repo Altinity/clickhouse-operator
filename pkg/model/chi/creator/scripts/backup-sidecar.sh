@@ -50,7 +50,7 @@ read_fingerprint() {
 # clickhouse-backup loads its configuration file anew for every operation, but checks the credentials of a request
 # against the configuration it last loaded: it refuses with 401 every request made with new credentials, the only
 # ones that would load them. kubelet updates the fingerprint along with the configuration file, at once. The restart
-# cancels the operations in progress, which their Jobs could not follow with the old credentials anyway.
+# cancels the operations in progress, which the integration tables could not follow with the old credentials anyway.
 run_server() {
 	local fingerprint_file=$1 fingerprint current server status=0
 	shift

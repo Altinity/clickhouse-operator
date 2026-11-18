@@ -255,6 +255,17 @@ type OperatorConfigRuntime struct {
 
 	// Namespace specifies namespace where the operator runs
 	Namespace string `json:"namespace" yaml:"namespace"`
+
+	// ClickHouseAccessExplicit tells whether the configuration sets the ClickHouse username and password of
+	// clickhouse.access itself, inline or by its Secret, rather than leaving them to the defaults. Operator-managed
+	// backup runs with these credentials only: it has no default ones. Nil until the configuration is normalized.
+	ClickHouseAccessExplicit *bool `json:"clickHouseAccessExplicit,omitempty" yaml:"clickHouseAccessExplicit,omitempty"`
+}
+
+// HasExplicitClickHouseAccess tells whether the configuration sets the ClickHouse username and password the operator
+// connects with itself, inline or by the Secret of clickhouse.access, nil-safe
+func (c *OperatorConfig) HasExplicitClickHouseAccess() bool {
+	return (c != nil) && (c.Runtime.ClickHouseAccessExplicit != nil) && *c.Runtime.ClickHouseAccessExplicit
 }
 
 // OperatorConfigWatch specifies watch section
@@ -917,11 +928,14 @@ type OperatorConfigBackup struct {
 	// StoragePath and StorageObjectDiskPath are where in its storage the clickhouse-backup sidecar of a host keeps the
 	// backups it makes, and their data on object disks, when the settings of the storage of its cluster set no path of
 	// their own. Each is a template that clickhouse-backup expands with the ClickHouse macros of the host - {namespace},
-	// {installation}, {cluster}, {shard} and {replica} - and the backup Jobs alike. The sidecar takes them as arguments
+	// {installation}, {cluster}, {shard} and {replica} - and the storage path check alike. The sidecar takes them as arguments
 	// of its command: changing either rolls the pods of every backup-enabled cluster, and leaves the backups made under
 	// the old paths where they are.
 	StoragePath           string `json:"storagePath"           yaml:"storagePath"`
 	StorageObjectDiskPath string `json:"storageObjectDiskPath" yaml:"storageObjectDiskPath"`
+	// Timeouts are the defaults of the timeouts of every backup, restore and schedule, spec.timeouts, which a resource
+	// overrides field by field. A field unset here, or out of its bounds, is the built-in default.
+	Timeouts BackupTimeouts `json:"timeouts" yaml:"timeouts"`
 }
 
 // OperatorConfig specifies operator config
@@ -1357,6 +1371,14 @@ func (c *OperatorConfig) normalizeSectionClickHouseAccess() {
 	default:
 		c.ClickHouse.Access.Scheme = defaultChScheme
 	}
+	// Whether the credentials are the configuration's own is told before the defaults fill them in, once: a second
+	// normalization would take the defaults for them
+	if c.Runtime.ClickHouseAccessExplicit == nil {
+		inline := (c.ClickHouse.Access.Username != "") && (c.ClickHouse.Access.Password != "")
+		secret := (c.ClickHouse.Access.Secret.Runtime.Username != "") && (c.ClickHouse.Access.Secret.Runtime.Password != "")
+		explicit := inline || secret
+		c.Runtime.ClickHouseAccessExplicit = &explicit
+	}
 	if c.ClickHouse.Access.Username == "" {
 		c.ClickHouse.Access.Username = defaultChUsername
 	}
@@ -1471,6 +1493,7 @@ func (c *OperatorConfig) normalizeSectionBackup() {
 	if c.Backup.StorageObjectDiskPath == "" {
 		c.Backup.StorageObjectDiskPath = defaultBackupStorageObjectDiskPath
 	}
+	c.Backup.Timeouts = *c.Backup.Timeouts.Sanitized()
 }
 
 // normalize() makes fully-and-correctly filled OperatorConfig

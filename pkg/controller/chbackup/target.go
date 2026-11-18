@@ -38,8 +38,6 @@ type pending struct {
 	reason  string
 	message string
 	requeue time.Duration
-	// released tells a hold of CronJobs an ended hold left suspended: it announces no suspension anew
-	released bool
 }
 
 // chiNotFound explains the wait for an installation that does not exist (yet).
@@ -71,7 +69,7 @@ func (p *pending) refusesOneOff() bool {
 
 // readInstallation reads the installation together with the normalized state of its last completed
 // reconcile. requireReady additionally holds the operation until the installation's current
-// reconcile has completed. A stopped installation is refused: its hosts are down, so a Job could only
+// reconcile has completed. A stopped installation is refused: its hosts are down, so a run could only
 // wait for them. The installation comes along with either hold when it completed a reconcile before,
 // for what that one tells.
 func (r *reconciler) readInstallation(
@@ -213,7 +211,7 @@ type targetResolver struct {
 }
 
 // newTargetResolver returns a resolver of the targets an operation on the clusters of an installation
-// starts its Jobs on; requireReady is as for readInstallation. Each cluster is resolved by the name the
+// starts its runs on; requireReady is as for readInstallation. Each cluster is resolved by the name the
 // operation pinned, never by its spec: an edit of the spec the API server does not refuse must not
 // retarget, or fail, the clusters the operation runs on.
 func (r *reconciler) newTargetResolver(ctx context.Context, namespace, chiName string, requireReady bool) *targetResolver {
