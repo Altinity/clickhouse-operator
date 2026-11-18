@@ -15,7 +15,6 @@
 package v1
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/util/mergo"
 	log "github.com/golang/glog"
 
 	core "k8s.io/api/core/v1"
