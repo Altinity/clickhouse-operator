@@ -97,6 +97,13 @@ func (cm *ConfigManager) Init() error {
 	log.V(1).Info("File-based CHOP config:")
 	log.V(1).Info("\n" + cm.fileConfig.String(true))
 
+	// Refuse a FIPS switch that is not a boolean before the first network call.
+	// The file-based checks below would read it as off, and the FIPS gate of
+	// the binary, which refuses it as well, runs only after them.
+	if err = cm.fileConfig.Security.GetFIPS().Validate(); err != nil {
+		return err
+	}
+
 	// Refuse an insecure kubeconfig before issuing the first network call.
 	// Evaluated against the FILE-based config only — moving this check after the
 	// CR-based merge (which requires a List over the kube wire) would defeat the

@@ -33,6 +33,9 @@ import (
 // hardening. Pure decision lives in pkg/util/fips so the metrics-exporter
 // binary can share it.
 func fipsGate() {
+	if err := chop.Config().Security.GetFIPS().Validate(); err != nil {
+		log.F().Fatal(err.Error())
+	}
 	fipsEnforced := chop.Config().Security.GetFIPS().IsEnforced()
 	// buildLinked is the durable "GOFIPS140-linked" property derived from
 	// runtime/debug.BuildInfo settings — independent of GODEBUG runtime mode.

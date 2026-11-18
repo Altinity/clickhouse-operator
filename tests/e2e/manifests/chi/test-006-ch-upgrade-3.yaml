@@ -9,7 +9,7 @@ spec:
       spec:
         containers:
         - name: clickhouse-pod
-          image: clickhouse/clickhouse-server:24.8
+          image: altinity/clickhouse-server:25.8.28.10001.altinitystable
   defaults:
     templates:
       podTemplate: clickhouse-new

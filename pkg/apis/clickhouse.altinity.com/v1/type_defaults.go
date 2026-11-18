@@ -46,17 +46,7 @@ func (defaults *Defaults) MergeFrom(from *Defaults, _type MergeType) *Defaults {
 		defaults = NewDefaults()
 	}
 
-	switch _type {
-	case MergeTypeFillEmptyValues:
-		if !from.ReplicasUseFQDN.HasValue() {
-			defaults.ReplicasUseFQDN = defaults.ReplicasUseFQDN.MergeFrom(from.ReplicasUseFQDN)
-		}
-	case MergeTypeOverrideByNonEmptyValues:
-		if from.ReplicasUseFQDN.HasValue() {
-			// Override by non-empty values only
-			defaults.ReplicasUseFQDN = defaults.ReplicasUseFQDN.MergeFrom(from.ReplicasUseFQDN)
-		}
-	}
+	defaults.ReplicasUseFQDN = MergeScalar(defaults.ReplicasUseFQDN, from.ReplicasUseFQDN, _type)
 
 	defaults.DistributedDDL = defaults.DistributedDDL.MergeFrom(from.DistributedDDL, _type)
 	defaults.StorageManagement = defaults.StorageManagement.MergeFrom(from.StorageManagement, _type)

@@ -331,6 +331,9 @@ func (w *worker) deleteCRProtocol(ctx context.Context, chi *api.ClickHouseInstal
 	// Delete ConfigMap(s)
 	_ = w.c.deleteConfigMapsCHI(ctx, chi)
 
+	// Delete backup Secret
+	_ = w.c.deleteSecretBackup(ctx, chi)
+
 	w.a.V(1).
 		WithEvent(chi, a.EventActionDelete, a.EventReasonDeleteCompleted).
 		WithAction(chi).
@@ -539,8 +542,8 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 		return nil
 	}
 
-	w.a.V(2).M(host).S().Info(host.Runtime.Address.HostName)
-	defer w.a.V(2).M(host).E().Info(host.Runtime.Address.HostName)
+	w.a.V(2).M(host).S().Info("%s", host.Runtime.Address.HostName)
+	defer w.a.V(2).M(host).E().Info("%s", host.Runtime.Address.HostName)
 
 	w.a.V(1).
 		WithEvent(host.GetCR(), a.EventActionDelete, a.EventReasonDeleteStarted).

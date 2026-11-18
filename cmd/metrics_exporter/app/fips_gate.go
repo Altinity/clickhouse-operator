@@ -30,6 +30,9 @@ import (
 // assertion is independent of the Enforced policy hardening. Pure decision
 // lives in pkg/util/fips.
 func fipsGate() {
+	if err := chop.Config().Security.GetFIPS().Validate(); err != nil {
+		log.F().Fatal(err.Error())
+	}
 	fipsEnforced := chop.Config().Security.GetFIPS().IsEnforced()
 	// buildLinked is the durable "GOFIPS140-linked" property; see operator
 	// fips_gate.go for the rationale (Enabled() conflates linkage with the

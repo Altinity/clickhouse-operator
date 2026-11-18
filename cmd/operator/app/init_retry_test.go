@@ -28,29 +28,29 @@ import (
 )
 
 // An ordinary API-server-state failure. Its shape is deliberately unremarkable: the retry must
-// key off the sentinel initKeeper attaches, never off how controller-runtime happens to wrap a
+// key off the sentinel an initializer attaches, never off how controller-runtime happens to wrap a
 // dial error today, so an error with no special structure has to be retried.
 func outageErr() error {
 	return errors.New("failed to get server groups: connection refused")
 }
 
 // shrinkBackoff keeps the multi-attempt cases instant. The shipped schedule is asserted separately
-// by TestKeeperInitRetryBackoffSchedule.
+// by TestInitRetryBackoffSchedule.
 //
 // It mutates a package var and restores it in Cleanup, which is safe only because nothing in this
 // package calls t.Parallel(). Do not add it here without giving this a different seam.
 func shrinkBackoff(t *testing.T) {
 	t.Helper()
-	saved := keeperInitRetryBackoff
-	keeperInitRetryBackoff = wait.Backoff{Duration: time.Microsecond, Factor: 1.0, Steps: 1}
-	t.Cleanup(func() { keeperInitRetryBackoff = saved })
+	saved := initRetryBackoff
+	initRetryBackoff = wait.Backoff{Duration: time.Microsecond, Factor: 1.0, Steps: 1}
+	t.Cleanup(func() { initRetryBackoff = saved })
 }
 
-func TestInitKeeperWithRetryStopsOnFirstSuccess(t *testing.T) {
+func TestInitWithRetryStopsOnFirstSuccess(t *testing.T) {
 	shrinkBackoff(t)
 
 	calls := 0
-	err := initKeeperWithRetry(context.Background(), func(context.Context) error {
+	err := initWithRetry(context.Background(), keeperComponent, func(context.Context) error {
 		calls++
 		return nil
 	})
@@ -59,11 +59,11 @@ func TestInitKeeperWithRetryStopsOnFirstSuccess(t *testing.T) {
 	require.Equal(t, 1, calls, "a successful init must not be retried")
 }
 
-func TestInitKeeperWithRetryRecoversFromTransientFailure(t *testing.T) {
+func TestInitWithRetryRecoversFromTransientFailure(t *testing.T) {
 	shrinkBackoff(t)
 
 	calls := 0
-	err := initKeeperWithRetry(context.Background(), func(context.Context) error {
+	err := initWithRetry(context.Background(), keeperComponent, func(context.Context) error {
 		calls++
 		if calls < 3 {
 			return outageErr()
@@ -75,10 +75,10 @@ func TestInitKeeperWithRetryRecoversFromTransientFailure(t *testing.T) {
 	require.Equal(t, 3, calls)
 }
 
-// The property that replaced the attempt budget: initKeeper runs only at start-up, so giving up
-// disables Keeper for the lifetime of the process. An outage lasting longer than any budget we
+// The property that replaced the attempt budget: an initializer runs only at start-up, so giving
+// up disables its controllers for the lifetime of the process. An outage lasting longer than any budget we
 // might have picked must therefore still be survivable.
-func TestInitKeeperWithRetryNeverGivesUp(t *testing.T) {
+func TestInitWithRetryNeverGivesUp(t *testing.T) {
 	shrinkBackoff(t)
 
 	// Large enough that no plausible budget could pass this by accident - the design it replaced
@@ -89,7 +89,7 @@ func TestInitKeeperWithRetryNeverGivesUp(t *testing.T) {
 	defer cancel()
 
 	calls := 0
-	err := initKeeperWithRetry(ctx, func(context.Context) error {
+	err := initWithRetry(ctx, keeperComponent, func(context.Context) error {
 		calls++
 		if calls < outageAttempts {
 			return outageErr()
@@ -102,18 +102,18 @@ func TestInitKeeperWithRetryNeverGivesUp(t *testing.T) {
 }
 
 // Scheme registration is deterministic, so retrying it would retry forever without ever changing
-// the outcome. initKeeper marks such failures at the source; only that marking stops the retry.
-func TestInitKeeperWithRetryDoesNotRetryTerminalError(t *testing.T) {
+// the outcome. The initializer marks such failures at the source; only that marking stops the retry.
+func TestInitWithRetryDoesNotRetryTerminalError(t *testing.T) {
 	shrinkBackoff(t)
 
 	cause := errors.New("unable to AddToScheme")
 	calls := 0
-	err := initKeeperWithRetry(context.Background(), func(context.Context) error {
+	err := initWithRetry(context.Background(), keeperComponent, func(context.Context) error {
 		calls++
-		return fmt.Errorf("%w: %w", errKeeperInitTerminal, cause)
+		return fmt.Errorf("%w: %w", errInitTerminal, cause)
 	})
 
-	require.ErrorIs(t, err, errKeeperInitTerminal)
+	require.ErrorIs(t, err, errInitTerminal)
 	require.ErrorIs(t, err, cause, "the underlying cause must survive the wrap, it is what gets logged")
 	require.Equal(t, 1, calls, "a terminal error must not be retried")
 }
@@ -122,14 +122,14 @@ func TestInitKeeperWithRetryDoesNotRetryTerminalError(t *testing.T) {
 // discovery - arrive as ordinary errors, and an earlier revision classified exactly these as
 // terminal by routing them through IsTransientAPIError. Nothing about the error's content is
 // matched here; the string is illustrative, and what is pinned is that an unmarked error retries.
-func TestInitKeeperWithRetryRetriesUnmarkedError(t *testing.T) {
+func TestInitWithRetryRetriesUnmarkedError(t *testing.T) {
 	shrinkBackoff(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	calls := 0
-	_ = initKeeperWithRetry(ctx, func(context.Context) error {
+	_ = initWithRetry(ctx, keeperComponent, func(context.Context) error {
 		calls++
 		if calls < 4 {
 			return errors.New("forbidden: User cannot list resource statefulsets")
@@ -143,13 +143,13 @@ func TestInitKeeperWithRetryRetriesUnmarkedError(t *testing.T) {
 // A cancelled context means the operator is shutting down, and the retry is otherwise unbounded -
 // so this is the only thing that ends it. Without it the goroutine would keep rebuilding a manager
 // nobody will start, and the WaitGroup in Run would never come back.
-func TestInitKeeperWithRetryAbandonsOnContextDone(t *testing.T) {
+func TestInitWithRetryAbandonsOnContextDone(t *testing.T) {
 	// Deliberately NOT shrunk: a loop that ignored ctx would have to wait out a real back-off, so
 	// this also proves the abandon happens during the wait rather than after it.
 	ctx, cancel := context.WithCancel(context.Background())
 
 	calls := 0
-	err := initKeeperWithRetry(ctx, func(context.Context) error {
+	err := initWithRetry(ctx, keeperComponent, func(context.Context) error {
 		calls++
 		cancel()
 		return outageErr()
@@ -158,13 +158,45 @@ func TestInitKeeperWithRetryAbandonsOnContextDone(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, 1, calls, "retrying past cancellation would keep the process from shutting down")
 	require.True(t, util.IsContextDone(ctx),
-		"launchKeeper reports shutdown differently from a real failure, and uses ctx to tell them apart")
+		"launchKeeper and launchBackup report shutdown differently from a real failure, and use ctx to tell them apart")
+}
+
+// Keeper and backup initialize side by side through the same helper. Neither may inherit the
+// other's progress - Step() mutates the backoff it is called on - nor its fate: a backup that can
+// never start must leave Keeper's retry untouched, and the other way round.
+func TestInitWithRetryKeepsComponentsIndependent(t *testing.T) {
+	shrinkBackoff(t)
+
+	keeperCalls, backupCalls := 0, 0
+	keeperErr := make(chan error, 1)
+	backupErr := make(chan error, 1)
+
+	go func() {
+		keeperErr <- initWithRetry(context.Background(), keeperComponent, func(context.Context) error {
+			keeperCalls++
+			if keeperCalls < 3 {
+				return outageErr()
+			}
+			return nil
+		})
+	}()
+	go func() {
+		backupErr <- initWithRetry(context.Background(), backupComponent, func(context.Context) error {
+			backupCalls++
+			return fmt.Errorf("%w: %w", errInitTerminal, errors.New("unable to AddToScheme"))
+		})
+	}()
+
+	require.NoError(t, <-keeperErr, "a terminal backup failure must not stop Keeper from starting")
+	require.ErrorIs(t, <-backupErr, errInitTerminal)
+	require.Equal(t, 3, keeperCalls)
+	require.Equal(t, 1, backupCalls)
 }
 
 // The schedule has to satisfy two opposing needs: catch a brief blip quickly, then stop filling
 // the log forever in an environment that will never come good.
-func TestKeeperInitRetryBackoffSchedule(t *testing.T) {
-	backoff := keeperInitRetryBackoff
+func TestInitRetryBackoffSchedule(t *testing.T) {
+	backoff := initRetryBackoff
 
 	var elapsed time.Duration
 	attemptsInFirstMinute := 0

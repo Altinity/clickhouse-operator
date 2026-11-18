@@ -1,0 +1,14 @@
+# test_010087
+# Same spec as test-010087-restore.yaml, with overwrite, applied once rows the backup does not hold
+# were added to the restored tables: the restore replaces the tables the backup holds that match
+# spec.tables, on every replica of the cold cluster, and leaves the rest alone.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseRestore"
+metadata:
+  name: restore-overwrite
+spec:
+  clickHouseInstallation: test-087-backup
+  cluster: cold
+  backupName: e2e-087-full
+  tables: "test_087.*"
+  overwrite: true

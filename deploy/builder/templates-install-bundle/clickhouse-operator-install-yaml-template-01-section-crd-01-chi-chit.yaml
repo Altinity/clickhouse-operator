@@ -1038,8 +1038,10 @@ spec:
                         Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationusers
 
                         any key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets
-                        secret value will pass in `pod.spec.containers.evn`, and generate with from_env=XXX in XML in /etc/clickhouse-server/users.d/chop-generated-users.xml
-                        it not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle
+                        by default the secret value is passed in `pod.spec.containers.env` and generated with from_env=XXX in /etc/clickhouse-server/users.d/chop-generated-users.xml
+                        a password change is then picked up only after the Pod is recreated
+                        set `valueFrom.hotReload: true` on user password, password_sha256_hex, or password_double_sha1_hex to publish that user as chop-generated-hot-reload-users.xml in a CHI-owned Secret, mounted into users.d next to chop-generated-users.xml, and reload it without a Pod restart
+                        hotReload on any other field is rejected
 
                         look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
 
@@ -1217,6 +1219,72 @@ spec:
                               through to the operator-wide defaults in ClickHouseOperatorConfiguration.
                               See docs/security_hardening.md for details.
                             x-kubernetes-preserve-unknown-fields: true
+                          backup: &TypeClusterBackup
+                            type: object
+                            description: |
+                              EXPERIMENTAL. Operator-managed backup for this cluster, overriding `chi.spec.backup`.
+                              Fields left empty are inherited from `chi.spec.backup`; set `enabled: "no"` to opt this cluster out.
+                              When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
+                              so turning it on or off rolls the cluster's Pods. Customize the sidecar through a container named
+                              clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the cluster
+                              has a `configSecretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
+                              so backup stays off and the operator warns.
+                              See docs/backup.md for details.
+                            properties:
+                              enabled:
+                                <<: *TypeStringBool
+                                description: |
+                                  Enable operator-managed backup: inject the clickhouse-backup sidecar and allow backup/restore resources to target
+                                  the cluster. Takes effect only with `configSecretRef` or `podTemplate` set, which name where the sidecar takes
+                                  its storage from: without either, backup stays off
+                              podTemplate:
+                                type: string
+                                description: |
+                                  Pod template whose container named clickhouse-backup the sidecar is built on: what the container sets is kept,
+                                  and the operator fills in only what it lacks. Only that container is taken, not the other containers, volumes
+                                  or Pod settings of the template. Left empty, the operator builds the sidecar on its own
+                              configSecretRef:
+                                type: object
+                                description: |
+                                  Secret in the installation's namespace whose key `config.yml` holds the clickhouse-backup configuration
+                                  of the sidecar, a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket, s3.path,
+                                  s3.access_key, s3.secret_key. The operator generates the configuration file of the sidecar from it,
+                                  which follows a change of the Secret without a restart. A cluster that leaves it out takes the
+                                  installation's; an explicit `name: ""` on a cluster leaves the cluster without one. Without one, the
+                                  storage is configured by the container of the Pod template `podTemplate` names
+                                properties:
+                                  name:
+                                    description: |
+                                      Name of the referent. More info:
+                                      https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    type: string
+                              recovery:
+                                type: object
+                                description: |
+                                  Restore a new installation from a backup once it has completed its first reconcile: the operator
+                                  creates a ClickHouseRestore of every backup-enabled cluster that inherits a backup name, users, roles and
+                                  grants included, and records the recovery in the `clickhouse.altinity.com/recovered-from` annotation.
+                                  Changing it changes no Pod. Taken from the installation only, never from a ClickHouseInstallationTemplate.
+                                properties:
+                                  backupName:
+                                    type: string
+                                    description: "Backup to recover from. An explicit empty name on a cluster leaves the cluster out of a recovery the installation asks for"
+                                    maxLength: 128
+                                    pattern: '^([A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?)?$'
+                                  sourceInstallation:
+                                    type: string
+                                    description: |
+                                      ClickHouseInstallation that made the backup, when not this one: the recovery reads the backup from the
+                                      storage paths the {installation} macro gives there. Empty, this installation
+                                    maxLength: 253
+                                    pattern: "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
+                                  sourceNamespace:
+                                    type: string
+                                    description: |
+                                      Namespace of the ClickHouseInstallation that made the backup, when not this one: the recovery reads the
+                                      backup from the storage paths the {namespace} macro gives there. Empty, the namespace of this installation
+                                    maxLength: 63
+                                    pattern: "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
                           pdbManaged:
                             <<: *TypeStringBool
                             description: |
@@ -1640,16 +1708,6 @@ spec:
                                 # nullable: true
                                 items:
                                   type: string
-                          distribution:
-                            type: string
-                            description: "DEPRECATED, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
-                            enum:
-                              # both humped and all-lowercase accepted
-                              - ""
-                              - "Unspecified"
-                              - "unspecified"
-                              - "OnePerHost"
-                              - "oneperhost"
                           podDistribution:
                             type: array
                             description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
@@ -1821,6 +1879,16 @@ spec:
                     them. Each cluster can shadow these via spec.configuration.clusters[].security.
                     See docs/security_hardening.md for details.
                   x-kubernetes-preserve-unknown-fields: true
+                backup:
+                  <<: *TypeClusterBackup
+                  description: |
+                    EXPERIMENTAL. Operator-managed backup defaults, applied to every cluster. Each cluster can override
+                    them via `chi.spec.configuration.clusters[].backup`, e.g. `enabled: "no"` to opt a cluster out.
+                    When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
+                    so turning it on or off rolls the cluster's Pods. Backup takes effect only where a cluster has a
+                    `configSecretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
+                    so backup stays off and the operator warns.
+                    See docs/backup.md for details.
                 useTemplates:
                   type: array
                   description: |

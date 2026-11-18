@@ -1,0 +1,11 @@
+# test_010087
+# Makes the backup of the every-minute schedule once, now: with the schedule's installation and options,
+# under the schedule's prefix and the time it is due as YYYYMMDDTHHMMSS, which keeps it out of the series
+# the schedule's retention prunes.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackup"
+metadata:
+  name: from-schedule
+spec:
+  scheduleRef:
+    name: every-minute

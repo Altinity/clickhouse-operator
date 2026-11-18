@@ -132,10 +132,27 @@ func (zkc *ZookeeperConfig) GetNodes() ZookeeperNodes {
 	return zkc.Nodes
 }
 
+// InheritFrom fills a cluster's ZooKeeper configuration from the installation-level one, for a
+// cluster that names no nodes of its own. Unlike a layer merge, the installation's root, identity
+// and timeouts replace the cluster's own: such a cluster has always been configured with them, so
+// its replicated tables live under that root and authenticate with those credentials, and honouring
+// the cluster's own values would move them. The cluster's own use_compression is kept, as always.
+func (zkc *ZookeeperConfig) InheritFrom(from *ZookeeperConfig) *ZookeeperConfig {
+	if from == nil {
+		return zkc
+	}
+	var compression *types.StringBool
+	if zkc != nil {
+		compression = zkc.UseCompression
+	}
+	zkc = zkc.MergeFrom(from, MergeTypeOverrideByNonEmptyValues)
+	zkc.UseCompression = MergeScalar(zkc.UseCompression, compression, MergeTypeOverrideByNonEmptyValues)
+	return zkc
+}
+
 // MergeFrom merges ZooKeeper configuration from the provided source.
-// Nodes are appended (duplicates skipped by equality check).
-// Keeper reference is adopted from source only if the receiver has none.
-// Scalar fields (timeouts, root, identity) are overwritten by non-zero source values.
+// Nodes are appended (duplicates skipped by equality check); the keeper reference and the scalar
+// fields (timeouts, root, identity, compression) follow the merge direction.
 func (zkc *ZookeeperConfig) MergeFrom(from *ZookeeperConfig, _type MergeType) *ZookeeperConfig {
 	if from == nil {
 		return zkc
@@ -168,24 +185,17 @@ func (zkc *ZookeeperConfig) MergeFrom(from *ZookeeperConfig, _type MergeType) *Z
 		}
 	}
 
-	// Adopt keeper reference from source if receiver has none
-	if zkc.Keeper.IsEmpty() && !from.Keeper.IsEmpty() {
+	// Keeper reference is resolved as a unit
+	keeperFromWins := (_type == MergeTypeOverrideByNonEmptyValues) || zkc.Keeper.IsEmpty()
+	if keeperFromWins && !from.Keeper.IsEmpty() {
 		zkc.Keeper = from.Keeper.DeepCopy()
 	}
 
-	if from.SessionTimeoutMs > 0 {
-		zkc.SessionTimeoutMs = from.SessionTimeoutMs
-	}
-	if from.OperationTimeoutMs > 0 {
-		zkc.OperationTimeoutMs = from.OperationTimeoutMs
-	}
-	if from.Root != "" {
-		zkc.Root = from.Root
-	}
-	if from.Identity != "" {
-		zkc.Identity = from.Identity
-	}
-	zkc.UseCompression = zkc.UseCompression.MergeFrom(from.UseCompression)
+	zkc.SessionTimeoutMs = MergeValue(zkc.SessionTimeoutMs, from.SessionTimeoutMs, _type)
+	zkc.OperationTimeoutMs = MergeValue(zkc.OperationTimeoutMs, from.OperationTimeoutMs, _type)
+	zkc.Root = MergeValue(zkc.Root, from.Root, _type)
+	zkc.Identity = MergeValue(zkc.Identity, from.Identity, _type)
+	zkc.UseCompression = MergeScalar(zkc.UseCompression, from.UseCompression, _type)
 
 	return zkc
 }

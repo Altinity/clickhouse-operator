@@ -1,0 +1,13 @@
+# test_010088
+# The backup the new installation is recovered from: schedule source-yearly of test-088-src, run once,
+# now. It is named after the schedule's prefix, the default prefix of schedule nightly of test-088-dr,
+# <namespace>-test-088-dr-nightly, as if an installation of that namespace and name had made it - in
+# another Kubernetes cluster, say, while that installation still runs - and the time it is due as
+# YYYYMMDDTHHMMSS, which keeps it out of the schedule's series.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackup"
+metadata:
+  name: source-backup
+spec:
+  scheduleRef:
+    name: source-yearly

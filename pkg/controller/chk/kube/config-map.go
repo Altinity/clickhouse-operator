@@ -39,8 +39,9 @@ func NewConfigMap(kubeClient client.Client, apiReader client.Reader) *ConfigMap 
 }
 
 func (c *ConfigMap) Create(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
-	err := c.kubeClient.Create(ctx, cm)
-	return cm, err
+	return commonKube.CreateWithRetry(ctx, func() (*core.ConfigMap, error) {
+		return cm, c.kubeClient.Create(ctx, cm)
+	})
 }
 
 func (c *ConfigMap) Get(ctx context.Context, namespace, name string) (*core.ConfigMap, error) {
@@ -58,8 +59,9 @@ func (c *ConfigMap) Get(ctx context.Context, namespace, name string) (*core.Conf
 }
 
 func (c *ConfigMap) Update(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
-	err := c.kubeClient.Update(ctx, cm)
-	return cm, err
+	return commonKube.UpdateWithRetry(ctx, func() (*core.ConfigMap, error) {
+		return cm, c.kubeClient.Update(ctx, cm)
+	})
 }
 
 func (c *ConfigMap) Delete(ctx context.Context, namespace, name string) error {

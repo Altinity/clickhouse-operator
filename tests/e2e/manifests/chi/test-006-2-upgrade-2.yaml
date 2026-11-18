@@ -9,14 +9,14 @@ spec:
       spec:
         containers:
         - name: clickhouse-pod
-          image: clickhouse/clickhouse-server:25.8
+          image: altinity/clickhouse-server:26.3.33.10001.altinitystable
   defaults:
     templates:
       podTemplate: default
   configuration:
     settings:
-      # This MergeTree setting is only valid in ClickHouse 25.5+
-      merge_tree/write_marks_for_substreams_in_compact_parts: "0"
+      # This MergeTree setting is only valid in ClickHouse 26.3+
+      merge_tree/vertical_merge_optimize_ttl_delete: "0"
     clusters:
     - name: default
       layout:

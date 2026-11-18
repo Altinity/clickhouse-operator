@@ -38,6 +38,7 @@ def _test_run_failed(test=None):
     return False
 
 
+_dump_log_lines = 20
 def _dump_failed_test_namespace(test, ns, shell):
     """Best-effort cluster snapshot before namespace teardown."""
     operator_ns = getattr(test.context, "operator_namespace", None) or ns
@@ -52,17 +53,36 @@ def _dump_failed_test_namespace(test, ns, shell):
             print(f"failed to list {kind}: {exc}")
 
     try:
-        print("\n--- Operator log (last 10 lines) ---")
+        print(f"\n--- ClickHouse log (last {_dump_log_lines} lines) ---")
+        chis = kubectl.get_obj_names("", obj_type = "chi", kind = "", ns=ns, shell=shell)
+        for chi in chis:
+            names = kubectl.get_pod_names(chi, ns=ns, shell=shell)
+            for name in names:
+                logs = kubectl.launch(f"logs {name} --tail={_dump_log_lines}", ns=ns, ok_to_fail=True, shell=shell)
+                print(f"\n# {name}")
+                print(logs or "(empty ClickHouse log)")
+    except Exception as exc:
+        print(f"failed to fetch ClickHouse logs: {exc}")
+
+    try:
+        print("\n--- CHI action plan ---")
+        chis = kubectl.get_obj_names("", obj_type = "chi", kind = "", ns=ns, shell=shell)
+        if not chis:
+            print("(no chi)")
+        for chi in chis:
+            plan = kubectl.get_actionPlan("chi", chi, ns=ns, shell=shell)
+            print(f"\n# chi-storage-{chi} status-actionPlan")
+            print(plan or "(empty action plan)")
+    except Exception as exc:
+        print(f"failed to fetch CHI action plan: {exc}")
+
+    try:
+        print(f"\n--- Operator log (last {_dump_log_lines} lines) ---")
         operator_pod = kubectl.get_operator_pod(ns=operator_ns, shell=shell)
         if not operator_pod:
             print(f"(operator pod not found in namespace {operator_ns})")
         else:
-            logs = kubectl.launch(
-                f"logs {operator_pod} -c clickhouse-operator --tail=10",
-                ns=operator_ns,
-                ok_to_fail=True,
-                shell=shell,
-            )
+            logs = kubectl.launch(f"logs {operator_pod} -c clickhouse-operator --tail={_dump_log_lines}", ns=operator_ns, ok_to_fail=True, shell=shell)
             print(logs or "(empty operator log)")
     except Exception as exc:
         print(f"failed to fetch operator logs: {exc}")
@@ -197,7 +217,6 @@ def set_settings(self):
     self.context.release_version = define("release_version", open(os.path.join(pathlib.Path(__file__).parent.absolute(), "../../release")).read(1024).strip(" \r\n\t"))
     self.context.operator_namespace = define("operator_namespace", os.getenv("OPERATOR_NAMESPACE") if "OPERATOR_NAMESPACE" in os.environ else self.context.test_namespace)
     self.context.operator_install = define("operator_install", os.getenv("OPERATOR_INSTALL") if "OPERATOR_INSTALL" in os.environ else "yes")
-    self.context.minio_namespace = define("minio_namespace", os.getenv("MINIO_NAMESPACE") if "MINIO_NAMESPACE" in os.environ else "minio")
     self.context.operator_docker_repo = define("operator_docker_repo", (
         os.getenv("OPERATOR_DOCKER_REPO") if "OPERATOR_DOCKER_REPO" in os.environ else "altinity/clickhouse-operator"
     ))
@@ -225,8 +244,6 @@ def set_settings(self):
     self.context.prometheus_scrape_interval = define("prometheus_scrape_interval", 10)
 
     self.context.keeper_type = define("keeper_type", os.getenv("KEEPER_TYPE") if "KEEPER_TYPE" in os.environ else "zookeeper") # zookeeper | clickhouse_keeper
-
-    self.context.minio_version = define("minio_version", "latest")
 
 
 @TestStep(Given)

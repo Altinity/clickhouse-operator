@@ -215,7 +215,6 @@ func (w *worker) ensureClusterSchemer(host *api.Host) *schemer.ClusterSchemer {
 	case api.ChSchemeHTTPS:
 		clusterConnectionParams.Port = host.HTTPSPort.IntValue()
 	}
-	w.schemer = schemer.NewClusterSchemer(clusterConnectionParams, host.Runtime.Version)
-
-	return w.schemer
+	// Each call gets its own schemer. Shard reconcile runs several of these at once.
+	return schemer.NewClusterSchemer(clusterConnectionParams, host.Runtime.Version)
 }

@@ -1,0 +1,90 @@
+# EXPERIMENTAL: operator-managed backup, see docs/backup.md
+#
+# Makes now, once, the backup that the "nightly" schedule
+# (docs/chb-examples/04-backup-schedule.yaml) makes every night: before an upgrade, say. The two
+# resources are tied by spec.scheduleRef.name alone, neither owns the other:
+#
+# - The schedule makes its own backups without any ClickHouseBackup: the CronJob of each cluster
+#   starts a Job per run, the runs report in the schedule's status, and their backups make up the
+#   series its retention deletes from. It knows nothing of this backup, which its status never
+#   shows.
+#
+# - This backup is a ClickHouseBackup as docs/chb-examples/02-backup-once.yaml is, with a status and
+#   Jobs of its own, but takes from the schedule what a one-off backup sets itself:
+#     - the installation,
+#     - the clusters, which spec.cluster may narrow to one,
+#     - every backup option of the schedule, namely:
+#         spec.schemaOnly, spec.replicaSelection, spec.tables,
+#         spec.partitions, spec.activeDeadlineSeconds,
+#       none of which it may set itself.
+#   Until it is validated it reads the schedule anew on every reconcile,
+#   waiting while the schedule does not exist (ScheduleNotFound) or is invalid (InvalidSpec). It
+#   then records what it read in status.schedule, and editing or deleting the schedule afterwards
+#   changes nothing about it. Its own fields are those below.
+#
+# - It is always named <prefix>-YYYYMMDDTHHMMSS: the schedule's prefix - its spec.backupNamePrefix
+#   or, unset, <namespace>-<installation>-<schedule> - as status.schedule.backupNamePrefix records
+#   it, and the UTC time it is due, here for instance default-backup-demo-nightly-20261012T101507,
+#   shown in status.backupName: spec.backupName is refused with spec.scheduleRef. The "T" keeps it
+#   out of the series, so retention never deletes it: delete it from the storage by hand once it is
+#   no longer needed, as deleting this resource does not. Creating this resource again later makes
+#   another backup only without spec.scheduledTime; with it, the backup gets the same name again,
+#   and fails before changing anything while the backup of that name is still in the storage.
+#
+# - It runs while the schedule is suspended or held for a restore too, but on each cluster it waits
+#   for any backup or restore running there, a run of the schedule included (OperationInProgress).
+#   A run of the schedule due meanwhile waits on each host until this backup is done there.
+#
+# - Two of them due in the same second get one name, and the second fails before it changes
+#   anything: create the failed one anew, without spec.scheduledTime, so that its new creation time
+#   gives it a new name, or give each its own spec.scheduledTime.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackup"
+metadata:
+  name: backup-demo-pre-upgrade
+spec:
+  # In place of spec.clickHouseInstallation: a backup names either the installation or a schedule
+  scheduleRef:
+    # The schedule, in the same namespace (cannot be changed later)
+    name: nightly
+
+  # Only this cluster (cannot be changed later), one the schedule backs up; left out, every cluster
+  # the schedule backs up.
+  # cluster: main
+
+  # Run the backup at this later time rather than when it is created, for instance before a
+  # maintenance window: an RFC 3339 time with its offset, or Z for UTC. Until then the backup stays
+  # Pending, its Validated condition False with the reason WaitingForScheduledTime, and the time can
+  # still be changed, or the backup deleted. At that time it is validated against the installation
+  # as it is then, and runs as any backup does. A time already past starts the backup at once,
+  # unless spec.startingDeadlineSeconds has passed too: keep one on a backup kept in git, which may
+  # be created again later. See 03-backup-later.yaml.
+  # scheduledTime: "2026-10-20T02:00:00+02:00"
+
+  # How many seconds after it is due (its creation, or spec.scheduledTime) the backup may still
+  # start. It starts on a cluster when the operator creates the cluster's Job, which waits, for
+  # instance, until the installation has completed its reconcile and no other backup or restore runs
+  # on the cluster. Past the deadline, a backup still not validated (an invalid spec, say) fails, as
+  # does each cluster whose Job is not created yet, with the reason StartingDeadlineExceeded and
+  # what it waited for; clusters already running finish. Unset, the backup waits as long as it
+  # takes. The operator checks a second after the backup is due, so keep it a minute or more. How
+  # long a Job may run once started is spec.activeDeadlineSeconds: the backup's own, or with
+  # spec.scheduleRef the schedule's.
+  # startingDeadlineSeconds: 3600
+
+  # Make this an incremental backup on top of the existing backup of this name: only the data parts
+  # not in that base yet are uploaded, which takes less storage and less time. The base must be in
+  # the storage of every host the backup runs on, or the Job fails before changing anything. A
+  # restore of this backup needs its whole chain of bases in the storage. The retention of a
+  # schedule never deletes a base that a backup it keeps still needs, but deleting a base any other
+  # way (BACKUPS_TO_KEEP_REMOTE, a bucket lifecycle rule, by hand) breaks every backup built on it.
+  # The runs of a schedule always make full backups, which can serve as bases.
+  # diffFromRemote: demo-base
+
+  # Check that the backup can be read back. Once it has completed on every cluster, a second Job
+  # per cluster downloads it from the storage on the first replica of each shard, checks that
+  # clickhouse-backup lists the download as complete, and deletes it again, touching no table.
+  # The data disk needs room for one copy of the backup meanwhile, and with AllReplicas the copies
+  # of the other replicas are not downloaded. The outcome is the Verified condition, Verified or
+  # VerificationFailed; a backup that failed on any cluster is not verified. Off by default.
+  verify: true

@@ -5,6 +5,8 @@
 # Paths
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 PROJECT_ROOT="$(realpath "${CUR_DIR}/../..")"
+# realpath of a missing folder is empty on macOS, which would render configs into the root folder
+mkdir -p "${PROJECT_ROOT}/tmp"
 PROJECT_TEMP="$(realpath "${PROJECT_ROOT}/tmp")"
 
 # Relative and abs paths where templates live
@@ -149,6 +151,14 @@ if [[ "${MANIFEST_PRINT_CRD}" == "yes" ]]; then
 
     # Render CHK
     SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-01-section-crd-03-chk.yaml"
+    ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
+    render_separator
+    cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
+        OPERATOR_VERSION="${OPERATOR_VERSION}"    \
+        envsubst
+
+    # Render Backup CRDs (ClickHouseBackup, ClickHouseBackupSchedule, ClickHouseRestore)
+    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-01-section-crd-04-backup.yaml"
     ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
     render_separator
     cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \

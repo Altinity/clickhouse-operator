@@ -23,4 +23,7 @@ const (
 	ClickHouseInstallationCRDResourceKind         = "ClickHouseInstallation"
 	ClickHouseInstallationTemplateCRDResourceKind = "ClickHouseInstallationTemplate"
 	ClickHouseOperatorCRDResourceKind             = "ClickHouseOperator"
+	ClickHouseBackupCRDResourceKind               = "ClickHouseBackup"
+	ClickHouseBackupScheduleCRDResourceKind       = "ClickHouseBackupSchedule"
+	ClickHouseRestoreCRDResourceKind              = "ClickHouseRestore"
 )

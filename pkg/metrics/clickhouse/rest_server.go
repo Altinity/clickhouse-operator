@@ -46,6 +46,7 @@ type HostRequest struct {
 	CRNamespace string               `json:"crNamespace"`
 	CRName      string               `json:"crName"`
 	ClusterName string               `json:"clusterName"`
+	ClusterTLS  *metrics.WatchedTLS  `json:"clusterTLS,omitempty"`
 	Host        *metrics.WatchedHost `json:"host"`
 }
 

@@ -16,12 +16,15 @@ package chi
 
 import (
 	"errors"
+	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 )
 
@@ -130,4 +133,60 @@ func TestShouldRestoreHostToServiceOnDeferral(t *testing.T) {
 	t.Run("no error means the caller never reaches this path", func(t *testing.T) {
 		require.False(t, shouldRestoreHostToServiceOnDeferral(hostWithStatus(types.ObjectStatusCreated), nil))
 	})
+}
+
+// hostForSchemer builds a host whose cluster lookup and HTTP port survive ensureClusterSchemer.
+func hostForSchemer(clusterName string, port int32) *api.Host {
+	host := &api.Host{Name: clusterName}
+	host.HTTPPort = types.NewInt32(port)
+	host.Runtime.Address.ClusterName = clusterName
+	chi := &api.ClickHouseInstallation{
+		Spec: api.ChiSpec{
+			Configuration: &api.Configuration{
+				Clusters: []*api.Cluster{{
+					Name: clusterName,
+				}},
+			},
+		},
+	}
+	host.SetCR(chi)
+	return host
+}
+
+// TestEnsureClusterSchemerParallelShards checks that concurrent shard reconcile gets a schemer
+// for the host it asked about. Run with -race: the schemer used to live on the shared worker.
+func TestEnsureClusterSchemerParallelShards(t *testing.T) {
+	cfg := chop.Config()
+	prev := cfg.ClickHouse.Access.Scheme
+	cfg.ClickHouse.Access.Scheme = api.ChSchemeAuto
+	t.Cleanup(func() { cfg.ClickHouse.Access.Scheme = prev })
+
+	w := &worker{}
+	const n = 32
+	hosts := make([]*api.Host, n)
+	for i := 0; i < n; i++ {
+		hosts[i] = hostForSchemer(fmt.Sprintf("shard-%d", i), int32(10000+i))
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(n)
+	errCh := make(chan error, n)
+	for _, host := range hosts {
+		go func(host *api.Host) {
+			defer wg.Done()
+			got := w.ensureClusterSchemer(host)
+			if got == nil {
+				errCh <- fmt.Errorf("%s: nil schemer", host.GetName())
+				return
+			}
+			if got.Port != host.HTTPPort.IntValue() {
+				errCh <- fmt.Errorf("%s: schemer port %d, host port %d", host.GetName(), got.Port, host.HTTPPort.IntValue())
+			}
+		}(host)
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Error(err)
+	}
 }

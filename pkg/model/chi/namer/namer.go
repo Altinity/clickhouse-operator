@@ -47,6 +47,9 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 	case interfaces.NameConfigMapCommonUsers:
 		cr := params[0].(api.ICustomResource)
 		return n.createConfigMapNameCommonUsers(cr)
+	case interfaces.NameSecretCommonUsers:
+		cr := params[0].(api.ICustomResource)
+		return n.createSecretNameCommonUsers(cr)
 
 	case interfaces.NameCRService:
 		if len(params) > 1 {

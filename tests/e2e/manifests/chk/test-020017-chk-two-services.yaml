@@ -25,4 +25,4 @@ spec:
         spec:
           containers:
             - name: clickhouse-keeper
-              image: "clickhouse/clickhouse-keeper:25.8"
+              image: "clickhouse/clickhouse-keeper:26.8"

@@ -97,7 +97,7 @@ func TestRemovedSecretRefSyntaxLeavesUnsafeOutputBehindTheAbort(t *testing.T) {
 
 	require.Equal(t, chi.StatusAborted, target.EnsureStatus().GetStatus(),
 		"the abort is the only thing standing between this output and the cluster")
-	require.True(t, user.Has("password_sha256_hex"),
+	require.True(t, user.Has(userFieldPasswordSHA256Hex),
 		"fallback still derives a password - documented here so the finalizeCR gate is not removed")
 }
 
@@ -127,7 +127,7 @@ func TestValueFromSecretKeyRefStillNormalizes(t *testing.T) {
 
 	require.NotEqual(t, chi.StatusAborted, target.EnsureStatus().GetStatus(),
 		"the modern secretKeyRef syntax must not be rejected")
-	require.True(t, user.Get("password").HasAttributes(),
+	require.True(t, user.Get(userFieldPassword).HasAttributes(),
 		"secretKeyRef must be substituted into an ENV reference, not silently dropped")
 }
 

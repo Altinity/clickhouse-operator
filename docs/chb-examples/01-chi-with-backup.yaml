@@ -1,0 +1,107 @@
+# EXPERIMENTAL: operator-managed backup, see docs/backup.md
+#
+# A ClickHouseInstallation with backup enabled, plus the Secret describing the backup storage.
+# The operator injects a clickhouse-backup sidecar into every Pod of the cluster and generates
+# the Secret "backup-demo-auto-backup-secret" with the sidecar's credentials.
+#
+# ClickHouse has to keep its data on a real PersistentVolume, as data-volume-template below does.
+#
+# Replicated tables need ZooKeeper or ClickHouse Keeper; this example references the
+# ClickHouseKeeperInstallation from docs/chk-examples/01-simple-1.yaml.
+#
+# No example names a namespace: kubectl creates each in the namespace given with -n, or else in that
+# of its current context, "default" unless the context names another. Apply them all to one
+# namespace, together with the ClickHouseKeeperInstallation: every reference these examples make
+# names a resource in the namespace of the one making it. The names of the schedule's backups the
+# examples quote, such as default-backup-demo-nightly-20261003-020000, start with "default", as the
+# default spec.backupNamePrefix of a schedule starts with its namespace.
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backup-demo-storage
+type: Opaque
+stringData:
+  # The clickhouse-backup configuration of the storage, a YAML mapping of the sections of its
+  # configuration file. The operator generates the configuration file of the sidecars from it,
+  # with the credentials of the sidecar and the default paths filled in, and the sidecars follow
+  # a change of it within minutes, without a restart. Keep the whole configuration here and in the
+  # env of the sidecar's container in its pod template, where backup and restore Jobs can check the
+  # storage paths: with several backup-enabled clusters, they refuse to run when the sidecar takes
+  # settings from envFrom or from a configuration file its command names.
+  config.yml: |
+    general:
+      remote_storage: s3
+    s3:
+      # MinIO installed with deploy/minio
+      endpoint: http://minio-hl.minio:9000
+      bucket: clickhouse-backup
+      # Left unset, the path is the default of the operator configuration (backup.storagePath, and
+      # backup.storageObjectDiskPath for object_disk_path), by default this one: {namespace},
+      # {installation}, {cluster} and {shard} are ClickHouse macros expanded on every host, so each
+      # shard of each cluster of each installation keeps its part of a backup in its own location.
+      # Every backup and restore refuses paths two shards would share.
+      # path: backup/{namespace}/{installation}/{cluster}/{shard}
+      force_path_style: true
+      access_key: minio-access-key
+      secret_key: minio-secret-key
+      # compression_format: zstd
+      # sse: AES256
+---
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: backup-demo
+spec:
+  # Installation-wide backup settings, inherited by every cluster.
+  backup:
+    enabled: "yes"
+    # The sidecar is customized through the clickhouse-backup container of the pod template named:
+    # podTemplate: backup-sidecar
+    # The clickhouse-backup configuration of the sidecar, kept in the Secret above
+    configSecretRef:
+      name: backup-demo-storage
+  defaults:
+    templates:
+      dataVolumeClaimTemplate: data-volume-template
+  configuration:
+    zookeeper:
+      keeper:
+        name: simple-1
+    clusters:
+      - name: main
+        layout:
+          shardsCount: 2
+          replicasCount: 2
+      # A cluster can override any field of spec.backup in its own
+      # spec.configuration.clusters[].backup, e.g. opt out of backup. Every backup, schedule and
+      # restore runs one Job per backup-enabled cluster it targets, all under one backup name.
+      # - name: scratch
+      #   backup:
+      #     enabled: "no"
+      #   layout:
+      #     shardsCount: 1
+  templates:
+    # podTemplates:
+    #   - name: backup-sidecar
+    #     spec:
+    #       containers:
+    #         # The operator keeps what this container sets and fills in the rest; the Jobs run its
+    #         # image under its identity. Only this container is taken, not volumes or pod settings.
+    #         - name: clickhouse-backup
+    #           env:
+    #             - name: LOG_LEVEL
+    #               value: debug
+    #           resources:
+    #             requests:
+    #               cpu: 100m
+    #               memory: 256Mi
+    volumeClaimTemplates:
+      - name: data-volume-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              # Room for the data plus one downloaded copy of a backup (verify, restore)
+              storage: 10Gi

@@ -168,6 +168,17 @@ connects to ClickHouse over the secure native port with CA verification enabled.
 
 It mounts the same `clickhouse-certs` Secret used by the rest of the deployment.
 
+This sidecar is self-managed: the CHI leaves `spec.backup` off, so the operator
+neither changes it nor lets backup resources target the cluster. With
+[operator-managed backup](backup.md) enabled, name this pod template in
+`spec.backup.podTemplate`, as the CHI is aborted while a pod template it does
+not name holds a `clickhouse-backup` container. The container then becomes the
+base of the operator's sidecar, whose REST API the backup Jobs call over plain
+HTTP. Drop `API_SECURE` with its certificate settings, the `command`/`args`,
+the API port and any API or ClickHouse credentials, which the operator
+provides; a value of `API_SECURE` that turns TLS on aborts the CHI. See
+[Customizing the sidecar](backup.md#customizing-the-sidecar).
+
 ## Related
 
 - FIPS controls, GODEBUG, image policy, and release evidence:

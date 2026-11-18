@@ -91,9 +91,10 @@ func (c *Generator) GetSectionFromFiles(section chi.SettingsSection, includeUnsp
 	return files.GetSection(section, includeUnspecified)
 }
 
-// getUsers creates data for users section. Used as "users.xml"
+// getUsers creates data for users section. Used as "users.xml".
+// Users that opt into hotReload are omitted here and published separately.
 func (c *Generator) getUsers() string {
-	return c.opts.Users.ClickHouseConfig(configUsers)
+	return c.opts.Users.WithoutHotReloadUsers().ClickHouseConfig(configUsers)
 }
 
 // getProfiles creates data for profiles section. Used as "profiles.xml"
@@ -496,6 +497,8 @@ func (c *Generator) getHostMacros(host *chi.Host) string {
 
 	// <installation>CHI-name-macros-value</installation>
 	util.Iline(b, 8, "<installation>%s</installation>", host.Runtime.Address.CHIName)
+	// <namespace>CHI-namespace-macros-value</namespace>
+	util.Iline(b, 8, "<namespace>%s</namespace>", host.Runtime.Address.Namespace)
 
 	// <CLUSTER_NAME>cluster-name-macros-value</CLUSTER_NAME>
 	// util.Iline(b, 8, "<%s>%[2]s</%[1]s>", replica.Address.ClusterName, c.getMacrosCluster(replica.Address.ClusterName))

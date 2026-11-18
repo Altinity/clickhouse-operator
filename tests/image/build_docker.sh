@@ -14,15 +14,10 @@ CLICKHOUSE_IMAGE_LATEST=${CLICKHOUSE_IMAGE_LATEST:="clickhouse/clickhouse-server
 CLICKHOUSE_OPERATOR_TESTS_IMAGE=${CLICKHOUSE_OPERATOR_TESTS_IMAGE:="registry.gitlab.com/altinity-public/container-images/clickhouse-operator-test-runner:latest"}
 ZOOKEEPER_IMAGE=${ZOOKEEPER_IMAGE:="zookeeper:3.8.4"}
 
-K8S_VERSION=${K8S_VERSION:=1.28.5}
+K8S_VERSION=${K8S_VERSION:=1.36.5}
 MINIKUBE_PRELOADED_TARBALL="preloaded-images-k8s-v18-v${K8S_VERSION}-docker-overlay2-amd64.tar.lz4"
-MINIKUBE_KICBASE_IMAGE=${MINIKUBE_KICBASE_IMAGE:-"gcr.io/k8s-minikube/kicbase:v0.0.42"}
+MINIKUBE_KICBASE_IMAGE=${MINIKUBE_KICBASE_IMAGE:-"gcr.io/k8s-minikube/kicbase:v0.0.51"}
 MINIKUBE_STORAGE_IMAGE=${MINIKUBE_STORAGE_IMAGE:="gcr.io/k8s-minikube/storage-provisioner:v20210514"}
-
-MINIO_IMAGE=${MINIO_IMAGE:="minio/minio:RELEASE.2021-06-17T00-10-46Z"}
-MINIO_CONSOLE_IMAGE=${MINIO_CONSOLE_IMAGE:="minio/console:latest"}
-MINIO_CLIENT_IMAGE=${MINIO_CLIENT_IMAGE:="minio/mc:latest"}
-MINIO_OPERATOR_IMAGE=${MINIO_OPERATOR_IMAGE:="minio/operator:v4.1.3"}
 
 PROMETHEUS_RELOADER_IMAGE=${PROMETHEUS_RELOADER_IMAGE:="quay.io/prometheus-operator/prometheus-config-reloader:v0.68.0"}
 PROMETHEUS_OPERATOR_IMAGE=${PROMETHEUS_OPERATOR_IMAGE:="quay.io/prometheus-operator/prometheus-operator:v0.68.0"}
@@ -52,10 +47,6 @@ ALL_IMAGES=(
   "${OPERATOR_IMAGE_OLD} operator_old"
   "${METRICS_EXPORTER_IMAGE} metrics_exporter"
   "${METRICS_EXPORTER_IMAGE_OLD} metrics_exporter_old"
-  "${MINIO_IMAGE} minio"
-  "${MINIO_CONSOLE_IMAGE} minio_console"
-  "${MINIO_CLIENT_IMAGE} minio_image"
-  "${MINIO_OPERATOR_IMAGE} minio_operator"
   "${PROMETHEUS_RELOADER_IMAGE} prometheus_preloader"
   "${PROMETHEUS_OPERATOR_IMAGE} prometheus_operator"
   "${PROMETHEUS_IMAGE} prometheus"
@@ -77,5 +68,5 @@ for item in  "${ALL_IMAGES[@]}"; do
 done
 
 echo "Build ${CLICKHOUSE_OPERATOR_TESTS_IMAGE}"
-docker buildx build --platform=linux/amd64 --progress=plain -f "${CUR_DIR}/Dockerfile" --output="type=image,name=${CLICKHOUSE_OPERATOR_TESTS_IMAGE}" "${CUR_DIR}" --push
+docker buildx build --platform=linux/amd64 --progress=plain --build-arg K8S_VERSION="${K8S_VERSION}" -f "${CUR_DIR}/Dockerfile" --output="type=image,name=${CLICKHOUSE_OPERATOR_TESTS_IMAGE}" "${CUR_DIR}" --push
 echo "All done"

@@ -15,11 +15,15 @@
 package creator
 
 import (
+	"crypto/rand"
+
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/backupconfig"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -36,6 +40,70 @@ func (c *Creator) CreateClusterSecret(cluster api.ICluster) *core.Secret {
 		StringData: map[string]string{
 			"secret": util.RandStringRange(10, 20),
 		},
+		Type: core.SecretTypeOpaque,
+	}
+}
+
+// CreateHotReloadUsersSecret is the CHI-owned Secret that holds
+// chop-generated-hot-reload-users.xml. usersXML is the generated document;
+// callers must not log it.
+func (c *Creator) CreateHotReloadUsersSecret(filename, usersXML string) *core.Secret {
+	return &core.Secret{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace:       c.cr.GetNamespace(),
+			Name:            c.nm.Name(interfaces.NameSecretCommonUsers, c.cr),
+			Labels:          c.macro.Scope(c.cr).Map(c.tagger.Label(interfaces.LabelSecretUsers)),
+			OwnerReferences: c.or.CreateOwnerReferences(c.cr),
+		},
+		Data: map[string][]byte{
+			filename: []byte(usersXML),
+		},
+		Type: core.SecretTypeOpaque,
+	}
+}
+
+// CreateBackupSecret creates the Secret with the credentials of the operator-managed clickhouse-backup
+// sidecars: random ones of their REST API. The ones they connect to ClickHouse with are the user's to add.
+func (c *Creator) CreateBackupSecret() *core.Secret {
+	return &core.Secret{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace:       c.cr.GetNamespace(),
+			Name:            c.nm.Name(interfaces.NameBackupAutoSecret, c.cr),
+			Labels:          c.macro.Scope(c.cr).Map(c.tagger.Label(interfaces.LabelSecretBackup)),
+			Annotations:     c.macro.Scope(c.cr).Map(c.tagger.Annotate(interfaces.AnnotateSecretBackup)),
+			OwnerReferences: c.or.CreateOwnerReferences(c.cr),
+		},
+		StringData: map[string]string{
+			config.ClickHouseBackupSecretKeyAPIUsername: rand.Text(),
+			config.ClickHouseBackupSecretKeyAPIPassword: rand.Text(),
+		},
+		Type: core.SecretTypeOpaque,
+	}
+}
+
+// CreateBackupConfigSecret creates the Secret with the configuration file of the operator-managed clickhouse-backup
+// sidecars of the cluster, along with the settings of it the storage path check of the backup Jobs reads, each
+// under the name of the env var clickhouse-backup knows it by
+func (c *Creator) CreateBackupConfigSecret(cluster string, backupConfig *backupconfig.Config) *core.Secret {
+	data := map[string][]byte{
+		backupconfig.FileName:               backupConfig.File,
+		backupconfig.APIFingerprintFileName: []byte(backupConfig.APIFingerprint),
+	}
+	if backupConfig.ManagedClickHouseUser != "" {
+		data[backupconfig.ManagedClickHouseUserKey] = []byte(backupConfig.ManagedClickHouseUser)
+	}
+	for name, value := range backupConfig.Settings {
+		data[name] = []byte(value)
+	}
+	return &core.Secret{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace:       c.cr.GetNamespace(),
+			Name:            c.nm.Name(interfaces.NameBackupConfigSecret, c.cr, cluster),
+			Labels:          c.macro.Scope(c.cr).Map(c.tagger.Label(interfaces.LabelSecretBackup)),
+			Annotations:     c.macro.Scope(c.cr).Map(c.tagger.Annotate(interfaces.AnnotateSecretBackup)),
+			OwnerReferences: c.or.CreateOwnerReferences(c.cr),
+		},
+		Data: data,
 		Type: core.SecretTypeOpaque,
 	}
 }

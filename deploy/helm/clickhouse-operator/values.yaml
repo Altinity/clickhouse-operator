@@ -86,6 +86,10 @@ operator:
   # operator.env -- additional environment variables for the clickhouse-operator container in deployment
   # possible format value `[{"name": "SAMPLE", "value": "text"}]`
   env: []
+  # operator.logVerbosity -- log verbosity level (glog `-v`) of the clickhouse-operator container.
+  # Rendered as `CHOP_LOGGER_V` env var, which overrides `logger.v` of the operator configuration for the clickhouse-operator only.
+  # Empty value keeps `logger.v` from the operator configuration.
+  logVerbosity: ""
   # operator.livenessProbe -- optional liveness probe for the clickhouse-operator container
   # check `kubectl explain pod.spec.containers.livenessProbe` for details
   # example:
@@ -128,6 +132,10 @@ metrics:
   # metrics.env -- additional environment variables for the deployment of metrics-exporter containers
   # possible format value `[{"name": "SAMPLE", "value": "text"}]`
   env: []
+  # metrics.logVerbosity -- log verbosity level (glog `-v`) of the metrics-exporter container, e.g. `0` to reduce log noise.
+  # Rendered as `CHOP_LOGGER_V` env var, which overrides `logger.v` of the operator configuration for the metrics-exporter only.
+  # Empty value keeps `logger.v` from the operator configuration.
+  logVerbosity: ""
   # metrics.livenessProbe -- optional liveness probe for the metrics-exporter container
   # check `kubectl explain pod.spec.containers.livenessProbe` for details
   # example:
@@ -434,7 +442,8 @@ configs:
             - version: "*"
               rules:
                 # see https://kb.altinity.com/altinity-kb-setup-and-maintenance/altinity-kb-server-config-files/#server-config-configxml-sections-which-dont-require-restart
-                # to be replaced with "select * from system.server_settings where changeable_without_restart = 'No'"
+                # changeable_without_restart = Yes reloads that server setting even when a wildcard rule below says restart.
+                # An exact rule such as settings/<name>: "yes" still restarts. Other server settings follow the rules below.
                 - settings/*: "yes"
                 # single values
                 - settings/access_control_path: "no"
@@ -707,10 +716,10 @@ configs:
           # Templates are added to the list of all templates and used when CHI is reconciled.
           # Templates are applied in sorted alpha-numeric order.
           path: chi/templates.d
-        # NB there is deliberately no `chk:` section here. OperatorConfigTemplate declares only a CHI
-        # field, so any template.chk.* key unmarshals into nothing and is pruned by the chopconf CRD -
-        # it read as a supported knob while doing nothing. CHK templating is not implemented; adding
-        # the keys back requires the Go field and a reader first.
+          # NB there is deliberately no `chk:` section here. OperatorConfigTemplate declares only a CHI
+          # field, so any template.chk.* key unmarshals into nothing and is pruned by the chopconf CRD -
+          # it read as a supported knob while doing nothing. CHK templating is not implemented; adding
+          # the keys back requires the Go field and a reader first.
       ################################################
       ##
       ## Reconcile section
@@ -735,6 +744,11 @@ configs:
           reconcileShardsThreadsNumber: 5
           # Max percentage of concurrent shard reconciles within one cluster in progress
           reconcileShardsMaxConcurrencyPercent: 50
+          # Kubernetes API client rate limit of the operator: requests per second and burst. Set both.
+          # 0 keeps the client-go defaults (5 and 10 per API group). Read from this file only, at startup.
+          # OPERATOR_K8S_CLIENT_QPS_LIMIT and OPERATOR_K8S_CLIENT_BURST_LIMIT env vars override them.
+          k8sClientQPS: 0
+          k8sClientBurst: 0
         # Reconcile StatefulSet scenario
         statefulSet:
           # Create StatefulSet scenario
@@ -867,11 +881,11 @@ configs:
               # Minimum duration a pod must stay Ready=False before recovery fires, once enabled
               # (Go duration string; default 5m). Raise it for slow-recovering replicas.
               onPodNotReadyThreshold: 5m
-            # Future scopes (not yet implemented):
-            # failed:
-            #   onPodReady: retry
-            # broken:
-            #   onPodReady: retry
+              # Future scopes (not yet implemented):
+              # failed:
+              #   onPodReady: retry
+              # broken:
+              #   onPodReady: retry
           # Future global policy knobs (not yet implemented) — flat peers of `onStatus`,
           # apply across all recovery scopes:
           #
@@ -970,6 +984,20 @@ configs:
         terminationGracePeriod: 30
       ################################################
       ##
+      ## Backup section
+      ##
+      ################################################
+      backup:
+        # EXPERIMENTAL. Where in its storage the clickhouse-backup sidecar of a host keeps its backups,
+        # and their object disk data, when the settings of that storage set no path of their own.
+        # Templates clickhouse-backup expands with the macros of the host: {namespace},
+        # {installation}, {cluster}, {shard}, {replica}. Changing them rolls the pods of every
+        # backup-enabled cluster and leaves the backups made under the old paths where they are.
+        # See docs/backup.md#storage-paths.
+        storagePath: "backup/{namespace}/{installation}/{cluster}/{shard}"
+        storageObjectDiskPath: "object_disks/{namespace}/{installation}/{cluster}/{shard}"
+      ################################################
+      ##
       ## Log parameters section
       ##
       ################################################
@@ -1008,7 +1036,11 @@ configs:
             "podTemplates": [
               {
                 "name": "chi-default-oneperhost-pod-template",
-                "distribution": "OnePerHost",
+                "podDistribution": [
+                  {
+                    "type": "ClickHouseAntiAffinity"
+                  }
+                ],
                 "spec": {
                   "containers" : [
                     {
@@ -1045,7 +1077,8 @@ configs:
         templates:
           podTemplates:
             - name: default-oneperhost-pod-template
-              distribution: "OnePerHost"
+              podDistribution:
+                - type: ClickHouseAntiAffinity
     default-storage-template.yaml.example: |
       apiVersion: "clickhouse.altinity.com/v1"
       kind: "ClickHouseInstallationTemplate"

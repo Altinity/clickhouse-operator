@@ -19,9 +19,16 @@ import (
 	"crypto/x509"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	kube "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/flowcontrol"
+
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 )
 
 // notATransport is a RoundTripper that is NOT *http.Transport, used to exercise the
@@ -94,4 +101,115 @@ func TestFloorTransportTLSMinVersion_EnforcesHandshake(t *testing.T) {
 		require.NoError(t, err)
 		_ = resp.Body.Close()
 	})
+}
+
+// testKubeconfig points at a port nothing listens on: building the clients sends no request.
+const testKubeconfig = `apiVersion: v1
+kind: Config
+clusters:
+- name: test
+  cluster:
+    server: https://127.0.0.1:1
+contexts:
+- name: test
+  context:
+    cluster: test
+current-context: test
+`
+
+// newClientset builds the clients from a config file with the given reconcile.runtime lines.
+func newClientset(t *testing.T, runtime string) *kube.Clientset {
+	t.Helper()
+	dir := t.TempDir()
+	kubeconfig := filepath.Join(dir, "kubeconfig")
+	require.NoError(t, os.WriteFile(kubeconfig, []byte(testKubeconfig), 0o600))
+	chopconf := filepath.Join(dir, "config.yaml")
+	require.NoError(t, os.WriteFile(chopconf, []byte("reconcile:\n  runtime:\n"+runtime), 0o600))
+	kubeClient, _, _, _, _ := GetClientset(kubeconfig, "", chopconf)
+	return kubeClient
+}
+
+// rateLimiters returns the rate limiters of the core/v1 and apps/v1 clients.
+func rateLimiters(t *testing.T, runtime string) (core, apps flowcontrol.RateLimiter) {
+	t.Helper()
+	kubeClient := newClientset(t, runtime)
+	return kubeClient.CoreV1().RESTClient().GetRateLimiter(), kubeClient.AppsV1().RESTClient().GetRateLimiter()
+}
+
+// burst counts the requests a fresh limiter lets through at once.
+func burst(limiter flowcontrol.RateLimiter) int {
+	n := 0
+	for n < 1000 && limiter.TryAccept() {
+		n++
+	}
+	return n
+}
+
+// The client takes QPS and burst from the config file; each env var, when set, wins over its own value.
+func TestGetClientsetRateLimitsFromConfig(t *testing.T) {
+	cases := []struct {
+		name             string
+		envQPS, envBurst string
+		qps              float32
+		burst            int
+	}{
+		{"config", "", "", 3, 7},
+		{"env vars win", "2", "4", 2, 4},
+		{"env burst wins", "", "4", 3, 4},
+		{"env qps wins", "2", "", 2, 7},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv(deployment.OPERATOR_K8S_CLIENT_QPS_LIMIT, c.envQPS)
+			t.Setenv(deployment.OPERATOR_K8S_CLIENT_BURST_LIMIT, c.envBurst)
+			core, _ := rateLimiters(t, "    k8sClientQPS: 3\n    k8sClientBurst: 7\n")
+			require.Equal(t, c.qps, core.QPS())
+			require.Equal(t, c.burst, burst(core))
+		})
+	}
+}
+
+// Unset, 0 or negative keeps the client-go defaults: every API group gets its own 5/10 limiter.
+// Setting 5/10 explicitly would not: the clientset would share one limiter across groups.
+func TestGetClientsetRateLimitsDefault(t *testing.T) {
+	t.Setenv(deployment.OPERATOR_K8S_CLIENT_QPS_LIMIT, "")
+	t.Setenv(deployment.OPERATOR_K8S_CLIENT_BURST_LIMIT, "")
+	for _, runtime := range []string{
+		"",
+		"    k8sClientQPS: 0\n    k8sClientBurst: 0\n",
+		"    k8sClientQPS: -1\n    k8sClientBurst: -1\n",
+	} {
+		core, apps := rateLimiters(t, runtime)
+		require.NotSame(t, core, apps, runtime)
+		require.Equal(t, float32(5), core.QPS(), runtime)
+		require.Equal(t, 10, burst(core), runtime)
+	}
+}
+
+// The warning fires when one CHI may reconcile more shards at once than the client's QPS.
+func TestWarnIfK8sClientQPSTooLow(t *testing.T) {
+	t.Setenv(deployment.OPERATOR_K8S_CLIENT_BURST_LIMIT, "")
+	cases := []struct {
+		name          string
+		envQPS        string
+		runtime       string
+		shardsThreads int
+		warn          bool
+	}{
+		{"code defaults", "", "", 1, false},
+		{"shipped config.yaml", "", "", 5, false},
+		{"shards raised, default limit", "", "", 200, true},
+		{"shards raised, low limit", "", "    k8sClientQPS: 50\n    k8sClientBurst: 100\n", 200, true},
+		{"shards raised, limit raised", "", "    k8sClientQPS: 200\n    k8sClientBurst: 400\n", 200, false},
+		{"env qps 300 over config 3", "300", "    k8sClientQPS: 3\n    k8sClientBurst: 7\n", 200, false},
+		{"env qps 2 over config 200", "2", "    k8sClientQPS: 200\n    k8sClientBurst: 400\n", 200, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv(deployment.OPERATOR_K8S_CLIENT_QPS_LIMIT, c.envQPS)
+			config := &api.OperatorConfig{}
+			config.Reconcile.Runtime.ReconcileShardsThreadsNumber = c.shardsThreads
+			require.Equal(t, c.warn, WarnIfK8sClientQPSTooLow(newClientset(t, c.runtime), config))
+		})
+	}
 }

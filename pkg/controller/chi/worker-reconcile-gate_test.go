@@ -95,6 +95,16 @@ func TestDecideReconcileGate(t *testing.T) {
 			want: gateNothingToDo,
 		},
 		{
+			name: "password Secret changed, generation unchanged",
+			in: reconcileGateInputs{
+				generationTheSame:           true,
+				operatorIPTheSame:           true,
+				passwordSecretChanged:       true,
+				hasHostNeedingStuckRecovery: alwaysFalse,
+			},
+			want: gatePasswordSecretChanged,
+		},
+		{
 			// a1be5bb63 - the clickhouse-operator user's networks/host_regexp carry the
 			// operator's pod IP and must be refreshed when it moves.
 			name: "operator IP changed",
@@ -104,6 +114,20 @@ func TestDecideReconcileGate(t *testing.T) {
 				hasHostNeedingStuckRecovery: alwaysFalse,
 			},
 			want: gateOperatorIPChanged,
+		},
+		{
+			// A same-generation event - an edit of a label, or the deletion of the backup Secret -
+			// recreates the backup Secret with new passwords ahead of the gate. The sidecars restart
+			// with them, so skipping would leave the users config with the old password and lock the
+			// sidecars out of ClickHouse while the CR reports Completed.
+			name: "backup Secret recreated, generation unchanged",
+			in: reconcileGateInputs{
+				generationTheSame:           true,
+				operatorIPTheSame:           true,
+				backupSecretChanged:         true,
+				hasHostNeedingStuckRecovery: alwaysFalse,
+			},
+			want: gateBackupSecretChanged,
 		},
 		{
 			// #1704 - an unhealthy host must not be skipped just because the spec is unchanged.
@@ -158,12 +182,14 @@ func TestDecideReconcileGate(t *testing.T) {
 // the reconcile. Stated separately so a future decision added to the enum has to be classified.
 func TestReconcileGateDecisionProceeds(t *testing.T) {
 	proceeds := map[reconcileGateDecision]bool{
-		gateNothingToDo:        false,
-		gateReconcileWork:      true,
-		gateFinalizerInstalled: true,
-		gateOperatorIPChanged:  true,
-		gateStuckHostRecovery:  true,
-		gateUnhealthyHosts:     true,
+		gateNothingToDo:           false,
+		gateReconcileWork:         true,
+		gateFinalizerInstalled:    true,
+		gateOperatorIPChanged:     true,
+		gateBackupSecretChanged:   true,
+		gateStuckHostRecovery:     true,
+		gatePasswordSecretChanged: true,
+		gateUnhealthyHosts:        true,
 	}
 	for decision, want := range proceeds {
 		require.Equal(t, want, decision.proceeds(), "decision %s", decision)

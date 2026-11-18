@@ -22,6 +22,10 @@ type ComparableAttributes struct {
 	additionalVolumes      []core.Volume      `json:"-" yaml:"-"`
 	additionalVolumeMounts []core.VolumeMount `json:"-" yaml:"-"`
 	skipOwnerRef           bool               `json:"-" yaml:"-"`
+	// hotReloadUsers is set when a user password opts into hotReload.
+	// It carries no credential material. The generated users XML is written
+	// to a Secret at reconcile time, not stored here.
+	hotReloadUsers bool `json:"-" yaml:"-"`
 }
 
 func (a *ComparableAttributes) GetAdditionalEnvVars() []core.EnvVar {
@@ -141,4 +145,21 @@ func (a *ComparableAttributes) SetSkipOwnerRef(skip bool) {
 		return
 	}
 	a.skipOwnerRef = skip
+}
+
+// GetHotReloadUsers reports whether hot-reload users are published in a
+// CHI-owned Secret and projected into users.d beside chop-generated-users.xml.
+func (a *ComparableAttributes) GetHotReloadUsers() bool {
+	if a == nil {
+		return false
+	}
+	return a.hotReloadUsers
+}
+
+// SetHotReloadUsers records that this reconcile publishes hot-reload users via a Secret.
+func (a *ComparableAttributes) SetHotReloadUsers(v bool) {
+	if a == nil {
+		return
+	}
+	a.hotReloadUsers = v
 }

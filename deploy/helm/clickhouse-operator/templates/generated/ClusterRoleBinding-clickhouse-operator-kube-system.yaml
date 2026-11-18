@@ -20,7 +20,6 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "altinity-clickhouse-operator.serviceAccountName" . }}
     namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
-
 # Template Parameters:
 #
 # NAMESPACE=kube-system

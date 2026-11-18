@@ -67,6 +67,9 @@ func (r *CRRegistry) AddHost(req *HostRequest) error {
 		cluster = &metrics.WatchedCluster{Name: req.ClusterName}
 		cr.Clusters = append(cr.Clusters, cluster)
 	}
+	if req.ClusterTLS != nil {
+		cluster.TLS = req.ClusterTLS
+	}
 
 	// Add or update host
 	found := false

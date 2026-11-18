@@ -24,7 +24,8 @@ version.
 
 Two independent evidence streams are published for every release tag.
 
-**Side-channel artifact bundle.** Every push of a `MAJOR.MINOR.PATCH` tag
+**Side-channel artifact bundle.** Every push of a `MAJOR.MINOR.PATCH`
+version branch, and every published GitHub Release tagged `release-*`,
 runs `.github/workflows/build_branch.yaml`, which uploads a GitHub
 Actions artifact named `release-evidence-<tag>` and also attaches the
 files inside it to the matching GitHub Release page. For each of the two

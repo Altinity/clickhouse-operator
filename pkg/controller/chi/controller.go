@@ -49,6 +49,7 @@ import (
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopClientSetScheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopInformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
+	chiListerV1 "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	chiKube "github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
@@ -83,6 +84,13 @@ type Controller struct {
 	namer       interfaces.INameManager
 	ctrlLabeler *ctrlLabeler.Labeler
 	pvcDeleter  *volume.PVCDeleter
+
+	// backupConfigProblems is what is wrong with the backup configuration Secrets as last warned about
+	backupConfigProblems backupConfigProblems
+
+	// chiLister lists ClickHouseInstallations so a source Secret change can
+	// find the CHIs that reference it. Nil in tests that do not watch Secrets.
+	chiLister chiListerV1.ClickHouseInstallationLister
 }
 
 // NewController creates instance of Controller
@@ -543,6 +551,31 @@ func (c *Controller) addEventHandlersPod(
 	})
 }
 
+func (c *Controller) addEventHandlersSecret(
+	kubeInformerFactory kubeInformers.SharedInformerFactory,
+) {
+	kubeInformerFactory.Core().V1().Secrets().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		UpdateFunc: func(old, new interface{}) {
+			oldSecret, ok := old.(*core.Secret)
+			if !ok {
+				return
+			}
+			newSecret, ok := new.(*core.Secret)
+			if !ok || !c.isTrackedObject(&newSecret.ObjectMeta) {
+				return
+			}
+			c.enqueueBackupSecretRotation(oldSecret, newSecret)
+		},
+		DeleteFunc: deleteHandler("secretInformer.DeleteFunc", func(secret *core.Secret) {
+			if !c.isTrackedObject(&secret.ObjectMeta) {
+				return
+			}
+			log.V(3).M(secret).Info("secretInformer.DeleteFunc")
+			c.enqueueBackupSecretOwner(secret)
+		}),
+	})
+}
+
 // NewInformerFactoryForCHOPGeneratedObjects builds the kube informer factory, narrowed at the
 // API server to objects the operator generated.
 //
@@ -609,6 +642,7 @@ func (c *Controller) addEventHandlers(
 	c.addEventHandlersConfigMap(kubeInformerFactory)
 	c.addEventHandlersStatefulSet(kubeInformerFactory)
 	c.addEventHandlersPod(kubeInformerFactory)
+	c.addEventHandlersSecret(kubeInformerFactory)
 }
 
 // isTrackedObject checks whether operator is interested in changes of this object
@@ -729,7 +763,7 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 		variants := len(c.queues) - api.DefaultReconcileSystemThreadsNumber
 		index = api.DefaultReconcileSystemThreadsNumber + util.HashIntoIntTopped(handle, variants)
 		switch command.Cmd {
-		case cmd_queue.ReconcileAdd:
+		case cmd_queue.ReconcileAdd, cmd_queue.ReconcilePasswordSecret:
 			enqueue = prepareCHIAdd(command)
 		case cmd_queue.ReconcileUpdate:
 			enqueue = prepareCHIUpdate(command)
@@ -778,6 +812,7 @@ func (c *Controller) addHostWatch(host *api.Host) {
 		CRNamespace: host.Runtime.Address.Namespace,
 		CRName:      host.Runtime.Address.CHIName,
 		ClusterName: host.Runtime.Address.ClusterName,
+		ClusterTLS:  metrics.NewWatchedTLS(host.GetCluster()),
 		Host: &metrics.WatchedHost{
 			Name:      host.Name,
 			Hostname:  host.Runtime.Address.FQDN,

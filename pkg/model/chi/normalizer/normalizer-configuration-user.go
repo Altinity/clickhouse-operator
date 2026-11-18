@@ -18,22 +18,121 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"regexp"
+	"slices"
 	"strings"
+
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/subst"
 )
 
 const envVarNamePrefixConfigurationUsers = "CONFIGURATION_USERS"
+
+// Fields of a user's settings
+const (
+	userFieldProfile               = "profile"
+	userFieldQuota                 = "quota"
+	userFieldPassword              = "password"
+	userFieldPasswordSHA256Hex     = "password_sha256_hex"
+	userFieldPasswordDoubleSHA1Hex = "password_double_sha1_hex"
+	userFieldNetworksIP            = "networks/ip"
+	userFieldNetworksHostRegexp    = "networks/host_regexp"
+)
 
 // removedSecretRefFieldPrefix is the user settings field prefix removed in 0.27.4. It covers
 // `k8s_secret_env_` too, which shares it. The syntax took a namespace/name/key triple and read
 // the Secret with the operator's own ServiceAccount, so it could reach any namespace.
 // Superseded by valueFrom.secretKeyRef, which cannot name a namespace at all.
 const removedSecretRefFieldPrefix = "k8s_secret_"
+
+// ensureBackupUser sets up the user the clickhouse-backup sidecars connect to ClickHouse as, named and
+// authenticated as the backup Secret says, when it sets both a username and a password. Without them there is no
+// such user, and the sidecars connect as clickhouse-backup does by default. The operator owns the user: whatever the CR sets for it, its profile and quota
+// aside, is dropped - another authentication method or network would lock the sidecars out or let the user in from
+// outside the pod.
+//
+// Its credentials are read from the backup Secret here rather than passed through env vars: users are common for
+// all clusters, so the env vars would go into every ClickHouse container of the CR, and enabling backup on one
+// cluster would restart every host. Set as plaintext, the password is replaced by its hash like any user's.
+func (n *Normalizer) ensureBackupUser(users *api.Settings) {
+	n.req.backupUsername = ""
+	username, password, ok := n.fetchBackupCredentials()
+	if !ok {
+		// No user to manage: the sidecar connects with whatever credentials the Secret has, if any
+		return
+	}
+	user := api.NewSettingsUser(users, username)
+	users.WalkKeysSafe(func(key string, _ *api.Setting) {
+		name, own := strings.CutPrefix(key, user.Name2Key(""))
+		if own && (name != userFieldProfile) && (name != userFieldQuota) {
+			users.DeleteKey(key)
+		}
+	})
+
+	n.req.backupUsername = username
+	user.Set(userFieldPassword, api.NewSettingScalar(password))
+	user.Set(userFieldNetworksIP, api.NewSettingVector(slices.Clone(config.ClickHouseBackupUserNetworksIP)))
+}
+
+// backupUsernameRegexp is what a username of the backup user may be: a name of an element of the users
+// configuration, which ClickHouse reads the users from
+var backupUsernameRegexp = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.-]*$`)
+
+// fetchBackupCredentials fetches the username and the password of the backup user from the backup Secret,
+// reporting whether there are both: the operator manages the backup user only when the Secret sets both. A Secret
+// not there yet, or without either, leaves the user out. A Secret that cannot be read for any other reason, or
+// names a user the backup user must not be, aborts the CR, as going on without the user would lock every sidecar
+// out.
+func (n *Normalizer) fetchBackupCredentials() (username, password string, ok bool) {
+	if n.secretGet == nil {
+		return "", "", false
+	}
+	namespace := n.req.GetTargetNamespace()
+	name := n.namer.Name(interfaces.NameBackupAutoSecret, n.req.GetTarget())
+	secret, err := n.secretGet(namespace, name)
+	switch {
+	case apiErrors.IsNotFound(err):
+		return "", "", false
+	case err != nil:
+		n.req.GetTarget().EnsureStatus().ReconcileAbortWithReason(
+			api.StatusReasonBackupSecretUnresolved,
+			fmt.Sprintf("backup Secret %s/%s cannot be read: %v", namespace, name, err),
+		)
+		return "", "", false
+	}
+	username = string(secret.Data[config.ClickHouseBackupSecretKeyClickHouseUsername])
+	password = string(secret.Data[config.ClickHouseBackupSecretKeyClickHousePassword])
+	if (username == "") || (password == "") {
+		return "", "", false
+	}
+	if problem := backupUsernameProblem(username); problem != "" {
+		n.req.GetTarget().EnsureStatus().ReconcileAbortWithReason(
+			api.StatusReasonBackupSecretUnresolved,
+			fmt.Sprintf("backup Secret %s/%s: %s %q %s", namespace, name, config.ClickHouseBackupSecretKeyClickHouseUsername, username, problem),
+		)
+		return "", "", false
+	}
+	return username, password, true
+}
+
+// backupUsernameProblem tells why the backup user cannot be named so, "" when it can
+func backupUsernameProblem(username string) string {
+	switch {
+	case !backupUsernameRegexp.MatchString(username):
+		return "is no valid username: letters, digits, '_', '.' and '-', not starting with a digit, '.' or '-'"
+	case username == defaultUsername:
+		return "names the default user"
+	case username == chop.Config().ClickHouse.Access.Username:
+		return "names the user of the operator"
+	}
+	return ""
+}
 
 func (n *Normalizer) normalizeConfigurationUser(user *api.SettingsUser) {
 	n.normalizeConfigurationUserSecretRef(user)
@@ -42,18 +141,22 @@ func (n *Normalizer) normalizeConfigurationUser(user *api.SettingsUser) {
 }
 
 func (n *Normalizer) normalizeConfigurationUserSecretRef(user *api.SettingsUser) {
-	user.WalkSafe(func(name string, _ *api.Setting) {
+	user.WalkSafe(func(name string, setting *api.Setting) {
 		if strings.HasPrefix(name, removedSecretRefFieldPrefix) {
 			n.rejectRemovedSecretRefField(user, name)
-		} else {
-			subst.ReplaceSettingsFieldWithEnvRefToSecretField(
-				n.req,
-				user,
-				name,
-				name,
-				envVarNamePrefixConfigurationUsers,
-			)
+			return
 		}
+		if setting.IsHotReload() {
+			n.acceptHotReloadUserField(user, name, setting)
+			return
+		}
+		subst.ReplaceSettingsFieldWithEnvRefToSecretField(
+			n.req,
+			user,
+			name,
+			name,
+			envVarNamePrefixConfigurationUsers,
+		)
 	})
 }
 
@@ -91,27 +194,59 @@ func (n *Normalizer) rejectRemovedSecretRefField(user *api.SettingsUser, name st
 	)
 }
 
+// userNonPasswordAuthMethods lists user settings that prevent adding a flat default password,
+// including grouped auth_methods (which may themselves contain password methods).
+var userNonPasswordAuthMethods = []string{
+	"no_password",
+	"ssl_certificates",
+	"ssh_keys",
+	"ldap",
+	"kerberos",
+	"http_authentication",
+	"auth_methods",
+}
+
+// userHasNonPasswordAuth checks whether the user has an authentication method other than a password.
+func userHasNonPasswordAuth(user *api.SettingsUser) bool {
+	found := false
+	user.Walk(func(name string, _ *api.Setting) {
+		method, _, _ := strings.Cut(name, "/")
+		if slices.Contains(userNonPasswordAuthMethods, method) {
+			found = true
+		}
+	})
+	return found
+}
+
 // normalizeConfigurationUserPassword deals with user passwords
 func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) {
+	// A hotReload credential stays a Secret reference on the CR. Hashing it here would
+	// write the password into the normalized spec, which is stored in CHI status.
+	// The managed Secret is rendered from a copy. Leaving the field empty would also
+	// fall through to the default password below.
+	if userHasHotReloadCredential(user) {
+		return
+	}
+
 	// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
-	if user.Has("password_double_sha1_hex") {
-		user.Delete("password_sha256_hex")
-		user.Delete("password")
+	if user.Has(userFieldPasswordDoubleSHA1Hex) {
+		user.Delete(userFieldPasswordSHA256Hex)
+		user.Delete(userFieldPassword)
 		// This is all for this user
 		return
 	}
 
 	// Than by priority goes password_sha256_hex, thus keep it only
-	if user.Has("password_sha256_hex") {
-		user.Delete("password_double_sha1_hex")
-		user.Delete("password")
+	if user.Has(userFieldPasswordSHA256Hex) {
+		user.Delete(userFieldPasswordDoubleSHA1Hex)
+		user.Delete(userFieldPassword)
 		// This is all for this user
 		return
 	}
 
 	// From now on we either have a plaintext password specified (explicitly or via ENV), or no password at all
 
-	if user.Get("password").HasAttributes() {
+	if user.Get(userFieldPassword).HasAttributes() {
 		// Have plaintext password with attributes - means we have plaintext password explicitly specified via ENV var
 		// This is fine
 		// This is all for this user
@@ -120,7 +255,13 @@ func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) 
 
 	// From now on we either have plaintext password specified as an explicit string, or no password at all
 
-	passwordPlaintext := user.Get("password").String()
+	passwordPlaintext := user.Get(userFieldPassword).String()
+
+	// ClickHouse accepts only one authentication method per user.
+	// A user that already has a non-password method must not get a default password.
+	if passwordPlaintext == "" && userHasNonPasswordAuth(user) {
+		return
+	}
 
 	// Apply default password for password-less non-default users
 	// 1. NB "default" user keeps empty password in here.
@@ -153,10 +294,10 @@ func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) 
 	// Password shouldn't be used when ssl_certificate set
 	if !user.Has("ssl_certificates/common_name") {
 		passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
-		user.Set("password_sha256_hex", api.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
+		user.Set(userFieldPasswordSHA256Hex, api.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
 		// And keep only one password specification - delete all the rest (if any exists)
-		user.Delete("password_double_sha1_hex")
-		user.Delete("password")
+		user.Delete(userFieldPasswordDoubleSHA1Hex)
+		user.Delete(userFieldPassword)
 	}
 }
 
@@ -189,6 +330,12 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.S
 		quota = ""
 		ips = []string{ip}
 		hostRegexp = ""
+	case n.req.backupUsername:
+		// User the clickhouse-backup sidecars connect as - from inside the pod only, never from the default networks.
+		// Without operator-managed backup, or without both credentials in the backup Secret, no user is, and a user
+		// of the name is the installation's own.
+		ips = slices.Clone(config.ClickHouseBackupUserNetworksIP)
+		hostRegexp = ""
 	}
 
 	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
@@ -211,15 +358,15 @@ type userFields struct {
 func setMandatoryUserFields(user *api.SettingsUser, fields *userFields) {
 	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
 	if fields.profile != "" {
-		user.SetIfNotExists("profile", api.NewSettingScalar(fields.profile))
+		user.SetIfNotExists(userFieldProfile, api.NewSettingScalar(fields.profile))
 	}
 	if fields.quota != "" {
-		user.SetIfNotExists("quota", api.NewSettingScalar(fields.quota))
+		user.SetIfNotExists(userFieldQuota, api.NewSettingScalar(fields.quota))
 	}
 	if len(fields.ips) > 0 {
-		user.Set("networks/ip", api.NewSettingVector(fields.ips).MergeFrom(user.Get("networks/ip")))
+		user.Set(userFieldNetworksIP, api.NewSettingVector(fields.ips).MergeFrom(user.Get(userFieldNetworksIP)))
 	}
 	if fields.hostRegexp != "" {
-		user.SetIfNotExists("networks/host_regexp", api.NewSettingScalar(fields.hostRegexp))
+		user.SetIfNotExists(userFieldNetworksHostRegexp, api.NewSettingScalar(fields.hostRegexp))
 	}
 }

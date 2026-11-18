@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 )
 
 // restoreFlags snapshots glog's process-wide flags so a test that drives SetupLog cannot leak its
@@ -69,4 +70,40 @@ func TestSetupLogLeavesUnsetOptionsAlone(t *testing.T) {
 
 	require.Equal(t, "preset=1", flag.Lookup("vmodule").Value.String(),
 		"an empty logger.vmodule must not clear an already-set flag")
+}
+
+// A CHOP_LOGGER_* env var overrides the config file value, so a container (e.g. metrics-exporter)
+// can get its own verbosity while sharing the operator's config file.
+func TestSetupLogEnvOverridesConfig(t *testing.T) {
+	restoreFlags(t, "v", "vmodule")
+
+	t.Setenv(deployment.CHOP_LOGGER_V, "0")
+	c := &CHOp{ConfigManager: &ConfigManager{config: &api.OperatorConfig{}}}
+	c.Config().Logger.V = "1"
+	c.Config().Logger.VModule = "worker=3"
+
+	c.SetupLog()
+
+	require.Equal(t, "0", flag.Lookup("v").Value.String(),
+		"CHOP_LOGGER_V must take precedence over logger.v")
+	require.Equal(t, "worker=3", flag.Lookup("vmodule").Value.String(),
+		"options without env override must keep the config file value")
+}
+
+// An env var applies even when the config file leaves the option unset, and an empty env var
+// is treated as unset so the config file value stays in effect.
+func TestSetupLogEnvWithoutConfigAndEmptyEnv(t *testing.T) {
+	restoreFlags(t, "v", "vmodule")
+
+	t.Setenv(deployment.CHOP_LOGGER_VMODULE, "worker=2")
+	t.Setenv(deployment.CHOP_LOGGER_V, "")
+	c := &CHOp{ConfigManager: &ConfigManager{config: &api.OperatorConfig{}}}
+	c.Config().Logger.V = "2"
+
+	c.SetupLog()
+
+	require.Equal(t, "worker=2", flag.Lookup("vmodule").Value.String(),
+		"CHOP_LOGGER_VMODULE must apply when logger.vmodule is unset")
+	require.Equal(t, "2", flag.Lookup("v").Value.String(),
+		"an empty CHOP_LOGGER_V must not override logger.v")
 }

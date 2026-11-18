@@ -22,6 +22,10 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/metadata"
+	"k8s.io/client-go/metadata/metadatainformer"
+	"k8s.io/client-go/tools/cache"
 )
 
 // Prometheus exporter defaults
@@ -43,6 +47,14 @@ func init() {
 
 var chiController *chi.Controller
 
+// newPasswordSecretMetadataInformerFactory watches names and resource versions,
+// not Secret data. No periodic resync is needed for rotation events.
+func newPasswordSecretMetadataInformerFactory(client metadata.Interface, namespace string) (metadatainformer.SharedInformerFactory, cache.SharedIndexInformer) {
+	factory := metadatainformer.NewFilteredSharedInformerFactory(client, 0, namespace, nil)
+	informer := factory.ForResource(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}).Informer()
+	return factory, informer
+}
+
 // initClickHouse is an entry point of the application
 func initClickHouse(ctx context.Context) {
 	log.S().P()
@@ -54,7 +66,7 @@ func initClickHouse(ctx context.Context) {
 	}
 
 	// Initialize k8s API clients
-	kubeClient, extClient, chopClient, dynamicClient := chop.GetClientset(kubeConfigFile, masterURL, chopConfigFile)
+	kubeClient, extClient, chopClient, dynamicClient, metadataClient := chop.GetClientset(kubeConfigFile, masterURL, chopConfigFile)
 
 	// Create operator instance. The chopconf load inside chop.New gates on
 	// clickhouse.security.kubernetes.allowInsecure BEFORE the first network call,
@@ -63,6 +75,7 @@ func initClickHouse(ctx context.Context) {
 	chop.New(kubeClient, chopClient, chopConfigFile)
 	log.V(1).F().Info("Config parsed:")
 	log.Info("\n" + chop.Config().String(true))
+	chop.WarnIfK8sClientQPSTooLow(kubeClient, chop.Config())
 
 	// Validate the runtime FIPS posture against chopconf security.policy.
 	// Fatals when chopconf requires FIPS but the binary/runtime can't deliver.
@@ -112,13 +125,24 @@ func initClickHouse(ctx context.Context) {
 		kubeInformerFactory,
 	)
 
+	// Source password Secrets do not carry the operator app label. Watch their
+	// metadata without caching Secret data; values are fetched only when rendering.
+	secretMetadataFactory, secretMetadataInformer := newPasswordSecretMetadataInformerFactory(
+		metadataClient, chop.Config().GetInformerNamespace(),
+	)
+	chiController.WatchPasswordSecrets(chopInformerFactory, secretMetadataInformer)
+
 	// Start CHK watcher (if enabled by config)
 	chiController.StartCHKWatcher(ctx)
+
+	// Keep the configuration files of the clickhouse-backup sidecars in step with their storage Secrets
+	chiController.StartBackupConfigSync(ctx)
 
 	// Start Informers
 	kubeInformerFactory.Start(ctx.Done())
 	chopInformerFactory.Start(ctx.Done())
 	chopConfigInformerFactory.Start(ctx.Done())
+	secretMetadataFactory.Start(ctx.Done())
 }
 
 // runClickHouse is an entry point of the application

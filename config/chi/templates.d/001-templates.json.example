@@ -24,7 +24,11 @@
       "podTemplates": [
         {
           "name": "chi-default-oneperhost-pod-template",
-          "distribution": "OnePerHost",
+          "podDistribution": [
+            {
+              "type": "ClickHouseAntiAffinity"
+            }
+          ],
           "spec": {
             "containers" : [
               {

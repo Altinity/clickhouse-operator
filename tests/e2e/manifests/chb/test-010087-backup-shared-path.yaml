@@ -1,0 +1,11 @@
+# test_010087
+# Applied once the S3_PATH of the storage Secret lost its {cluster} macro: shard 0 of
+# both backup-enabled clusters would upload to one path, so the Job of every cluster must refuse
+# the backup before it changes anything.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackup"
+metadata:
+  name: shared-path-backup
+spec:
+  clickHouseInstallation: test-087-backup
+  backupName: e2e-087-shared-path

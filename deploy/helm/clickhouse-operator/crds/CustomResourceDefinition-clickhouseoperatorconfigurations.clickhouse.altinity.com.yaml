@@ -7,7 +7,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.27.4
+    clickhouse.altinity.com/chop: 0.28.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -441,20 +441,20 @@ spec:
                               # escape hatch x-kubernetes-preserve-unknown-fields.
                               x-kubernetes-preserve-unknown-fields: true
                             queries:
-                              !!merge <<: *TypeStringBool
+                              <<: *TypeStringBool
                               description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to complete all running queries"
                             include:
-                              !!merge <<: *TypeStringBool
+                              <<: *TypeStringBool
                               description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be included into a ClickHouse cluster"
                             replicas:
                               type: object
                               description: "Whether the operator during reconcile procedure should wait for replicas to catch-up"
                               properties:
                                 all:
-                                  !!merge <<: *TypeStringBool
+                                  <<: *TypeStringBool
                                   description: "Whether the operator during reconcile procedure should wait for all replicas to catch-up"
                                 new:
-                                  !!merge <<: *TypeStringBool
+                                  <<: *TypeStringBool
                                   description: "Whether the operator during reconcile procedure should wait for new replicas to catch-up"
                                 delay:
                                   type: integer
@@ -464,13 +464,13 @@ spec:
                               description: "What probes the operator should wait during host launch procedure"
                               properties:
                                 startup:
-                                  !!merge <<: *TypeStringBool
+                                  <<: *TypeStringBool
                                   description: |
                                     Whether the operator during host launch procedure should wait for startup probe to succeed.
                                     In case probe is unspecified wait is assumed to be completed successfully.
                                     Default option value is to do not wait.
                                 readiness:
-                                  !!merge <<: *TypeStringBool
+                                  <<: *TypeStringBool
                                   description: |
                                     Whether the operator during host launch procedure should wait for readiness probe to succeed.
                                     In case probe is unspecified wait is assumed to be completed successfully.
@@ -484,15 +484,15 @@ spec:
                                 Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated
                               properties:
                                 onDelete:
-                                  !!merge <<: *TypeStringBool
+                                  <<: *TypeStringBool
                                   description: |
                                     Whether the operator during reconcile procedure should drop replicas when replica is deleted
                                 onLostVolume:
-                                  !!merge <<: *TypeStringBool
+                                  <<: *TypeStringBool
                                   description: |
                                     Whether the operator during reconcile procedure should drop replicas when replica volume is lost
                                 active:
-                                  !!merge <<: *TypeStringBool
+                                  <<: *TypeStringBool
                                   description: |
                                     Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated
                         hooks:
@@ -606,7 +606,7 @@ spec:
                               description: "actions to execute after host reconcile"
                               nullable: true
                               items:
-                                !!merge <<: *TypeHookActionChop
+                                <<: *TypeHookActionChop
                     coordination:
                       type: object
                       description: "Coordination with external systems during reconcile"
@@ -716,7 +716,7 @@ spec:
                         When propagating labels from the chi's `metadata.labels` section to child objects' `metadata.labels`,
                         exclude labels from the following list
                     appendScope:
-                      !!merge <<: *TypeStringBool
+                      <<: *TypeStringBool
                       description: |
                         Whether to append *Scope* labels to StatefulSet and Pod
                         - "LabelShardScopeIndex"
@@ -752,16 +752,16 @@ spec:
                       description: "defines status fields options"
                       properties:
                         action:
-                          !!merge <<: *TypeStringBool
+                          <<: *TypeStringBool
                           description: "Whether the operator should fill status field 'action'"
                         actions:
-                          !!merge <<: *TypeStringBool
+                          <<: *TypeStringBool
                           description: "Whether the operator should fill status field 'actions'"
                         error:
-                          !!merge <<: *TypeStringBool
+                          <<: *TypeStringBool
                           description: "Whether the operator should fill status field 'error'"
                         errors:
-                          !!merge <<: *TypeStringBool
+                          <<: *TypeStringBool
                           description: "Whether the operator should fill status field 'errors'"
                 statefulSet:
                   type: object
@@ -777,6 +777,24 @@ spec:
                     terminationGracePeriod:
                       type: integer
                       description: "Optional duration in seconds the pod needs to terminate gracefully. \nLook details in `pod.spec.terminationGracePeriodSeconds`\n"
+                backup:
+                  type: object
+                  description: "EXPERIMENTAL. Defaults of operator-managed backup, see docs/backup.md"
+                  properties:
+                    storagePath:
+                      type: string
+                      description: |
+                        Where in its storage the clickhouse-backup sidecar of a host keeps its backups when the settings of that
+                        storage set no path. A template clickhouse-backup expands with the macros of the host: {namespace},
+                        {installation}, {cluster}, {shard}, {replica}. Default: backup/{namespace}/{installation}/{cluster}/{shard}.
+                        Changing it rolls the pods of every backup-enabled cluster and leaves the backups made under the old path
+                        where they are
+                    storageObjectDiskPath:
+                      type: string
+                      description: |
+                        Where in its storage the clickhouse-backup sidecar of a host keeps the object disk data of its backups when
+                        the settings of that storage set no object disk path. A template like storagePath.
+                        Default: object_disks/{namespace}/{installation}/{cluster}/{shard}
                 logger:
                   type: object
                   description: "allow setup clickhouse-operator logger behavior"

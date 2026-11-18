@@ -100,25 +100,13 @@ type ReconcileStatefulSetRecreate struct {
 }
 
 // MergeFrom merges from specified ReconcileStatefulSet
-func (s ReconcileStatefulSet) MergeFrom(from ReconcileStatefulSet) ReconcileStatefulSet {
-	if s.Create.OnFailure == "" {
-		s.Create.OnFailure = from.Create.OnFailure
-	}
-	if s.Update.Timeout == 0 {
-		s.Update.Timeout = from.Update.Timeout
-	}
-	if s.Update.PollInterval == 0 {
-		s.Update.PollInterval = from.Update.PollInterval
-	}
-	if s.Update.OnFailure == "" {
-		s.Update.OnFailure = from.Update.OnFailure
-	}
-	if s.Recreate.OnDataLoss == "" {
-		s.Recreate.OnDataLoss = from.Recreate.OnDataLoss
-	}
-	if s.Recreate.OnUpdateFailure == "" {
-		s.Recreate.OnUpdateFailure = from.Recreate.OnUpdateFailure
-	}
+func (s ReconcileStatefulSet) MergeFrom(from ReconcileStatefulSet, _type MergeType) ReconcileStatefulSet {
+	s.Create.OnFailure = MergeValue(s.Create.OnFailure, from.Create.OnFailure, _type)
+	s.Update.Timeout = MergeValue(s.Update.Timeout, from.Update.Timeout, _type)
+	s.Update.PollInterval = MergeValue(s.Update.PollInterval, from.Update.PollInterval, _type)
+	s.Update.OnFailure = MergeValue(s.Update.OnFailure, from.Update.OnFailure, _type)
+	s.Recreate.OnDataLoss = MergeValue(s.Recreate.OnDataLoss, from.Recreate.OnDataLoss, _type)
+	s.Recreate.OnUpdateFailure = MergeValue(s.Recreate.OnUpdateFailure, from.Recreate.OnUpdateFailure, _type)
 	return s
 }
 
@@ -152,30 +140,14 @@ func (r *ChiReconcile) MergeFrom(from *ChiReconcile, _type MergeType) *ChiReconc
 		r = NewChiReconcile()
 	}
 
-	switch _type {
-	case MergeTypeFillEmptyValues:
-		if r.Policy == "" {
-			r.Policy = from.Policy
-		}
-		if r.ConfigMapPropagationTimeout == 0 {
-			r.ConfigMapPropagationTimeout = from.ConfigMapPropagationTimeout
-		}
-	case MergeTypeOverrideByNonEmptyValues:
-		if from.Policy != "" {
-			// Override by non-empty values only
-			r.Policy = from.Policy
-		}
-		if from.ConfigMapPropagationTimeout != 0 {
-			// Override by non-empty values only
-			r.ConfigMapPropagationTimeout = from.ConfigMapPropagationTimeout
-		}
-	}
+	r.Policy = MergeValue(r.Policy, from.Policy, _type)
+	r.ConfigMapPropagationTimeout = MergeValue(r.ConfigMapPropagationTimeout, from.ConfigMapPropagationTimeout, _type)
 
 	r.Cleanup = r.Cleanup.MergeFrom(from.Cleanup, _type)
 	r.Macros = r.Macros.MergeFrom(from.Macros, _type)
 	r.Runtime = r.Runtime.MergeFrom(from.Runtime, _type)
-	r.StatefulSet = r.StatefulSet.MergeFrom(from.StatefulSet)
-	r.Host = r.Host.MergeFrom(from.Host)
+	r.StatefulSet = r.StatefulSet.MergeFrom(from.StatefulSet, _type)
+	r.Host = r.Host.MergeFrom(from.Host, _type)
 
 	return r
 }
@@ -309,5 +281,5 @@ func (r *ChiReconcile) InheritStatefulSetFrom(from OperatorConfigReconcile) {
 }
 
 func (r *ChiReconcile) InheritHostFrom(from ReconcileHost) {
-	r.Host = r.Host.MergeFrom(from)
+	r.Host = r.Host.MergeFrom(from, MergeTypeFillEmptyValues)
 }

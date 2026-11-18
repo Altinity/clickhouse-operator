@@ -53,4 +53,22 @@ const (
 
 	// CHOP_CONFIG path to clickhouse operator configuration file
 	CHOP_CONFIG = "CHOP_CONFIG"
+
+	// CHOP_LOGGER_* override the corresponding logger.* options of the configuration file.
+	// They are read by the process they are set for, so each container (operator, metrics-exporter)
+	// can have its own logging options while sharing the same configuration file.
+	// Ex.: CHOP_LOGGER_V=0 makes the metrics-exporter quiet while the operator keeps logger.v from config.
+
+	// CHOP_LOGGER_LOGTOSTDERR overrides logger.logtostderr
+	CHOP_LOGGER_LOGTOSTDERR = "CHOP_LOGGER_LOGTOSTDERR"
+	// CHOP_LOGGER_ALSOLOGTOSTDERR overrides logger.alsologtostderr
+	CHOP_LOGGER_ALSOLOGTOSTDERR = "CHOP_LOGGER_ALSOLOGTOSTDERR"
+	// CHOP_LOGGER_STDERRTHRESHOLD overrides logger.stderrthreshold
+	CHOP_LOGGER_STDERRTHRESHOLD = "CHOP_LOGGER_STDERRTHRESHOLD"
+	// CHOP_LOGGER_V overrides logger.v - log verbosity level
+	CHOP_LOGGER_V = "CHOP_LOGGER_V"
+	// CHOP_LOGGER_VMODULE overrides logger.vmodule
+	CHOP_LOGGER_VMODULE = "CHOP_LOGGER_VMODULE"
+	// CHOP_LOGGER_LOG_BACKTRACE_AT overrides logger.log_backtrace_at
+	CHOP_LOGGER_LOG_BACKTRACE_AT = "CHOP_LOGGER_LOG_BACKTRACE_AT"
 )

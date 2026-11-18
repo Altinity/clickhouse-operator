@@ -21,6 +21,7 @@ const (
 	LabelConfigMapCommonUsers LabelType = "Label cm common users"
 	LabelConfigMapHost        LabelType = "Label cm host"
 	LabelConfigMapStorage     LabelType = "Label cm storage"
+	LabelSecretBackup         LabelType = "Label secret backup"
 
 	LabelServiceCR         LabelType = "Label svc chi"
 	LabelServiceCluster    LabelType = "Label svc cluster"
@@ -34,6 +35,7 @@ const (
 
 	LabelPDB         LabelType = "Label pdb"
 	LabelSecret      LabelType = "Label secret"
+	LabelSecretUsers LabelType = "Label secret users"
 	LabelSTS         LabelType = "Label STS"
 	LabelPodTemplate LabelType = "Label PodTemplate"
 )

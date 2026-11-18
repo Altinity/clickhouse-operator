@@ -205,7 +205,7 @@ function update_deployment_resource() {
   a_data="${annotations}" yq e -i '.podAnnotations |= env(a_data)' "${values_yaml}"
   yq e -i '.spec.template.metadata.annotations = {}' "${file}"
 
-  yq e -i '.spec.template.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 8 }}{{ if .Values.podLabels }}{{ toYaml .Values.podLabels | nindent 8 }}{{ end }}"' "${file}"
+  yq e -i '.spec.template.metadata.labels |= "{{ include \"altinity-clickhouse-operator.podTemplateLabels\" . | nindent 8 }}{{ if .Values.podLabels }}{{ toYaml .Values.podLabels | nindent 8 }}{{ end }}"' "${file}"
   yq e -i '.spec.template.metadata.annotations += {"{{ if .Values.podAnnotations }}{{ toYaml .Values.podAnnotations | nindent 8 }}{{ end }}": null}' "${file}"
   yq e -i '.spec.template.spec.imagePullSecrets |= "{{ toYaml .Values.imagePullSecrets | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.serviceAccountName |= "{{ include \"altinity-clickhouse-operator.serviceAccountName\" . }}"' "${file}"
@@ -230,7 +230,7 @@ function update_deployment_resource() {
     yq e -i '(.spec.template.spec.volumes[] | select(.configMap != null) | .configMap.name | select(. == "'"${cm}"'")) |= "'"${newCm}"'"' "${file}"
     local cmName="${cm/etc-clickhouse-operator-/}"
     cmName="${cmName/etc-keeper-operator-/keeper-}"
-    yq e -i '.spec.template.metadata.annotations += {"checksum/'"${cmName}"'": "{{ include (print $.Template.BasePath \"/generated/ConfigMap-'"${cm}"'.yaml\") . | sha256sum }}"}' "${file}"
+    yq e -i '.spec.template.metadata.annotations += {"checksum/'"${cmName}"'": "{{ include \"altinity-clickhouse-operator.configMapContentHash\" (dict \"ctx\" . \"name\" \"/generated/ConfigMap-'"${cm}"'.yaml\") }}"}' "${file}"
   done
   
   yq e -i '.spec.template.spec.containers[0].name |= "{{ .Chart.Name }}"' "${file}"
@@ -239,6 +239,7 @@ function update_deployment_resource() {
   yq e -i '.spec.template.spec.containers[0].resources |= "{{ toYaml .Values.operator.resources | nindent 12 }}"' "${file}"
   yq e -i '.spec.template.spec.containers[0].securityContext |= "{{ toYaml .Values.operator.containerSecurityContext | nindent 12 }}"' "${file}"
   yq e -i '(.spec.template.spec.containers[0].env[] | select(.valueFrom.resourceFieldRef.containerName == "clickhouse-operator") | .valueFrom.resourceFieldRef.containerName) = "{{ .Chart.Name }}"' "${file}"
+  yq e -i '.spec.template.spec.containers[0].env += ["{{ include \"altinity-clickhouse-operator.operator.loggerEnv\" . | nindent 12 }}"]' "${file}"
   yq e -i '.spec.template.spec.containers[0].env += ["{{ with .Values.operator.env }}{{ toYaml . | nindent 12 }}{{ end }}"]' "${file}"
   yq e -i '.spec.template.spec.containers[0] += {"__OPERATOR_LIVENESS_PROBE__": null}' "${file}"
   yq e -i '.spec.template.spec.containers[0] += {"__OPERATOR_READINESS_PROBE__": null}' "${file}"
@@ -248,13 +249,16 @@ function update_deployment_resource() {
   yq e -i '.spec.template.spec.containers[1].resources |= "{{ toYaml .Values.metrics.resources | nindent 12 }}"' "${file}"
   yq e -i '.spec.template.spec.containers[1].securityContext |= "{{ toYaml .Values.metrics.containerSecurityContext | nindent 12 }}"' "${file}"
   yq e -i '(.spec.template.spec.containers[1].env[] | select(.valueFrom.resourceFieldRef.containerName == "clickhouse-operator") | .valueFrom.resourceFieldRef.containerName) = "{{ .Chart.Name }}"' "${file}"
+  yq e -i '.spec.template.spec.containers[1].env += ["{{ include \"altinity-clickhouse-operator.metrics.loggerEnv\" . | nindent 12 }}"]' "${file}"
   yq e -i '.spec.template.spec.containers[1].env += ["{{ with .Values.metrics.env }}{{ toYaml . | nindent 12 }}{{ end }}"]' "${file}"
   yq e -i '.spec.template.spec.containers[1] += {"__METRICS_LIVENESS_PROBE__": null}' "${file}"
   yq e -i '.spec.template.spec.containers[1] += {"__METRICS_READINESS_PROBE__": null}' "${file}"
 
   perl -pi -e "s/'{{ if .Values.podAnnotations }}{{ toYaml .Values.podAnnotations \| nindent 8 }}{{ end }}': null/{{ if .Values.podAnnotations }}{{ toYaml .Values.podAnnotations \| nindent 8 }}{{ end }}/g" "${file}"
   perl -pi -e "s/'{{ if .Values.operator.priorityClassName }}priorityClassName: {{ .Values.operator.priorityClassName \| quote }}{{ end }}': null/{{ if .Values.operator.priorityClassName }}priorityClassName: {{ .Values.operator.priorityClassName | quote }}{{ end }}/g" "${file}"
+  perl -pi -e "s/- '({{ include \"altinity-clickhouse-operator.operator.loggerEnv\" . \| nindent 12 }})'/\$1/g" "${file}"
   perl -pi -e "s/- '{{ with .Values.operator.env }}{{ toYaml . \| nindent 12 }}{{ end }}'/{{ with .Values.operator.env }}{{ toYaml . \| nindent 12 }}{{ end }}/g" "${file}"
+  perl -pi -e "s/- '({{ include \"altinity-clickhouse-operator.metrics.loggerEnv\" . \| nindent 12 }})'/\$1/g" "${file}"
   perl -pi -e "s/- '{{ with .Values.metrics.env }}{{ toYaml . \| nindent 12 }}{{ end }}'/{{ with .Values.metrics.env }}{{ toYaml . \| nindent 12 }}{{ end }}/g" "${file}"
   perl -0pi -e 's/\n\s*__OPERATOR_LIVENESS_PROBE__: null/\n          {{- with .Values.operator.livenessProbe }}\n          livenessProbe: {{- toYaml . | nindent 12 }}\n          {{- end }}/g' "${file}"
   perl -0pi -e 's/\n\s*__OPERATOR_READINESS_PROBE__: null/\n          {{- with .Values.operator.readinessProbe }}\n          readinessProbe: {{- toYaml . | nindent 12 }}\n          {{- end }}/g' "${file}"

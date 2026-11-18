@@ -26,10 +26,12 @@ import (
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/dynamic"
 	kube "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	kuberest "k8s.io/client-go/rest"
 	kubeclientcmd "k8s.io/client-go/tools/clientcmd"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/util/tlsutil"
@@ -92,6 +94,7 @@ func GetClientset(kubeConfigFile, masterURL, chopConfigFile string) (
 	*apiextensions.Clientset,
 	*chopclientset.Clientset,
 	dynamic.Interface,
+	metadata.Interface,
 ) {
 	kubeConfig, err := getKubeConfig(kubeConfigFile, masterURL)
 	if err != nil {
@@ -102,6 +105,14 @@ func GetClientset(kubeConfigFile, masterURL, chopConfigFile string) (
 	minVerStr, hardened := resolveK8sTLSMinVersion(chopConfigFile)
 	if minVer := tlsutil.VersionUint16(minVerStr); minVer != 0 {
 		applyK8sClientTLSMinVersion(kubeConfig, minVer, hardened)
+	}
+
+	qps, burst := resolveK8sClientRateLimits(chopConfigFile)
+	if qps > 0 {
+		kubeConfig.QPS = qps
+	}
+	if burst > 0 {
+		kubeConfig.Burst = burst
 	}
 
 	// Layer on k8s client rate limiting overrides if specified in CHOP config.
@@ -148,7 +159,12 @@ func GetClientset(kubeConfigFile, masterURL, chopConfigFile string) (
 		log.F().Fatal("Unable to initialize kubernetes dynamic clientset: %s", err.Error())
 	}
 
-	return kubeClientset, apiextensionsClientset, chopClientset, dynamicClientset
+	metadataClient, err := metadata.NewForConfig(kubeConfig)
+	if err != nil {
+		log.F().Fatal("Unable to initialize kubernetes metadata client: %s", err.Error())
+	}
+
+	return kubeClientset, apiextensionsClientset, chopClientset, dynamicClientset, metadataClient
 }
 
 // resolveK8sTLSMinVersion reads the file-based chopconf and returns the effective
@@ -168,6 +184,33 @@ func resolveK8sTLSMinVersion(chopConfigFile string) (minVersion string, hardened
 		return "", false
 	}
 	return string(fileConfig.ResolveK8sTLSMinVersion()), fileConfig.Security.RequiresHardening()
+}
+
+// resolveK8sClientRateLimits reads reconcile.runtime.k8sClientQPS and k8sClientBurst from the
+// file-based chopconf. File-only for the same reason as resolveK8sTLSMinVersion.
+func resolveK8sClientRateLimits(chopConfigFile string) (qps float32, burst int) {
+	cm := newConfigManager(nil, nil, chopConfigFile)
+	fileConfig, err := cm.getFileBasedConfig(chopConfigFile)
+	if err != nil || fileConfig == nil {
+		return 0, 0
+	}
+	return fileConfig.Reconcile.Runtime.K8sClientQPS, fileConfig.Reconcile.Runtime.K8sClientBurst
+}
+
+// WarnIfK8sClientQPSTooLow warns when one CHI may reconcile more shards at once than the k8s
+// client allows requests per second, so the reconcile waits on client-side throttling. The QPS
+// is taken from the built client, so env overrides count. Returns whether it warned.
+func WarnIfK8sClientQPSTooLow(kubeClient *kube.Clientset, config *api.OperatorConfig) bool {
+	shardsThreads := config.Reconcile.Runtime.ReconcileShardsThreadsNumber
+	qps := kubeClient.CoreV1().RESTClient().GetRateLimiter().QPS()
+	if float32(shardsThreads) <= qps {
+		return false
+	}
+	log.Warning("k8s client QPS limit %v is below reconcile.runtime.reconcileShardsThreadsNumber %d, "+
+		"reconcile will wait on client-side throttling. Raise %s and %s if set, "+
+		"otherwise reconcile.runtime.k8sClientQPS and k8sClientBurst",
+		qps, shardsThreads, deployment.OPERATOR_K8S_CLIENT_QPS_LIMIT, deployment.OPERATOR_K8S_CLIENT_BURST_LIMIT)
+	return true
 }
 
 // applyK8sClientTLSMinVersion stamps MinVersion onto the rest.Config transport via

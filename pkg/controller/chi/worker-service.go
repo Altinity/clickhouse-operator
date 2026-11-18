@@ -29,8 +29,8 @@ import (
 
 // reconcileService reconciles core.Service
 func (w *worker) reconcileService(ctx context.Context, cr chi.ICustomResource, service, prevService *core.Service) error {
-	w.a.V(2).M(cr).S().Info(service.GetName())
-	defer w.a.V(2).M(cr).E().Info(service.GetName())
+	w.a.V(2).M(cr).S().Info("%s", service.GetName())
+	defer w.a.V(2).M(cr).E().Info("%s", service.GetName())
 
 	// Check whether this object already exists
 	curService, err := w.c.getService(ctx, service)

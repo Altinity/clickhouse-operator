@@ -104,14 +104,21 @@ func (c *STS) get(ctx context.Context, namespace, name string) (*apps.StatefulSe
 func (c *STS) Create(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
 	yamlBytes, _ := yaml.Marshal(sts)
 	log.V(3).M(sts).Info("Going to create STS: %s\n%s", util.NamespaceNameString(sts), string(yamlBytes))
-	err := c.kubeClient.Create(ctx, sts)
-	return sts, err
+	return commonKube.CreateWithRetry(ctx, func() (*apps.StatefulSet, error) {
+		return sts, c.kubeClient.Create(ctx, sts)
+	})
+}
+
+// ValidateCreate runs a server-side dry-run create: validation runs, nothing is persisted.
+func (c *STS) ValidateCreate(ctx context.Context, sts *apps.StatefulSet) error {
+	return c.kubeClient.Create(ctx, sts.DeepCopy(), client.DryRunAll)
 }
 
 func (c *STS) Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
 	log.V(3).M(sts).Info("Going to update STS: %s", util.NamespaceNameString(sts))
-	err := c.kubeClient.Update(ctx, sts)
-	return sts, err
+	return commonKube.UpdateWithRetry(ctx, func() (*apps.StatefulSet, error) {
+		return sts, c.kubeClient.Update(ctx, sts)
+	})
 }
 
 // Remove issues a fire-and-forget delete against the API server. It returns immediately after

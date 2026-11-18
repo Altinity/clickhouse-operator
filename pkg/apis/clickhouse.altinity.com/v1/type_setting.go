@@ -386,6 +386,16 @@ func (s *Setting) Clone() *Setting {
 	if err != nil {
 		return nil
 	}
+	// Attributes and embed are runtime annotations (remove="1", from_env). They are
+	// not part of the JSON value, and a users file that loses remove="1" leaves the
+	// stock <password> in place next to password_sha256_hex.
+	if len(s.attributes) > 0 {
+		clone.attributes = make(map[string]string, len(s.attributes))
+		for name, value := range s.attributes {
+			clone.attributes[name] = value
+		}
+	}
+	clone.embed = s.embed
 
 	// Clone is ready
 	return clone

@@ -39,6 +39,10 @@ import (
 // resolveAllKeeperReferences resolves all keeper references in the CHI spec to ZooKeeper nodes.
 // Must be called before normalization.
 //
+// The nodes are resolved into a copy of the CHI, which is returned - also along with an error, holding
+// whatever has been resolved by then. The CHI given stays as it is, so it can be built from again without
+// its nodes piling up.
+//
 // Each ZookeeperConfig level is resolved independently — resolved nodes are appended to
 // that level's own Nodes slice, not to a shared one:
 //   - Top-level spec.configuration.zookeeper.keeper → resolved into spec.configuration.zookeeper.nodes
@@ -49,7 +53,9 @@ import (
 //   - If a cluster has NO zookeeper config (empty) → it inherits the top-level config entirely
 //   - If a cluster has ANY zookeeper config (own keeper ref or own nodes) → top-level is ignored
 //     for that cluster (InheritZookeeperFrom returns early when cluster.Zookeeper is non-empty)
-func (w *worker) resolveAllKeeperReferences(ctx context.Context, cr *api.ClickHouseInstallation) error {
+func (w *worker) resolveAllKeeperReferences(ctx context.Context, cr *api.ClickHouseInstallation) (*api.ClickHouseInstallation, error) {
+	cr = cr.DeepCopy()
+
 	// Pass CR's namespace domain pattern to the resolver.
 	// resolveKeeperReference is nil-safe (HasKeeper handles nil ZookeeperConfig),
 	// so we can pass the chained getter output directly without a pre-check.
@@ -57,17 +63,17 @@ func (w *worker) resolveAllKeeperReferences(ctx context.Context, cr *api.ClickHo
 
 	// Resolve top-level zookeeper keeper ref into top-level nodes
 	if err := w.resolveKeeperReference(ctx, cr.GetNamespace(), domainPattern, cr.Spec.GetConfiguration().GetZookeeper()); err != nil {
-		return err
+		return cr, err
 	}
 
 	// Resolve each cluster's zookeeper keeper ref into that cluster's own nodes
 	for _, cluster := range cr.Spec.GetConfiguration().GetClusters() {
 		if err := w.resolveKeeperReference(ctx, cr.GetNamespace(), domainPattern, cluster.GetZookeeper()); err != nil {
-			return err
+			return cr, err
 		}
 	}
 
-	return nil
+	return cr, nil
 }
 
 // resolveKeeperReference resolves a single KeeperRef into ZookeeperNodes within the given

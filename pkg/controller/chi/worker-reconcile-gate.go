@@ -27,6 +27,14 @@ const (
 	// gateOperatorIPChanged: the operator's pod IP moved, so the clickhouse-operator user's
 	// networks/host_regexp must be refreshed.
 	gateOperatorIPChanged reconcileGateDecision = "OperatorIPChanged"
+	// gatePasswordSecretChanged: a Secret referenced by hotReload changed. The CHI
+	// spec did not, so generation is unchanged, but the managed users Secret must
+	// be regenerated. The Pod template does not include the Secret's contents.
+	gatePasswordSecretChanged reconcileGateDecision = "PasswordSecretChanged"
+	// gateBackupSecretChanged: this pass created the backup Secret or filled in its missing REST API keys, with new
+	// random values. The configuration files of the sidecars must take them, or the backup Jobs, which read them from
+	// the Secret, are refused by the sidecars.
+	gateBackupSecretChanged reconcileGateDecision = "BackupSecretChanged"
 	// gateStuckHostRecovery: a host has been sustained-NotReady past its threshold.
 	gateStuckHostRecovery reconcileGateDecision = "StuckHostRecovery"
 	// gateUnhealthyHosts: a host is unhealthy, so the shard may need recovery (#1704).
@@ -59,6 +67,11 @@ type reconcileGateInputs struct {
 	generationTheSame               bool
 	hasUnhealthyHosts               bool
 	operatorIPTheSame               bool
+	// passwordSecretChanged is set when this reconcile was enqueued because a
+	// source Secret changed. It must be tested before the generation-same skip.
+	passwordSecretChanged bool
+	// backupSecretChanged is set when the backup Secret was created or completed ahead of the gate.
+	backupSecretChanged bool
 	// hasHostNeedingStuckRecovery is lazy: it costs live pod reads, so it is only consulted once
 	// the cheaper reasons have been ruled out.
 	hasHostNeedingStuckRecovery func() bool
@@ -92,6 +105,10 @@ func decideReconcileGate(in reconcileGateInputs) reconcileGateDecision {
 		return gateFinalizerInstalled
 	case !in.operatorIPTheSame:
 		return gateOperatorIPChanged
+	case in.passwordSecretChanged:
+		return gatePasswordSecretChanged
+	case in.backupSecretChanged:
+		return gateBackupSecretChanged
 	case in.generationTheSame && !in.hasUnhealthyHosts:
 		return gateNothingToDo
 	case in.hasReconcileWork:

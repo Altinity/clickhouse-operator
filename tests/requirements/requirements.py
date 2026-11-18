@@ -523,14 +523,14 @@ RQ_SRS_026_ClickHouseOperator_PodTemplates = Requirement(
     description=(
         '[ClickHouse Operator] SHALL support customized [Pod] templates for cluster, shard, replica and [CHI] level.\n'
         '[Pod] templates SHALL correspond to [Kubernetes] `PodTemplate` standard specification with\n'
-        'two additional properties `distribution` and `zones` to simplify affinity and anti-affinity rules.\n'
+        'two additional properties `podDistribution` and `zones` to simplify affinity and anti-affinity rules.\n'
         '\n'
         'Pod templates SHALL support defining the following:\n'
         '\n'
         '* image reference for particular [ClickHouse] version\n'
         '* CPU/memory requests\n'
         '* affinity and anti-affinity rules that are also available as separate shortcuts:\n'
-        '  * `distribution`’ property streamlines OnePerHost semantics\n'
+        '  * `podDistribution` property streamlines pod anti-affinity semantics\n'
         '  * `zones` property streamlines multi-AZ deployment (tested with AWS)\n'
         '\n'
     ),
@@ -8557,14 +8557,14 @@ version: 1.0
 
 [ClickHouse Operator] SHALL support customized [Pod] templates for cluster, shard, replica and [CHI] level.
 [Pod] templates SHALL correspond to [Kubernetes] `PodTemplate` standard specification with
-two additional properties `distribution` and `zones` to simplify affinity and anti-affinity rules.
+two additional properties `podDistribution` and `zones` to simplify affinity and anti-affinity rules.
 
 Pod templates SHALL support defining the following:
 
 * image reference for particular [ClickHouse] version
 * CPU/memory requests
 * affinity and anti-affinity rules that are also available as separate shortcuts:
-  * `distribution`’ property streamlines OnePerHost semantics
+  * `podDistribution` property streamlines pod anti-affinity semantics
   * `zones` property streamlines multi-AZ deployment (tested with AWS)
 
 ### Custom Service Templates

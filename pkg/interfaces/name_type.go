@@ -20,6 +20,7 @@ const (
 	NameConfigMapHost        NameType = "ConfigMapHost"
 	NameConfigMapCommon      NameType = "ConfigMapCommon"
 	NameConfigMapCommonUsers NameType = "NameConfigMapCommonUsers"
+	NameSecretCommonUsers    NameType = "NameSecretCommonUsers"
 )
 const (
 	NameCRService                    NameType = "NameCRService"
@@ -41,5 +42,7 @@ const (
 	NamePod                          NameType = "NamePod"
 	NamePVCNameByVolumeClaimTemplate NameType = "NamePVCNameByVolumeClaimTemplate"
 	NameClusterAutoSecret            NameType = "NameClusterAutoSecret"
+	NameBackupAutoSecret             NameType = "NameBackupAutoSecret"
+	NameBackupConfigSecret           NameType = "NameBackupConfigSecret"
 	NameClusterPDB                   NameType = "NameClusterPDB"
 )
