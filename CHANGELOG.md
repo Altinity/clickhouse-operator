@@ -78,7 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **Updated Go from `1.26.8` to `1.27.3`**, including the fix for `CVE-2026-111943`. Go 1.27 also removes support for certain legacy `GODEBUG` settings. Review [upgrade compatibility](docs/security_hardening_fips.md). by [@sunsingerus](https://github.com/sunsingerus) and [@lucas-alpaca](https://github.com/lucas-alpaca) in [#2120](https://github.com/Altinity/clickhouse-operator/pull/2120)
 
-* **Updated `golang.org/x/net` to `v0.60.0` and `golang.org/x/text` to `v0.42.0`** to address security vulnerabilities. by [@sunsingerus](https://github.com/sunsingerus)
+* **Updated `golang.org/x/net` to `v0.62.0` and `golang.org/x/text` to `v0.43.0`** to address security vulnerabilities.
 
 ## [0.27.4](https://github.com/Altinity/clickhouse-operator/compare/release-0.27.3...release-0.27.4)
 
