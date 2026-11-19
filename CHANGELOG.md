@@ -78,7 +78,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **Updated Go from `1.26.8` to `1.27.3`**, including the fix for `CVE-2026-111943`. Go 1.27 also removes support for certain legacy `GODEBUG` settings. Review [upgrade compatibility](docs/security_hardening_fips.md). by [@sunsingerus](https://github.com/sunsingerus) and [@lucas-alpaca](https://github.com/lucas-alpaca) in [#2120](https://github.com/Altinity/clickhouse-operator/pull/2120)
 
-* **Updated `golang.org/x/net` to `v0.62.0` and `golang.org/x/text` to `v0.43.0`** to address security vulnerabilities.
+* **Updated `golang.org/x/net` from `v0.56.0` to `v0.62.0` and `golang.org/x/text` from `v0.39.0` to `v0.43.0`.** `x/net` `v0.60.0` addresses `CVE-2026-78659`, `CVE-2026-78660`, `CVE-2026-78663`, `CVE-2026-78669`, and `CVE-2026-97032`; `v0.62.0` addresses `CVE-2026-78661` and `CVE-2026-97045`. `x/text` `v0.41.0` addresses `CVE-2026-56851`.
+
+* **Updated `go.opentelemetry.io/otel/sdk` and `go.opentelemetry.io/otel/trace` to `v1.47.0`** to address `CVE-2026-128085`. The matching `otel`, `otel/metric`, `otel/sdk/metric`, and `otel/log` modules are `v1.47.0` as well.
 
 ## [0.27.4](https://github.com/Altinity/clickhouse-operator/compare/release-0.27.3...release-0.27.4)
 
