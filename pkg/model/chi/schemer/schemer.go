@@ -27,6 +27,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/altinity/clickhouse-operator/pkg/util/retry"
 )
 
 // ClusterSchemer specifies cluster schema manager
@@ -79,6 +80,14 @@ func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostT
 		clickhouse.NewQueryOptions().SetRetry(false).SetLogQueries(true))
 }
 
+// Three attempts allow ConfigMap updates to propagate without imposing the
+// longer CREATE-statement retry window on failed schema reads (5s + 10s backoff).
+const schemaReadRetryAttempts = 3
+
+func retryPeerSchemaRead(ctx context.Context, read func() error) error {
+	return retry.Retry(ctx, schemaReadRetryAttempts, "Reading schema from peers", log.V(1), read)
+}
+
 // createTablesSQLs makes all SQL for migrating tables
 func (s *ClusterSchemer) createTablesSQLs(
 	ctx context.Context,
@@ -90,10 +99,17 @@ func (s *ClusterSchemer) createTablesSQLs(
 	distributedCreateSQLs []string,
 	err error,
 ) {
-	if replicatedObjectNames, replicatedCreateSQLs, err = s.getReplicatedObjectsSQLs(ctx, host); err != nil {
-		return nil, nil, nil, nil, err
-	}
-	if distributedObjectNames, distributedCreateSQLs, err = s.getDistributedObjectsSQLs(ctx, host); err != nil {
+	// No DDL is executed until both discovery passes complete. Retry the reads
+	// together so transient authentication failures do not abort the reconcile.
+	err = retryPeerSchemaRead(ctx, func() error {
+		var readErr error
+		if replicatedObjectNames, replicatedCreateSQLs, readErr = s.getReplicatedObjectsSQLs(ctx, host); readErr != nil {
+			return readErr
+		}
+		distributedObjectNames, distributedCreateSQLs, readErr = s.getDistributedObjectsSQLs(ctx, host)
+		return readErr
+	})
+	if err != nil {
 		return nil, nil, nil, nil, err
 	}
 	return
