@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/imdario/mergo"
+	"github.com/altinity/clickhouse-operator/pkg/util/mergo"
 	core "k8s.io/api/core/v1"
 	utiljson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
