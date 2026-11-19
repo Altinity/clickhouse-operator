@@ -100,6 +100,16 @@ def wait_config_applied(chi_name, user, retries=30, delay=5, pwd="", host="127.0
     return False
 
 
+def wait_query_result(chi_name, sql, expected, retries=15, delay=2, **kwargs):
+    """Poll until a query returns the expected output; return the last output."""
+    for i in range(retries):
+        out = query_with_error(chi_name, sql, **kwargs)
+        if out == expected:
+            break
+        time.sleep(delay)
+    return out
+
+
 def wait_config_denied(chi_name, user, retries=30, delay=5, pwd="", host="127.0.0.1"):
     """Poll ClickHouse until a user becomes unavailable after config change."""
     for i in range(retries):
