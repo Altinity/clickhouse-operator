@@ -2442,12 +2442,12 @@ def test_010016(self):
             )
 
         with Then("Custom macro 'layer' should change the value"):
-            out = clickhouse.query(chi, sql="select substitution from system.macros where macro='layer'")
-            assert out == "03"
+            out = clickhouse.wait_query_result(chi, "select substitution from system.macros where macro='layer'", "03")
+            assert out == "03", error()
 
         with And("Dictionary 'three' should exist"):
-            out = clickhouse.query(chi, sql="select dictGet('three', 'three', toUInt64(0))")
-            assert out == "0"
+            out = clickhouse.wait_query_result(chi, "select dictGet('three', 'three', toUInt64(0))", "0")
+            assert out == "0", error()
 
         with And("ClickHouse SHOULD NOT BE restarted"):
             new_start_time = kubectl.get_clickhouse_start(chi)
