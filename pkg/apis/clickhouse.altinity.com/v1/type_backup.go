@@ -15,6 +15,8 @@
 package v1
 
 import (
+	"fmt"
+
 	core "k8s.io/api/core/v1"
 
 	clickhouse_altinity_com "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
@@ -33,8 +35,8 @@ const (
 // BackupStorageHint tells how to settle the backup of a cluster that turns it on without a storage,
 // which leaves it off: name the Secret of the clickhouse-backup configuration, or turn backup off there, which a
 // cluster may inherit unasked.
-const BackupStorageHint = "name the Secret of the clickhouse-backup configuration in backup.configSecretRef, " +
-	"or set backup.enabled to \"no\""
+const BackupStorageHint = "name the Secret and the key of the clickhouse-backup configuration in " +
+	"backup.storageConfig.valueFrom.secretKeyRef, or set backup.enabled to \"no\""
 
 // BackupAnnotations lists the annotations that record operator-managed recovery. They describe the
 // installation, not its pods, so they must never be copied into pod templates: a change there would
@@ -49,19 +51,20 @@ var BackupAnnotations = []string{
 type ClusterBackup struct {
 	// Enabled turns operator-managed backup on for the cluster: the operator injects the
 	// clickhouse-backup sidecar into its pods and backup/restore resources may target it. It takes
-	// effect only with ConfigSecretRef, see IsEnabled.
+	// effect only with StorageConfig, see IsEnabled.
 	Enabled *types.StringBool `json:"enabled,omitempty"                yaml:"enabled,omitempty"`
 	// PodTemplate names the pod template whose clickhouse-backup container the sidecar is built on: what the
 	// container sets is kept, and only what it lacks is filled in. Only that container is taken, not the other
 	// containers, volumes or pod settings of the template. Empty, the operator builds the sidecar on its own.
 	PodTemplate *types.String `json:"podTemplate,omitempty"            yaml:"podTemplate,omitempty"`
-	// ConfigSecretRef names a Secret in the installation's namespace whose key config.yml holds the clickhouse-backup
-	// configuration of the sidecar, a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket,
-	// s3.access_key. The operator generates the configuration file of the sidecar from it, which follows a change of
-	// the Secret without a restart. A cluster that leaves it out takes the installation's, an installation a
-	// template's; an explicit name "" on a cluster leaves the cluster without one. It is required: without one,
-	// backup stays off. The configuration must set api.username and api.password of the clickhouse-backup REST API.
-	ConfigSecretRef *core.LocalObjectReference `json:"configSecretRef,omitempty" yaml:"configSecretRef,omitempty"`
+	// StorageConfig tells where the clickhouse-backup configuration of the sidecar is, a YAML mapping of its sections,
+	// e.g. general.remote_storage, s3.bucket, s3.access_key: the key valueFrom.secretKeyRef.key of the Secret
+	// valueFrom.secretKeyRef.name in the installation's namespace. The operator generates the configuration file of the
+	// sidecar from it, which follows a change of the Secret without a restart. A cluster that leaves it out takes the
+	// installation's, an installation a template's; an explicit name "" on a cluster leaves the cluster without one. It
+	// is required: without one, backup stays off. The configuration must set api.username and api.password of the
+	// clickhouse-backup REST API.
+	StorageConfig *StorageConfig `json:"storageConfig,omitempty" yaml:"storageConfig,omitempty"`
 	// PreferredReplica is the index, from 0, of the replica of each shard a backup works on, as the backupReplica of
 	// the Altinity usual backup workflow: a backup of one replica per shard (FirstPerShard) runs on the sidecar of that replica,
 	// or on that of the first replica when the shard has fewer replicas or the preferred one does not answer when the
@@ -78,6 +81,21 @@ type ClusterBackup struct {
 	// completed its first reconcile. It configures the operator, not the sidecar: it never changes a
 	// pod. It is never taken from a ClickHouseInstallationTemplate.
 	Recovery *BackupRecovery `json:"recovery,omitempty"               yaml:"recovery,omitempty"`
+}
+
+// StorageConfig is where the clickhouse-backup configuration of the sidecar is kept.
+type StorageConfig struct {
+	// ValueFrom is the Secret key that holds the configuration, as for the cluster secret and the settings. Its
+	// secretKeyRef takes a name and a key, both required for a storage; hotReload and optional are not supported.
+	ValueFrom *types.DataSource `json:"valueFrom,omitempty" yaml:"valueFrom,omitempty"`
+}
+
+// NewStorageConfig returns the storage config that takes the clickhouse-backup configuration from the key of the
+// Secret.
+func NewStorageConfig(secret, key string) *StorageConfig {
+	return &StorageConfig{ValueFrom: &types.DataSource{
+		SecretKeyRef: &core.SecretKeySelector{LocalObjectReference: core.LocalObjectReference{Name: secret}, Key: key},
+	}}
 }
 
 // BackupRecovery names the backup a cluster is recovered from.
@@ -162,10 +180,11 @@ func (b *ClusterBackup) LacksStorage() bool {
 	return b.IsRequested() && !b.namesStorageSettings()
 }
 
-// namesStorageSettings reports whether the backup names the Secret of the clickhouse-backup configuration, the only
-// source of its storage settings and of the credentials of its REST API: a pod template only overrides the container.
+// namesStorageSettings reports whether the backup names the Secret and the key of the clickhouse-backup configuration,
+// the only source of its storage settings and of the credentials of its REST API: a pod template only overrides the
+// container.
 func (b *ClusterBackup) namesStorageSettings() bool {
-	return b.GetConfigSecretName() != ""
+	return (b.GetStorageConfigSecretName() != "") && (b.GetStorageConfigSecretKey() != "")
 }
 
 // Validate checks the backup block against the allowed values, nil-safe.
@@ -176,7 +195,32 @@ func (b *ClusterBackup) Validate() error {
 	if err := ValidateBackupNaming(b.Naming.Value()); err != nil {
 		return err
 	}
+	if err := b.StorageConfig.validate("backup.storageConfig"); err != nil {
+		return err
+	}
 	return validateStringBool("backup.enabled", b.Enabled)
+}
+
+// validate checks that the storage config asks for nothing but a Secret key, nil-safe. A key is required where a
+// Secret is named: a name "" is how a cluster leaves itself without a storage, and needs none.
+func (in *StorageConfig) validate(field string) error {
+	if (in == nil) || (in.ValueFrom == nil) {
+		return nil
+	}
+	from := field + ".valueFrom"
+	if in.ValueFrom.IsHotReload() {
+		return fmt.Errorf("%w: %s.hotReload is not supported", ErrInvalidBackupSpec, from)
+	}
+	ref := in.ValueFrom.SecretKeyRef
+	switch {
+	case ref == nil:
+		return nil
+	case (ref.Optional != nil) && *ref.Optional:
+		return fmt.Errorf("%w: %s.secretKeyRef.optional is not supported", ErrInvalidBackupSpec, from)
+	case (ref.Name != "") && (ref.Key == ""):
+		return fmt.Errorf("%w: %s.secretKeyRef.key is required", ErrInvalidBackupSpec, from)
+	}
+	return nil
 }
 
 // GetNaming returns the naming template of the backups of the cluster, "" for the default naming, nil-safe.
@@ -195,12 +239,30 @@ func (b *ClusterBackup) GetPodTemplate() *types.String {
 	return b.PodTemplate
 }
 
-// GetConfigSecretName returns the name of the Secret of the sidecar configuration, "" when there is none, nil-safe.
-func (b *ClusterBackup) GetConfigSecretName() string {
-	if (b == nil) || (b.ConfigSecretRef == nil) {
-		return ""
+// GetStorageConfigSecretName returns the name of the Secret of the sidecar configuration, "" when there is none,
+// nil-safe.
+func (b *ClusterBackup) GetStorageConfigSecretName() string {
+	if ref := b.getStorageConfigSecretKeyRef(); ref != nil {
+		return ref.Name
 	}
-	return b.ConfigSecretRef.Name
+	return ""
+}
+
+// GetStorageConfigSecretKey returns the key of that Secret the sidecar configuration is in, "" when there is none,
+// nil-safe.
+func (b *ClusterBackup) GetStorageConfigSecretKey() string {
+	if ref := b.getStorageConfigSecretKeyRef(); ref != nil {
+		return ref.Key
+	}
+	return ""
+}
+
+// getStorageConfigSecretKeyRef returns the reference to the Secret key of the sidecar configuration, nil-safe.
+func (b *ClusterBackup) getStorageConfigSecretKeyRef() *core.SecretKeySelector {
+	if (b == nil) || (b.StorageConfig == nil) || (b.StorageConfig.ValueFrom == nil) {
+		return nil
+	}
+	return b.StorageConfig.ValueFrom.SecretKeyRef
 }
 
 // GetPreferredReplica returns the index of the replica of each shard a backup works on, 0 when unset or negative,
@@ -271,9 +333,9 @@ func (b *ClusterBackup) MergeFrom(from *ClusterBackup, _type MergeType) *Cluster
 
 	b.Enabled = MergeScalar(b.Enabled, from.Enabled, _type)
 	b.PodTemplate = MergeScalar(b.PodTemplate, from.PodTemplate, _type)
-	// The reference is copied: it may be that of a cached template or of the installation level, which other
+	// The storage config is copied: it may be that of a cached template or of the installation level, which other
 	// clusters read
-	b.ConfigSecretRef = MergePointer(b.ConfigSecretRef, from.ConfigSecretRef.DeepCopy(), _type)
+	b.StorageConfig = MergePointer(b.StorageConfig, from.StorageConfig.DeepCopy(), _type)
 	b.PreferredReplica = MergeScalar(b.PreferredReplica, from.PreferredReplica, _type)
 	b.Naming = MergeScalar(b.Naming, from.Naming, _type)
 	b.Recovery = b.Recovery.MergeFrom(from.Recovery, _type)

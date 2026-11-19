@@ -15,8 +15,11 @@ spec:
   backup:
     enabled: "yes"
     podTemplate: default
-    configSecretRef:
-      name: backup-storage
+    storageConfig:
+      valueFrom:
+        secretKeyRef:
+          name: backup-storage
+          key: config.yml
     recovery:
       backupName: set-by-the-scenario
       sourceInstallation: test-088-src

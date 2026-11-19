@@ -60,10 +60,12 @@ var backupConfigSyncInstallationTimeout = 15 * time.Second
 var (
 	// errBackupStorageSecretNotFound: the storage Secret of the cluster does not exist
 	errBackupStorageSecretNotFound = errors.New("does not exist")
-	// errBackupStorageConfigNotFound: the storage Secret of the cluster holds no configuration file
-	errBackupStorageConfigNotFound = fmt.Errorf("has no key %s", backupconfig.FileName)
-	// errBackupStorageConfigEmpty: the storage Secret of the cluster holds an empty configuration file
-	errBackupStorageConfigEmpty = fmt.Errorf("has an empty key %s", backupconfig.FileName)
+	// errBackupStorageConfigNotFound: the storage Secret of the cluster holds no configuration file in its key. It is
+	// wrapped with the key, see getBackupStorageConfig.
+	errBackupStorageConfigNotFound = errors.New("has no key")
+	// errBackupStorageConfigEmpty: the storage Secret of the cluster holds an empty configuration file in its key. It
+	// is wrapped with the key, see getBackupStorageConfig.
+	errBackupStorageConfigEmpty = errors.New("has an empty key")
 	// errBackupStorageSecretUnreadable: the storage Secret of the cluster cannot be read for any reason but its
 	// absence
 	errBackupStorageSecretUnreadable = errors.New("cannot be read")
@@ -76,6 +78,8 @@ type backupConfigOutcome struct {
 	secret *core.Secret
 	// storageSecret is the name of the storage Secret of the cluster, "" for none
 	storageSecret string
+	// storageKey is the key of the storage Secret the configuration file is in, "" for none
+	storageKey string
 	// noStorage tells why the storage Secret of the cluster gives no storage settings: errBackupStorageSecretNotFound,
 	// errBackupStorageConfigNotFound or errBackupStorageConfigEmpty, nil when it does
 	noStorage error
@@ -138,8 +142,11 @@ func (c *Controller) reconcileBackupConfigSecret(
 	credentials backupconfig.Credentials,
 	keepClickHouseCredentials bool,
 ) backupConfigOutcome {
-	outcome := backupConfigOutcome{storageSecret: cluster.GetBackup().GetConfigSecretName()}
-	storage, err := c.getBackupStorageConfig(ctx, cr.GetNamespace(), outcome.storageSecret)
+	outcome := backupConfigOutcome{
+		storageSecret: cluster.GetBackup().GetStorageConfigSecretName(),
+		storageKey:    cluster.GetBackup().GetStorageConfigSecretKey(),
+	}
+	storage, err := c.getBackupStorageConfig(ctx, cr.GetNamespace(), outcome.storageSecret, outcome.storageKey)
 	if err != nil {
 		outcome.err = err
 		return outcome
@@ -195,9 +202,9 @@ type backupStorageConfig struct {
 	missing error
 }
 
-// getBackupStorageConfig returns the storage settings the storage Secret holds, none for no Secret
-func (c *Controller) getBackupStorageConfig(ctx context.Context, namespace, name string) (backupStorageConfig, error) {
-	if name == "" {
+// getBackupStorageConfig returns the storage settings the key of the storage Secret holds, none for no Secret
+func (c *Controller) getBackupStorageConfig(ctx context.Context, namespace, name, key string) (backupStorageConfig, error) {
+	if (name == "") || (key == "") {
 		return backupStorageConfig{}, nil
 	}
 	secret, err := c.kube.Secret().Get(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Namespace: namespace, Name: name}})
@@ -207,12 +214,12 @@ func (c *Controller) getBackupStorageConfig(ctx context.Context, namespace, name
 	case err != nil:
 		return backupStorageConfig{}, fmt.Errorf("%w: %w", errBackupStorageSecretUnreadable, err)
 	}
-	storageConfig, ok := secret.Data[backupconfig.FileName]
+	storageConfig, ok := secret.Data[key]
 	switch {
 	case !ok:
-		return backupStorageConfig{missing: errBackupStorageConfigNotFound}, nil
+		return backupStorageConfig{missing: fmt.Errorf("%w %s", errBackupStorageConfigNotFound, key)}, nil
 	case len(bytes.TrimSpace(storageConfig)) == 0:
-		return backupStorageConfig{missing: errBackupStorageConfigEmpty}, nil
+		return backupStorageConfig{missing: fmt.Errorf("%w %s", errBackupStorageConfigEmpty, key)}, nil
 	}
 	return backupStorageConfig{config: storageConfig}, nil
 }
@@ -451,7 +458,7 @@ func (c *Controller) backupStorageUsable(ctx context.Context, cr *api.ClickHouse
 		if !backup.IsEnabled() {
 			continue
 		}
-		storage, err := c.getBackupStorageConfig(ctx, cr.GetNamespace(), backup.GetConfigSecretName())
+		storage, err := c.getBackupStorageConfig(ctx, cr.GetNamespace(), backup.GetStorageConfigSecretName(), backup.GetStorageConfigSecretKey())
 		if (err != nil) || (storage.missing != nil) {
 			return false
 		}

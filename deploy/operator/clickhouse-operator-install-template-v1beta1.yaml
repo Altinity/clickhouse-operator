@@ -1219,7 +1219,7 @@ spec:
                           When enabled in mode sidecar, the operator injects a clickhouse-backup sidecar into every Pod of the
                           cluster, so turning it on or off rolls the cluster's Pods. Customize the container through a container
                           named clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the
-                          cluster has a `configSecretRef`: without it clickhouse-backup would have no storage and no API
+                          cluster has a `storageConfig`: without it clickhouse-backup would have no storage and no API
                           credentials, so backup stays off and the operator warns.
                           See docs/backup.md for details.
                         properties:
@@ -1227,7 +1227,7 @@ spec:
                             <<: *TypeStringBool
                             description: |
                               Enable operator-managed backup: inject the clickhouse-backup sidecar and allow backup/restore resources to target
-                              the cluster. Takes effect only with `configSecretRef` set, which names where clickhouse-backup takes its
+                              the cluster. Takes effect only with `storageConfig` set, which names where clickhouse-backup takes its
                               storage and API credentials from: without it, backup stays off
                           podTemplate:
                             type: string
@@ -1235,21 +1235,41 @@ spec:
                               Pod template whose container named clickhouse-backup the sidecar is built on: what the container sets is kept,
                               and the operator fills in only what it lacks. Only that container is taken, not the other containers, volumes
                               or Pod settings of the template. Left empty, the operator builds the sidecar on its own
-                          configSecretRef:
+                          storageConfig:
                             type: object
                             description: |
-                              Secret in the installation's namespace whose key `config.yml` holds the clickhouse-backup configuration
-                              of the sidecar, a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket, s3.path,
+                              Where the clickhouse-backup configuration of the sidecar is: a key of a Secret in the installation's
+                              namespace, which holds a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket, s3.path,
                               s3.access_key, s3.secret_key. The operator generates the configuration file of the sidecar from it,
                               which follows a change of the Secret without a restart. A cluster that leaves it out takes the
-                              installation's; an explicit `name: ""` on a cluster leaves the cluster without one. Required: without
-                              one, backup stays off. The configuration must set api.username and api.password of the REST API
+                              installation's; an explicit `secretKeyRef.name: ""` on a cluster leaves the cluster without one. Required:
+                              without one, backup stays off. The configuration must set api.username and api.password of the REST API
                             properties:
-                              name:
-                                description: |
-                                  Name of the referent. More info:
-                                  https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                type: string
+                              valueFrom:
+                                description: "Source of the clickhouse-backup configuration"
+                                type: object
+                                properties:
+                                  secretKeyRef:
+                                    description: |
+                                      Selects a key of a secret in the clickhouse installation namespace.
+                                    type: object
+                                    properties:
+                                      name:
+                                        description: |
+                                          Name of the referent. More info:
+                                          https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                        type: string
+                                      key:
+                                        description: The key of the secret that holds the clickhouse-backup configuration, e.g. `config.yml`. Required.
+                                        type: string
+                                      optional:
+                                        description: Not supported, an optional source is refused
+                                        type: boolean
+                                    required:
+                                      - key
+                                  hotReload:
+                                    description: Not supported, a hot reload is refused
+                                    type: boolean
                           preferredReplica:
                             type: integer
                             minimum: 0
@@ -1899,7 +1919,7 @@ spec:
                 them via `chi.spec.configuration.clusters[].backup`, e.g. `enabled: "no"` to opt a cluster out.
                 When enabled in mode sidecar, the operator injects a clickhouse-backup sidecar into every Pod of the
                 cluster, so turning it on or off rolls the cluster's Pods. Backup takes effect only where a cluster has
-                a `configSecretRef`: without it clickhouse-backup would have no storage and no API credentials, so
+                a `storageConfig`: without it clickhouse-backup would have no storage and no API credentials, so
                 backup stays off and the operator warns.
                 See docs/backup.md for details.
             useTemplates:
@@ -3147,7 +3167,7 @@ spec:
                           When enabled in mode sidecar, the operator injects a clickhouse-backup sidecar into every Pod of the
                           cluster, so turning it on or off rolls the cluster's Pods. Customize the container through a container
                           named clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the
-                          cluster has a `configSecretRef`: without it clickhouse-backup would have no storage and no API
+                          cluster has a `storageConfig`: without it clickhouse-backup would have no storage and no API
                           credentials, so backup stays off and the operator warns.
                           See docs/backup.md for details.
                         properties:
@@ -3155,7 +3175,7 @@ spec:
                             <<: *TypeStringBool
                             description: |
                               Enable operator-managed backup: inject the clickhouse-backup sidecar and allow backup/restore resources to target
-                              the cluster. Takes effect only with `configSecretRef` set, which names where clickhouse-backup takes its
+                              the cluster. Takes effect only with `storageConfig` set, which names where clickhouse-backup takes its
                               storage and API credentials from: without it, backup stays off
                           podTemplate:
                             type: string
@@ -3163,21 +3183,41 @@ spec:
                               Pod template whose container named clickhouse-backup the sidecar is built on: what the container sets is kept,
                               and the operator fills in only what it lacks. Only that container is taken, not the other containers, volumes
                               or Pod settings of the template. Left empty, the operator builds the sidecar on its own
-                          configSecretRef:
+                          storageConfig:
                             type: object
                             description: |
-                              Secret in the installation's namespace whose key `config.yml` holds the clickhouse-backup configuration
-                              of the sidecar, a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket, s3.path,
+                              Where the clickhouse-backup configuration of the sidecar is: a key of a Secret in the installation's
+                              namespace, which holds a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket, s3.path,
                               s3.access_key, s3.secret_key. The operator generates the configuration file of the sidecar from it,
                               which follows a change of the Secret without a restart. A cluster that leaves it out takes the
-                              installation's; an explicit `name: ""` on a cluster leaves the cluster without one. Required: without
-                              one, backup stays off. The configuration must set api.username and api.password of the REST API
+                              installation's; an explicit `secretKeyRef.name: ""` on a cluster leaves the cluster without one. Required:
+                              without one, backup stays off. The configuration must set api.username and api.password of the REST API
                             properties:
-                              name:
-                                description: |
-                                  Name of the referent. More info:
-                                  https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                type: string
+                              valueFrom:
+                                description: "Source of the clickhouse-backup configuration"
+                                type: object
+                                properties:
+                                  secretKeyRef:
+                                    description: |
+                                      Selects a key of a secret in the clickhouse installation namespace.
+                                    type: object
+                                    properties:
+                                      name:
+                                        description: |
+                                          Name of the referent. More info:
+                                          https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                        type: string
+                                      key:
+                                        description: The key of the secret that holds the clickhouse-backup configuration, e.g. `config.yml`. Required.
+                                        type: string
+                                      optional:
+                                        description: Not supported, an optional source is refused
+                                        type: boolean
+                                    required:
+                                      - key
+                                  hotReload:
+                                    description: Not supported, a hot reload is refused
+                                    type: boolean
                           preferredReplica:
                             type: integer
                             minimum: 0
@@ -3827,7 +3867,7 @@ spec:
                 them via `chi.spec.configuration.clusters[].backup`, e.g. `enabled: "no"` to opt a cluster out.
                 When enabled in mode sidecar, the operator injects a clickhouse-backup sidecar into every Pod of the
                 cluster, so turning it on or off rolls the cluster's Pods. Backup takes effect only where a cluster has
-                a `configSecretRef`: without it clickhouse-backup would have no storage and no API credentials, so
+                a `storageConfig`: without it clickhouse-backup would have no storage and no API credentials, so
                 backup stays off and the operator warns.
                 See docs/backup.md for details.
             useTemplates:

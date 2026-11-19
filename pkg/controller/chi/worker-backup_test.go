@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -207,7 +208,7 @@ func TestBackupWithoutStorageAborts(t *testing.T) {
 		"one cluster":             {cr: newCR(nil, lacking()), names: "without a storage on the clusters: c0 - "},
 		"two clusters, one event": {cr: newCR(nil, lacking(), enabledBackup(), lacking()), names: "without a storage on the clusters: c0, c2 - "},
 		"a storage of no Secret on a cluster": {
-			cr:    newCR(nil, &api.ClusterBackup{Enabled: types.NewStringBool(true), ConfigSecretRef: &core.LocalObjectReference{}}),
+			cr:    newCR(nil, &api.ClusterBackup{Enabled: types.NewStringBool(true), StorageConfig: api.NewStorageConfig("", "")}),
 			names: "without a storage on the clusters: c0 - ",
 		},
 		"inherited from the installation": {cr: newCR(lacking(), nil, off()), names: "without a storage on the clusters: c0 - "},
@@ -390,4 +391,54 @@ func TestBackupStorageUsableAfterAbort(t *testing.T) {
 		w := newBackupSecretWorker(&backupSecretFakeSecret{secrets: testStorageSecrets()}, cr)
 		require.False(t, w.c.backupStorageUsable(context.Background(), cr))
 	})
+}
+
+// The configuration of the sidecars is read from the key the cluster names, not from a fixed one, and a Secret that
+// lacks that key is told by it, whatever else it holds.
+func TestBackupStorageSecretKeyIsTheUsers(t *testing.T) {
+	const key = "storage.yaml"
+	newCR := func(key string) *api.ClickHouseInstallation {
+		backup := enabledBackup()
+		backup.StorageConfig = api.NewStorageConfig(testStorageSecret, key)
+		return newBackupSecretCR(t, backup)
+	}
+	storage := func(data map[string]string) map[string]*core.Secret {
+		secret := &core.Secret{ObjectMeta: meta.ObjectMeta{Name: testStorageSecret}, Data: map[string][]byte{}}
+		for name, value := range data {
+			secret.Data[name] = []byte(value)
+		}
+		return map[string]*core.Secret{testStorageSecret: secret}
+	}
+
+	t.Run("read from the key named", func(t *testing.T) {
+		secrets := storage(map[string]string{key: "s3:\n  bucket: mine\n"})
+		reconcileBackupAuxObjects(t, newCR(key), secrets)
+		require.Equal(t, "mine", configFile(t, secrets[configSecretName])["s3"]["bucket"])
+	})
+	t.Run("the fixed key is not taken in its place", func(t *testing.T) {
+		cr := newCR(key)
+		events, err := reconcileBackupAuxObjectsErr(t, cr, storage(map[string]string{backupconfig.FileName: "s3:\n  bucket: other\n"}))
+		requireBackupConfigAbort(t, cr, events, err, "has no key "+key+" - it has to hold the clickhouse-backup configuration in key "+key)
+	})
+	t.Run("an empty key named", func(t *testing.T) {
+		cr := newCR(key)
+		events, err := reconcileBackupAuxObjectsErr(t, cr, storage(map[string]string{key: " \n", backupconfig.FileName: "s3: {}"}))
+		requireBackupConfigAbort(t, cr, events, err, "has an empty key "+key)
+	})
+	t.Run("a key of no name", func(t *testing.T) {
+		cr := newCR("")
+		events, err := reconcileBackupAuxObjectsErr(t, cr, storage(map[string]string{backupconfig.FileName: "s3: {}"}))
+		requireBackupConfigAbort(t, cr, events, err, "without a storage on the clusters: c - ")
+	})
+	for name, from := range map[string]*types.DataSource{
+		"a hot reload":    {SecretKeyRef: api.NewStorageConfig(testStorageSecret, key).ValueFrom.SecretKeyRef, HotReload: true},
+		"an optional key": {SecretKeyRef: &core.SecretKeySelector{LocalObjectReference: core.LocalObjectReference{Name: testStorageSecret}, Key: key, Optional: ptr.To(true)}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cr := newCR(key)
+			cr.Spec.Backup.StorageConfig = &api.StorageConfig{ValueFrom: from}
+			events, err := reconcileBackupAuxObjectsErr(t, cr, storage(map[string]string{key: "s3: {}"}))
+			requireBackupConfigAbort(t, cr, events, err, "spec.backup: ")
+		})
+	}
 }

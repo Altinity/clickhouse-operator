@@ -174,8 +174,8 @@ const testStorageSecret = "s3-credentials"
 // enabledBackup turns backup on with a storage Secret
 func enabledBackup() *api.ClusterBackup {
 	return &api.ClusterBackup{
-		Enabled:         types.NewStringBool(true),
-		ConfigSecretRef: &core.LocalObjectReference{Name: testStorageSecret},
+		Enabled:       types.NewStringBool(true),
+		StorageConfig: api.NewStorageConfig(testStorageSecret, "config.yml"),
 	}
 }
 

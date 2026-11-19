@@ -151,7 +151,7 @@ func (k kubeObjects) withConfigSecrets(t *testing.T, inMemory *api.ClickHouseIns
 		if !cluster.GetBackup().IsEnabled() {
 			continue
 		}
-		storageConfig := k.secrets[cluster.GetBackup().GetConfigSecretName()][backupconfig.FileName]
+		storageConfig := k.secrets[cluster.GetBackup().GetStorageConfigSecretName()][backupconfig.FileName]
 		built, err := backupconfig.Build([]byte(storageConfig), backupconfig.Credentials{}, backupconfig.Defaults{
 			Path:           chop.Config().Backup.StoragePath,
 			ObjectDiskPath: chop.Config().Backup.StorageObjectDiskPath,
@@ -236,11 +236,11 @@ func sidecarSettingsInstallation(t *testing.T, mutate func(chi *api.ClickHouseIn
 	t.Helper()
 	hot := layoutCluster("hot", 2, 2, &api.ClusterBackup{Enabled: types.NewStringBool(true)})
 	plain := layoutCluster("plain", 1, 1, &api.ClusterBackup{Enabled: types.NewStringBool(false)})
-	cold := layoutCluster("cold", 1, 2, &api.ClusterBackup{Enabled: types.NewStringBool(true), ConfigSecretRef: &core.LocalObjectReference{Name: "s3-cold"}})
+	cold := layoutCluster("cold", 1, 2, &api.ClusterBackup{Enabled: types.NewStringBool(true), StorageConfig: api.NewStorageConfig("s3-cold", "config.yml")})
 	// warm takes the storage Secret of the installation
 	warm := layoutCluster("warm", 2, 1, &api.ClusterBackup{Enabled: types.NewStringBool(true)})
 	chi := newCHI("demo", hot, plain, cold, warm)
-	chi.Spec.Backup = &api.ClusterBackup{ConfigSecretRef: &core.LocalObjectReference{Name: "s3-main"}}
+	chi.Spec.Backup = &api.ClusterBackup{StorageConfig: api.NewStorageConfig("s3-main", "config.yml")}
 	chi.Spec.Templates = &api.Templates{PodTemplates: []api.PodTemplate{{
 		Name: "own-command",
 		Spec: core.PodSpec{Containers: []core.Container{

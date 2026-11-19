@@ -454,8 +454,11 @@ Another example with selectively described replicas. Note - `replicasCount` spec
   backup:
     enabled: "yes"
     podTemplate: backup-sidecar  # its clickhouse-backup container is the sidecar's base
-    configSecretRef:         # the Secret of the clickhouse-backup configuration, required
-      name: clickhouse-backup-config
+    storageConfig:           # where the clickhouse-backup configuration is, required
+      valueFrom:
+        secretKeyRef:
+          name: clickhouse-backup-config
+          key: config.yml
     # mode: sidecar          # or pod: no sidecar, a backup Pod per shard while a backup or restore runs
     recovery:                # a new installation only
       backupName: default-prod-nightly-20261003023000
@@ -478,12 +481,13 @@ run per cluster, through SQL on the integration tables of the sidecars (see
     only that container is taken.
     It customizes the container only and names no storage. Left empty, the operator builds the sidecar on its own (see
     [backup.md](backup.md#customizing-the-sidecar))
-  - `configSecretRef` - the `name` of a Secret in the installation's namespace whose key `config.yml` holds the
-    clickhouse-backup configuration of the sidecar, a YAML mapping of its sections, e.g. `general.remote_storage`,
+  - `storageConfig` - `valueFrom.secretKeyRef` names a Secret in the installation's namespace, by its `name`, and the
+    `key` of it that holds the clickhouse-backup configuration of the sidecar, a YAML mapping of its sections, e.g. `general.remote_storage`,
     `s3.bucket`, `s3.path`, `s3.access_key`, `s3.secret_key`; the operator generates the sidecar's configuration file
     from it. A cluster takes the installation's unless it names its own, and the installation a template's;
-    `name: ""` on a cluster leaves it without one. It is required wherever backup is enabled: without it, with a
-    Secret that does not exist or holds no readable `config.yml`, or with an invalid backup block, the reconcile of the
+    `secretKeyRef.name: ""` on a cluster leaves it without one. It is required wherever backup is enabled, with
+    both the `name` and the `key`: without it, with a Secret that does not exist or holds no readable configuration in
+    its `key`, or with an invalid backup block (a `secretKeyRef` without a `key`, `hotReload` or `optional`), the reconcile of the
     installation is aborted (status `Aborted`, reason `BackupConfigInvalid`, warning event
     `BackupStorageConfigInvalid`) until it is fixed. The operator forces `general.backups_to_keep_remote: 0` and turns
     `rebase_during_delete` and `rebase_before_remove_old_remote` on: only the schedules' retention deletes backups.

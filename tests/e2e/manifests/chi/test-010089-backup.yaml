@@ -10,8 +10,11 @@ spec:
     - name: clickhouse-version
   backup:
     enabled: "yes"
-    configSecretRef:
-      name: backup-storage
+    storageConfig:
+      valueFrom:
+        secretKeyRef:
+          name: backup-storage
+          key: config.yml
   configuration:
     clusters:
       - name: main

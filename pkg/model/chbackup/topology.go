@@ -307,7 +307,7 @@ func newTopologyCluster(
 ) topologyCluster {
 	cluster := topologyCluster{
 		name:             c.GetName(),
-		configSecret:     c.GetBackup().GetConfigSecretName(),
+		configSecret:     c.GetBackup().GetStorageConfigSecretName(),
 		preferredReplica: c.GetBackup().GetPreferredReplica(),
 		naming:           c.GetBackup().GetNaming(),
 		endpoints:        map[string]HostEndpoint{},

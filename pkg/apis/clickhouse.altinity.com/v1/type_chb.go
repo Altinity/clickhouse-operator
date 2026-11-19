@@ -178,7 +178,7 @@ const (
 	// BackupReasonBackupDisabled: backup is not enabled on the target cluster(s).
 	BackupReasonBackupDisabled = "BackupDisabled"
 	// BackupReasonNoBackupStorage: the target cluster(s) turn backup on without the settings of a
-	// storage, neither configSecretRef nor podTemplate, which leaves their backup off.
+	// storage, neither storageConfig nor podTemplate, which leaves their backup off.
 	BackupReasonNoBackupStorage = "NoBackupStorage"
 	// BackupReasonNoTargetHosts: the target resolves to no hosts.
 	BackupReasonNoTargetHosts = "NoTargetHosts"

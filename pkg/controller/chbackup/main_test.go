@@ -107,8 +107,8 @@ func backupCluster(name string, shards int, enabled bool) *api.Cluster {
 		Name:   name,
 		Layout: &api.ChiClusterLayout{ShardsCount: shards, ReplicasCount: 2},
 		Backup: &api.ClusterBackup{
-			Enabled:         types.NewStringBool(enabled),
-			ConfigSecretRef: &core.LocalObjectReference{Name: testStorageSecret},
+			Enabled:       types.NewStringBool(enabled),
+			StorageConfig: api.NewStorageConfig(testStorageSecret, "config.yml"),
 		},
 	}
 }
@@ -116,7 +116,7 @@ func backupCluster(name string, shards int, enabled bool) *api.Cluster {
 // lackingCluster is a cluster that turns backup on without a storage, which leaves its backup off.
 func lackingCluster(name string, shards int) *api.Cluster {
 	cluster := backupCluster(name, shards, true)
-	cluster.Backup.ConfigSecretRef = nil
+	cluster.Backup.StorageConfig = nil
 	return cluster
 }
 

@@ -171,8 +171,11 @@ spec:
   backup:
     enabled: "yes"
     # The Secret of the clickhouse-backup configuration of the sidecar
-    configSecretRef:
-      name: backup-demo-storage
+    storageConfig:
+      valueFrom:
+        secretKeyRef:
+          name: backup-demo-storage
+          key: config.yml
   configuration:
     clusters:
       - name: main
@@ -187,15 +190,15 @@ spec:
 
 | Field                    | Meaning                                                                                                                                                                                                                                                    |
 |--------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `enabled`                | `"yes"` turns operator-managed backup on. Accepts the usual yes/no forms (`"yes"`, `"no"`, `true`, `false`, ...). Off by default. Requires `configSecretRef`, see below.                                                                                        |
+| `enabled`                | `"yes"` turns operator-managed backup on. Accepts the usual yes/no forms (`"yes"`, `"no"`, `true`, `false`, ...). Off by default. Requires `storageConfig`, see below.                                                                                        |
 | `podTemplate`            | Pod template whose `clickhouse-backup` container the sidecar is built on, see [Customizing the sidecar](#customizing-the-sidecar). It customizes the container only: it names no storage. `""` on a cluster: the operator's own. |
-| `configSecretRef`        | Secret in the CHI namespace whose key `config.yml` holds the `clickhouse-backup` configuration of the sidecar, see [Backup storage](#backup-storage). Required where backup is enabled. `name: ""` on a cluster: none.                                     |
+| `storageConfig`          | `valueFrom.secretKeyRef`: the `name` of a Secret in the CHI namespace and the `key` of it that holds the `clickhouse-backup` configuration of the sidecar, see [Backup storage](#backup-storage). Both are required where backup is enabled; `hotReload` and `optional` are not supported. `secretKeyRef.name: ""` on a cluster: none.                                     |
 | `preferredReplica`       | Index, from 0, of the replica of each shard a backup works on, as the `backupReplica` of the Altinity usual backup workflow; empty is 0, the first replica. A `FirstPerShard` backup runs on that replica's sidecar, or on the first replica's when the shard has fewer replicas or the preferred one's ClickHouse does not answer when the run starts (`OrchestratorReplicaFallback` event), see [Which hosts are involved](#which-hosts-are-involved). |
 | `naming`                 | Template the backups of the cluster are named by, one name per shard, e.g. `shard{shardNum}-{YYYYMMDDHHIISS}` as the Altinity usual backup workflow names them; empty, the default, names a backup `<prefix>-YYYYMMDDHHMMSS` alike on every shard. See [Backup naming](#backup-naming). |
 | `recovery`               | `backupName`: the backup a new CHI starts from, see [Recover a new CHI from a backup](#recover-a-new-chi-from-a-backup). `""` on a cluster: nothing to recover there. `sourceInstallation`, `sourceNamespace`: the CHI that made the backup, when another; `""` on a cluster: this CHI. |
 
 Inheritance follows `spec.security`: a cluster inherits every field it leaves empty from
-`spec.backup`, so a cluster-level value always wins, `configSecretRef` included: a cluster may keep
+`spec.backup`, so a cluster-level value always wins, `storageConfig` included: a cluster may keep
 its backups in a storage of its own. Everything else about the sidecar - its
 image, environment, resources, security context - is set in the pod template `podTemplate` names, see
 [Customizing the sidecar](#customizing-the-sidecar). Set `enabled: "no"` on a cluster to opt it
@@ -210,8 +213,9 @@ as in [`01-chi-with-backup.yaml`](chb-examples/01-chi-with-backup.yaml); see
 [Data volume](#data-volume) for why.
 
 **Backup needs a storage, or the reconcile is aborted.** A cluster with backup enabled, on the cluster
-or inherited from `spec.backup`, needs a `configSecretRef` whose Secret exists and holds a readable
-`config.yml`, and the backup block has to validate. Otherwise the operator aborts the reconcile of the
+or inherited from `spec.backup`, needs a `storageConfig` whose Secret exists and holds a readable
+configuration in its `key`, and the backup block has to validate: a `secretKeyRef` without a `key`, a `hotReload: true`
+and an `optional: true` are refused, with a message naming the field. Otherwise the operator aborts the reconcile of the
 whole CHI before it changes anything: its status turns `Aborted` with the reason
 `BackupConfigInvalid` and a message naming the cluster and what is wrong, and a
 `BackupStorageConfigInvalid` warning event goes to the CHI. `podTemplate` does not stand in for a
@@ -223,7 +227,7 @@ mounts at `/etc/clickhouse-backup` gives way to the one the operator generates t
 
 **Enabling or disabling backup rolls that cluster's Pods only.** Adding or removing the sidecar
 changes the cluster's Pod template, so the operator performs its usual rolling update, host by host.
-Changing `podTemplate`, which Secret `configSecretRef` names, or the sidecar's container in its pod template rolls the Pods the same
+Changing `podTemplate` or the sidecar's container in its pod template rolls the Pods the same
 way; `recovery` is no sidecar setting, and changing it restarts nothing. Changing the contents of the
 storage Secret restarts nothing at all: the operator regenerates the configuration file of the
 sidecars, which they read anew for every operation, see [Secret changes](#secret-changes). The other clusters of the CHI are not restarted: they only
@@ -381,8 +385,11 @@ spec:
   backup:
     enabled: "yes"
     podTemplate: backup-sidecar
-    configSecretRef:
-      name: backup-demo-storage
+    storageConfig:
+      valueFrom:
+        secretKeyRef:
+          name: backup-demo-storage
+          key: config.yml
   templates:
     podTemplates:
       - name: backup-sidecar
@@ -459,12 +466,12 @@ one downloaded copy of a backup.
 
 Where a cluster keeps its backups - the storage type, the bucket or container, the path - and the
 credentials to reach them are configured by a Secret in the CHI namespace, the storage Secret, named
-in the `configSecretRef` of the cluster, its own or inherited from `spec.backup`.
-Its key `config.yml` holds the storage settings: a YAML mapping of the sections of the
+in the `storageConfig.valueFrom.secretKeyRef` of the cluster, its own or inherited from `spec.backup`.
+Its `key`, `config.yml` in the examples, holds the storage settings: a YAML mapping of the sections of the
 `clickhouse-backup` configuration file - `general`, `s3`, `gcs`, `azblob`, ... - see the
 [clickhouse-backup configuration reference](https://github.com/Altinity/clickhouse-backup#default-config)
 for every option. The operator generates the configuration file of the sidecars from it, see
-[What the operator runs](#what-the-operator-runs); other keys of the Secret are not read. A minimal S3
+[What the operator runs](#what-the-operator-runs); other keys of the Secret are not read, and the `key` is yours to name. A minimal S3
 or MinIO Secret:
 
 ```yaml
@@ -541,7 +548,7 @@ the sidecar's container in its pod template to keep local copies.
 
 The reconcile of the CHI does not go ahead without a usable Secret, see
 [Enabling backup](#enabling-backup). When the Secret does not exist - not created
-yet, or misspelled in `configSecretRef` - holds no key `config.yml`, or an empty one, as a Secret of
+yet, or misspelled in `storageConfig` - holds no such `key`, or an empty one, as a Secret of
 environment-variable keys does, or holds storage settings that are no YAML mapping of sections - not
 YAML at all, a section that is no mapping, a setting the operator reads that is a list - the operator
 aborts the reconcile of the whole CHI before it creates or changes anything: its status turns
@@ -584,7 +591,7 @@ tables until it restarts, and the operator cannot drive it meanwhile: a run that
 
 ### A storage per cluster
 
-`configSecretRef` is inherited like every other field, so a cluster that names a Secret of its own
+`storageConfig` is inherited like every other field, so a cluster that names a Secret of its own
 keeps its backups in a storage of its own, and a CHI's Secret wins over the one of a
 `ClickHouseInstallationTemplate` it uses:
 
@@ -592,8 +599,11 @@ keeps its backups in a storage of its own, and a CHI's Secret wins over the one 
 spec:
   backup:
     enabled: "yes"
-    configSecretRef:
-      name: backup-demo-storage
+    storageConfig:
+      valueFrom:
+        secretKeyRef:
+          name: backup-demo-storage
+          key: config.yml
   configuration:
     clusters:
       # Keeps its backups as backup-demo-storage says
@@ -601,11 +611,14 @@ spec:
       # Keeps its backups as backup-demo-storage-cold says
       - name: cold
         backup:
-          configSecretRef:
-            name: backup-demo-storage-cold
+          storageConfig:
+            valueFrom:
+              secretKeyRef:
+                name: backup-demo-storage-cold
+                key: config.yml
 ```
 
-* **`configSecretRef: {name: ""}` on a cluster** leaves the cluster without a storage Secret: with
+* **`secretKeyRef: {name: ""}` in the `storageConfig` of a cluster** leaves the cluster without a storage Secret: with
   backup enabled there, the reconcile of the CHI is aborted, see [Enabling backup](#enabling-backup);
   set `enabled: "no"` on the cluster as well to leave it without backup.
 
@@ -919,7 +932,7 @@ other contents therefore takes effect by itself:
   change while a backup or restore runs leaves it with the old settings on some hosts and the new ones on others:
   change the storage Secret only while no backup or restore runs.
 * **A removed setting counts.** The file is generated from the Secret as it is, so a setting removed
-  from it is gone from the file too. A deleted storage Secret, or one without `config.yml` or with an
+  from it is gone from the file too. A deleted storage Secret, or one without the `key` of the `storageConfig` or with an
   empty one, leaves the storage settings of the file as they were, with a `BackupStorageSecretMissing`
   event: removing the Secret does not take the storage from the sidecars. Storage settings that
   cannot be read leave the file as it was, with a `BackupStorageConfigInvalid` event, see
@@ -1208,7 +1221,7 @@ newest such run that completed.
 
 The status also tells how the runs went, for each cluster in `status.clusters`:
 
-* `configSecret`: the `configSecretRef` its runs keep their backups by, as of the last run - for a
+* `configSecret`: the Secret of the `storageConfig` its runs keep their backups by, as of the last run - for a
   cluster the schedule backs up no more, the storage its unpruned backups lie in (see
   [Hosts that leave a schedule](#hosts-that-leave-a-schedule));
 * `lastScheduleTime`: the slot of the last run that started; `lastSuccessfulTime`: when a run last
@@ -2099,8 +2112,11 @@ Name the backup a new CHI starts from in its `spec.backup.recovery`:
 spec:
   backup:
     enabled: "yes"
-    configSecretRef:
-      name: backup-demo-storage
+    storageConfig:
+      valueFrom:
+        secretKeyRef:
+          name: backup-demo-storage
+          key: config.yml
     recovery:
       backupName: default-backup-demo-nightly-20261003023000
       # The CHI that made the backup, when another one - its namespace too, when another and the
@@ -2140,8 +2156,11 @@ by a schedule of all clusters, its `status.clusters[].lastBackupName`, while the
 spec:
   backup:
     enabled: "yes"
-    configSecretRef:
-      name: backup-demo-storage
+    storageConfig:
+      valueFrom:
+        secretKeyRef:
+          name: backup-demo-storage
+          key: config.yml
     recovery:
       backupName: default-backup-demo-nightly-20261003023000
   configuration:
@@ -2234,7 +2253,7 @@ Every resource reports progress in `status`:
 * `phase`, `reason`, `message`, `nextScheduleTime` and `entries` (schedules): `Active`, `Suspended` or
   `Aborted`, see [ClickHouseBackupSchedule](#clickhousebackupschedule);
 * `clusters` (backups and restores): one entry per cluster, fixed when the resource is validated,
-  with the cluster's `phase`, `hosts`, `configSecret` - the `configSecretRef` of the storage
+  with the cluster's `phase`, `hosts`, `configSecret` - the Secret of the `storageConfig` of the storage
   the run keeps the backup in, or reads it from - `startTime` and `completionTime`, the `reason` and
   `message` of its outcome, and `run`, the state of its run, see
   [How the operator runs an operation](#how-the-operator-runs-an-operation);
@@ -2270,7 +2289,7 @@ The condition `reason` says why, with the details in `message`:
 | `CHINotFound`, `CHINotReady`, `CHIStopped`           | The CHI does not exist, has not completed its reconcile, or is stopped; the resource waits. |
 | `NoClickHouseAccess`                                 | The operator configuration sets no ClickHouse username and password of its own (`clickhouse.access`, or its Secret) to drive the sidecars with, the defaults not counting; the resource waits, see [How the operator runs an operation](#how-the-operator-runs-an-operation). |
 | `ClusterNotFound`, `BackupDisabled`, `NoTargetHosts` | The CHI cannot run the operation as configured, see [Which hosts are involved](#which-hosts-are-involved); for a backup that [runs a schedule](#run-a-schedule-now), also a `cluster` the schedule does not back up.                                                                             |
-| `NoBackupStorage`                                    | The target cluster has backup enabled without `configSecretRef`, see [Enabling backup](#enabling-backup). Schedules of every cluster: as `Validated`, leaving such clusters out, which run no more. |
+| `NoBackupStorage`                                    | The target cluster has backup enabled without `storageConfig`, see [Enabling backup](#enabling-backup). Schedules of every cluster: as `Validated`, leaving such clusters out, which run no more. |
 | `OperationInProgress`                                | Another operation of the cluster runs, or, for a backup, a restore of access entities of its cluster, or of every cluster, is unfinished; a restore of access entities waits for every cluster; the resource waits its turn; a restore also waits for a scheduled run of the CHI whose backup it reads.                                                  |
 | `WaitingForGarbageCollection`                        | Recovery: a `ClickHouseRestore` of the name a recovery restore needs belongs to a deleted owner, or is being deleted; the recovery of the cluster waits until it is gone. |
 | `NameConflict`                                       | Recovery: the name of a recovery restore is taken by another restore, see [Recover a new CHI from a backup](#recover-a-new-chi-from-a-backup). |

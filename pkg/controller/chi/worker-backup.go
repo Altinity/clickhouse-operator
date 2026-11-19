@@ -109,7 +109,7 @@ func (w *worker) reconcileBackupConfigSecrets(ctx context.Context, cr *api.Click
 }
 
 // backupSpecProblems lists what is wrong with the backup blocks of the installation and of its clusters: a value out
-// of range, or a cluster that turns backup on without naming the Secret of its clickhouse-backup configuration -
+// of range, or a cluster that turns backup on without naming the Secret and the key of its clickhouse-backup configuration -
 // backup takes explicit configuration, never defaults. A cluster that turns backup off is never a problem. The
 // clusters inherit spec.backup here as the normalizer has them do, so the spec reads alike before and after it.
 func backupSpecProblems(cr *api.ClickHouseInstallation) []string {
@@ -140,12 +140,12 @@ func backupConfigAbortProblem(cr *api.ClickHouseInstallation, cluster string, ou
 	storageSecret := util.NamespaceNameString(&meta.ObjectMeta{Namespace: cr.GetNamespace(), Name: outcome.storageSecret})
 	switch {
 	case errors.Is(outcome.err, backupconfig.ErrInvalidStorageConfig):
-		return fmt.Sprintf("cluster %s: Secret %s holds a %s that cannot be read: %v", cluster, storageSecret, backupconfig.FileName, outcome.err)
+		return fmt.Sprintf("cluster %s: Secret %s holds a %s that cannot be read: %v", cluster, storageSecret, outcome.storageKey, outcome.err)
 	case errors.Is(outcome.err, errBackupStorageSecretUnreadable):
 		return fmt.Sprintf("cluster %s: Secret %s %v", cluster, storageSecret, outcome.err)
 	case outcome.noStorage != nil:
 		return fmt.Sprintf("cluster %s: Secret %s %v - it has to hold the clickhouse-backup configuration in key %s",
-			cluster, storageSecret, outcome.noStorage, backupconfig.FileName)
+			cluster, storageSecret, outcome.noStorage, outcome.storageKey)
 	}
 	return ""
 }
@@ -172,7 +172,7 @@ func warnBackupConfigOutcome(announcer a.Announcer, cr *api.ClickHouseInstallati
 		announcer.V(1).M(cr).F().
 			WithEvent(cr, a.EventActionReconcile, a.EventReasonBackupStorageConfigInvalid).
 			Warning("Secret %s of the backup storage of cluster %s holds a %s that cannot be read - the sidecars "+
-				"keep their configuration until it is fixed: %v", storageSecret, cluster, backupconfig.FileName, outcome.err)
+				"keep their configuration until it is fixed: %v", storageSecret, cluster, outcome.storageKey, outcome.err)
 	case outcome.err != nil:
 		announcer.V(1).M(cr).F().
 			WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
@@ -182,13 +182,13 @@ func warnBackupConfigOutcome(announcer a.Announcer, cr *api.ClickHouseInstallati
 			WithEvent(cr, a.EventActionReconcile, a.EventReasonBackupStorageSecretMissing).
 			Warning("Secret %s of the backup storage of cluster %s %v - the sidecars keep the storage settings they "+
 				"have until the Secret holds the clickhouse-backup configuration of the storage in key %s again",
-				storageSecret, cluster, outcome.noStorage, backupconfig.FileName)
+				storageSecret, cluster, outcome.noStorage, outcome.storageKey)
 	case outcome.noStorage != nil:
 		announcer.V(1).M(cr).F().
 			WithEvent(cr, a.EventActionReconcile, a.EventReasonBackupStorageSecretMissing).
 			Warning("Secret %s of the backup storage of cluster %s %v - its backups fail until the Secret holds the "+
 				"clickhouse-backup configuration of the storage in key %s, which the sidecars pick up within a few minutes",
-				storageSecret, cluster, outcome.noStorage, backupconfig.FileName)
+				storageSecret, cluster, outcome.noStorage, outcome.storageKey)
 	}
 }
 

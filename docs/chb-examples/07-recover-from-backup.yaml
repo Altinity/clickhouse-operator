@@ -33,8 +33,11 @@ spec:
   backup:
     enabled: "yes"
     # The clickhouse-backup configuration of the sidecar, kept in the Secret of 01-chi-with-backup.yaml
-    configSecretRef:
-      name: backup-demo-storage
+    storageConfig:
+      valueFrom:
+        secretKeyRef:
+          name: backup-demo-storage
+          key: config.yml
     recovery:
       # The backup to restore, e.g. LAST-BACKUP of kubectl get chbs -o wide; check that it still
       # exists on every cluster, or name each cluster's own backup, see docs/backup.md.

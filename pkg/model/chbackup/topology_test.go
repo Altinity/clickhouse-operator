@@ -52,8 +52,8 @@ func TestMain(m *testing.M) {
 
 func enabledBackup() *api.ClusterBackup {
 	return &api.ClusterBackup{
-		Enabled:         types.NewStringBool(true),
-		ConfigSecretRef: &core.LocalObjectReference{Name: testStorageSecret},
+		Enabled:       types.NewStringBool(true),
+		StorageConfig: api.NewStorageConfig(testStorageSecret, "config.yml"),
 	}
 }
 

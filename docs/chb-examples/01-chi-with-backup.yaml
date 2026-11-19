@@ -59,8 +59,11 @@ spec:
     # The sidecar is customized through the clickhouse-backup container of the pod template named:
     # podTemplate: backup-sidecar
     # The clickhouse-backup configuration of the sidecar, kept in the Secret above
-    configSecretRef:
-      name: backup-demo-storage
+    storageConfig:
+      valueFrom:
+        secretKeyRef:
+          name: backup-demo-storage
+          key: config.yml
     # How the operator reaches clickhouse-backup: sidecar, the default, runs it in every ClickHouse Pod; pod runs no
     # sidecar and starts one backup Pod per shard, on the volumes of a replica, only while a backup or restore runs.
   defaults:

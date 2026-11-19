@@ -140,8 +140,8 @@ func sidecarOn(cr *chi.ClickHouseInstallation, cluster *chi.Cluster, sidecar cor
 
 func enabled() *chi.ClusterBackup {
 	return &chi.ClusterBackup{
-		Enabled:         types.NewStringBool(true),
-		ConfigSecretRef: &core.LocalObjectReference{Name: storageSecret},
+		Enabled:       types.NewStringBool(true),
+		StorageConfig: chi.NewStorageConfig(storageSecret, "config.yml"),
 	}
 }
 
@@ -330,7 +330,7 @@ func TestBackupSidecar(t *testing.T) {
 	}
 	cr := newCR(newCluster(backedUpCluster, enabled()), newCluster(plainCluster, nil))
 	cr.Spec.Backup = &chi.ClusterBackup{
-		ConfigSecretRef: &core.LocalObjectReference{Name: storageSecret},
+		StorageConfig: chi.NewStorageConfig(storageSecret, "config.yml"),
 	}
 	sidecarOn(cr, cr.Spec.Configuration.Clusters[0], core.Container{Env: []core.EnvVar{{Name: "LOG_LEVEL", Value: "debug"}}, Resources: *resources})
 	cr = normalize(t, cr)
@@ -603,8 +603,8 @@ func TestBackupWithoutStorageAddsNothing(t *testing.T) {
 	for name, backup := range map[string]*chi.ClusterBackup{
 		"nothing named": {Enabled: types.NewStringBool(true)},
 		"a storage of no Secret": {
-			Enabled:         types.NewStringBool(true),
-			ConfigSecretRef: &core.LocalObjectReference{},
+			Enabled:       types.NewStringBool(true),
+			StorageConfig: chi.NewStorageConfig("", ""),
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -637,7 +637,7 @@ func TestBackupWithoutStorageAddsNothing(t *testing.T) {
 // clickhouse-backup sets the env vars an operation overrides for the whole process.
 func TestBackupSidecarSettingsForJobs(t *testing.T) {
 	cr := newCR(newCluster(backedUpCluster, enabled()))
-	cr.Spec.Backup = &chi.ClusterBackup{ConfigSecretRef: &core.LocalObjectReference{Name: storageSecret}}
+	cr.Spec.Backup = &chi.ClusterBackup{StorageConfig: chi.NewStorageConfig(storageSecret, "config.yml")}
 	sts, _ := createStatefulSet(t, normalize(t, cr), backedUpCluster)
 	sidecar := requireBackupContainer(t, sts)
 
@@ -659,7 +659,7 @@ func TestBackupSidecarSettingsForJobs(t *testing.T) {
 // sidecar sets a path: it would take precedence over the path the storage settings set.
 func TestBackupSidecarDefaultPaths(t *testing.T) {
 	cr := newCR(newCluster(backedUpCluster, enabled()))
-	cr.Spec.Backup = &chi.ClusterBackup{ConfigSecretRef: &core.LocalObjectReference{Name: storageSecret}}
+	cr.Spec.Backup = &chi.ClusterBackup{StorageConfig: chi.NewStorageConfig(storageSecret, "config.yml")}
 	sts, _ := createStatefulSet(t, normalize(t, cr), backedUpCluster)
 	sidecar := requireBackupContainer(t, sts)
 
@@ -960,7 +960,7 @@ func rewordComments(t *testing.T, script string) string {
 // restarting ClickHouse, which an operator upgrade that merely rewords a comment of a script must not.
 func TestBackupSidecarScriptCommentsLeavePodTemplateAlone(t *testing.T) {
 	cr := newCR(newCluster(backedUpCluster, enabled()))
-	cr.Spec.Backup = &chi.ClusterBackup{ConfigSecretRef: &core.LocalObjectReference{Name: storageSecret}}
+	cr.Spec.Backup = &chi.ClusterBackup{StorageConfig: chi.NewStorageConfig(storageSecret, "config.yml")}
 	cr = normalize(t, cr)
 	shipped, _ := createStatefulSet(t, cr, backedUpCluster)
 
@@ -1083,7 +1083,7 @@ func TestBackupAnnotationsNotPropagated(t *testing.T) {
 func TestBackupSidecarScriptSurvivesKubeletExpansion(t *testing.T) {
 	require.Contains(t, chiCreator.BackupSidecarScript, "$$", "the script relies on $$")
 	cr := newCR(newCluster(backedUpCluster, enabled()))
-	cr.Spec.Backup = &chi.ClusterBackup{ConfigSecretRef: &core.LocalObjectReference{Name: storageSecret}}
+	cr.Spec.Backup = &chi.ClusterBackup{StorageConfig: chi.NewStorageConfig(storageSecret, "config.yml")}
 	sts, _ := createStatefulSet(t, normalize(t, cr), backedUpCluster)
 	sidecar := requireBackupContainer(t, sts)
 	require.Equal(t, sidecarCommand(), receivedCommand(sidecar))

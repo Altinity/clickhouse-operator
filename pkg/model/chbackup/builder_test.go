@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiMachinery "k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -354,12 +353,12 @@ func TestRecoveries(t *testing.T) {
 		}},
 		&api.Cluster{Name: "plain", Backup: &api.ClusterBackup{Enabled: types.NewStringBool(false)}},
 		&api.Cluster{Name: "lacking", Backup: &api.ClusterBackup{
-			Enabled: types.NewStringBool(true), ConfigSecretRef: &core.LocalObjectReference{},
+			Enabled: types.NewStringBool(true), StorageConfig: api.NewStorageConfig("", ""),
 		}},
 	)
 	chi.Spec.Backup = &api.ClusterBackup{
-		ConfigSecretRef: &core.LocalObjectReference{Name: testStorageSecret},
-		Recovery:        &api.BackupRecovery{BackupName: types.NewString("nightly-20261004-020000")},
+		StorageConfig: api.NewStorageConfig(testStorageSecret, "config.yml"),
+		Recovery:      &api.BackupRecovery{BackupName: types.NewString("nightly-20261004-020000")},
 	}
 	_, stored := normalize(t, chi)
 
