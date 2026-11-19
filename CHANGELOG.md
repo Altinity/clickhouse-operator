@@ -66,6 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **Users with non-password authentication methods no longer receive an injected default password**, preventing invalid user configurations and ClickHouse startup failures. Supports certificate, LDAP, Kerberos, SSH, HTTP, `no_password`, and `auth_methods` authentication. by [@ringerc](https://github.com/ringerc) in [#2156](https://github.com/Altinity/clickhouse-operator/pull/2156) and [@alex-zaitsev](https://github.com/alex-zaitsev) in [#2157](https://github.com/Altinity/clickhouse-operator/pull/2157). Fixes [#2155](https://github.com/Altinity/clickhouse-operator/issues/2155)
 
+* **Operator API packages can now be imported as a Go module without additional dependency overrides.** The fork-specific `mergo` implementation is included in `pkg/util/mergo`, removing the need for downstream consumers to add their own `mergo` `replace` directive to build against the operator's Go API packages. by [@sks](https://github.com/sks) in [#2160](https://github.com/Altinity/clickhouse-operator/pull/2160). Fixes [#2150](https://github.com/Altinity/clickhouse-operator/issues/2150)
+
 * **Malformed boolean-like configuration values no longer interrupt reconciliation** of other resources. by [@sunsingerus](https://github.com/sunsingerus)
 
 * **Corrected ClickHouse container detection** when logging or backup sidecars appear first in a pod template. by [@sunsingerus](https://github.com/sunsingerus)
