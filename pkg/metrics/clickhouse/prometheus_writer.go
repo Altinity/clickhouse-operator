@@ -32,6 +32,10 @@ import (
 const (
 	namespace = "chi"
 	subsystem = "clickhouse"
+
+	// asyncMetricKeyLabel carries the element of a key-value asynchronous metric that has no pre 26.8 name.
+	// It is not just "key" so it cannot collide with a label of the watched CR.
+	asyncMetricKeyLabel = "async_metric_key"
 )
 
 const (
@@ -63,7 +67,8 @@ func NewCHIPrometheusWriter(
 }
 
 // WriteMetrics pushes set of prometheus.Metric objects created from the ClickHouse system data
-// Expected data structure: metric, value, description, type (gauge|counter)
+// Expected data structure: metric, value, description, type (gauge|counter), key (optional)
+// A non-empty key is the element of a key-value metric that has no pre 26.8 name, written as the async_metric_key label.
 // TODO add namespace handling. It is just skipped for now
 func (w *CHIPrometheusWriter) WriteMetrics(data [][]string) {
 	for _, metric := range data {
@@ -81,7 +86,11 @@ func (w *CHIPrometheusWriter) WriteMetrics(data [][]string) {
 		} else {
 			metricType = prometheus.GaugeValue
 		}
-		w.writeSingleMetricToPrometheus(name, desc, metricType, value, nil)
+		var labels map[string]string
+		if len(metric) > 4 && metric[4] != "" {
+			labels = map[string]string{asyncMetricKeyLabel: metric[4]}
+		}
+		w.writeSingleMetricToPrometheus(name, desc, metricType, value, labels)
 	}
 }
 
