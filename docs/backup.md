@@ -192,7 +192,7 @@ spec:
 |--------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `enabled`                | `"yes"` turns operator-managed backup on. Accepts the usual yes/no forms (`"yes"`, `"no"`, `true`, `false`, ...). Off by default. Requires `storageConfig`, see below.                                                                                        |
 | `podTemplate`            | Pod template whose `clickhouse-backup` container the sidecar is built on, see [Customizing the sidecar](#customizing-the-sidecar). It customizes the container only: it names no storage. `""` on a cluster: the operator's own. |
-| `storageConfig`          | `valueFrom.secretKeyRef`: the `name` of a Secret in the CHI namespace and the `key` of it that holds the `clickhouse-backup` configuration of the sidecar, see [Backup storage](#backup-storage). Both are required where backup is enabled; `hotReload` and `optional` are not supported. `secretKeyRef.name: ""` on a cluster: none.                                     |
+| `storageConfig`          | `valueFrom.secretKeyRef` selects the `name` of a Secret in the CHI namespace and the `key` holding the `clickhouse-backup` storage configuration; see [Backup storage](#backup-storage). A non-empty name and key are needed to enable backup. The CRD requires `key` whenever `secretKeyRef` is present, even if `name: ""` clears an inherited Secret. `hotReload: true` and `optional: true` are not supported. |
 | `preferredReplica`       | Index, from 0, of the replica of each shard a backup works on, as the `backupReplica` of the Altinity usual backup workflow; empty is 0, the first replica. A `FirstPerShard` backup runs on that replica's sidecar, or on the first replica's when the shard has fewer replicas or the preferred one's ClickHouse does not answer when the run starts (`OrchestratorReplicaFallback` event), see [Which hosts are involved](#which-hosts-are-involved). |
 | `naming`                 | Template the backups of the cluster are named by, one name per shard, e.g. `shard{shardNum}-{YYYYMMDDHHIISS}` as the Altinity usual backup workflow names them; empty, the default, names a backup `<prefix>-YYYYMMDDHHMMSS` alike on every shard. See [Backup naming](#backup-naming). |
 | `recovery`               | `backupName`: the backup a new CHI starts from, see [Recover a new CHI from a backup](#recover-a-new-chi-from-a-backup). `""` on a cluster: nothing to recover there. `sourceInstallation`, `sourceNamespace`: the CHI that made the backup, when another; `""` on a cluster: this CHI. |
@@ -618,9 +618,23 @@ spec:
                 key: config.yml
 ```
 
-* **`secretKeyRef: {name: ""}` in the `storageConfig` of a cluster** leaves the cluster without a storage Secret: with
-  backup enabled there, the reconcile of the CHI is aborted, see [Enabling backup](#enabling-backup);
-  set `enabled: "no"` on the cluster as well to leave it without backup.
+* **To disable backup for one cluster**, set `backup.enabled: "no"` on that cluster. There is
+  no need to override `storageConfig`.
+* **To explicitly clear an inherited storage Secret**, set `secretKeyRef.name: ""` and include
+  `secretKeyRef.key` (for example, `config.yml`). The CRD requires `key` whenever `secretKeyRef`
+  is present, even when `name` is empty and the key will not be read. A cluster with backup enabled
+  and no storage Secret cannot be reconciled, so set `enabled: "no"` as well:
+
+  ```yaml
+  - name: cold
+    backup:
+      enabled: "no"
+      storageConfig:
+        valueFrom:
+          secretKeyRef:
+            name: ""
+            key: config.yml
+  ```
 
 ### Storage paths
 
