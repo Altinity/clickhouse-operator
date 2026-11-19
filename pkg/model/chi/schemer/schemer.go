@@ -27,6 +27,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/altinity/clickhouse-operator/pkg/util/retry"
 )
 
 // ClusterSchemer specifies cluster schema manager
@@ -79,6 +80,16 @@ func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostT
 		clickhouse.NewQueryOptions().SetRetry(false).SetLogQueries(true))
 }
 
+// schemaReadRetryAttempts is the number of attempts to read the schema from peers.
+// Three attempts (5s and 10s backoff) cover a users.d ConfigMap update that has not yet
+// reached every peer, which shows up as a transient Code 516 authentication failure.
+const schemaReadRetryAttempts = 3
+
+// retryPeerSchemaRead runs read up to schemaReadRetryAttempts times and returns the last error
+func retryPeerSchemaRead(ctx context.Context, read func() error) error {
+	return retry.Retry(ctx, schemaReadRetryAttempts, "Reading schema from peers", log.V(1), read)
+}
+
 // createTablesSQLs makes all SQL for migrating tables
 func (s *ClusterSchemer) createTablesSQLs(
 	ctx context.Context,
@@ -90,10 +101,16 @@ func (s *ClusterSchemer) createTablesSQLs(
 	distributedCreateSQLs []string,
 	err error,
 ) {
-	if replicatedObjectNames, replicatedCreateSQLs, err = s.getReplicatedObjectsSQLs(ctx, host); err != nil {
-		return nil, nil, nil, nil, err
-	}
-	if distributedObjectNames, distributedCreateSQLs, err = s.getDistributedObjectsSQLs(ctx, host); err != nil {
+	// No DDL runs until both reads complete, so a failed attempt can safely repeat both.
+	err = retryPeerSchemaRead(ctx, func() error {
+		var readErr error
+		if replicatedObjectNames, replicatedCreateSQLs, readErr = s.getReplicatedObjectsSQLs(ctx, host); readErr != nil {
+			return readErr
+		}
+		distributedObjectNames, distributedCreateSQLs, readErr = s.getDistributedObjectsSQLs(ctx, host)
+		return readErr
+	})
+	if err != nil {
 		return nil, nil, nil, nil, err
 	}
 	return

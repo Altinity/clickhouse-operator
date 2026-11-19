@@ -17,6 +17,7 @@ package schemer_test
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -113,4 +114,31 @@ func TestHostCreateTablesFailsWhenPeersCannotBeRead(t *testing.T) {
 	s := schemer.NewClusterSchemer(testConnectionParams(closedPort(t)), swversion.NewSoftWareVersion("26.10.3.7"))
 	require.Error(t, s.HostCreateTables(context.Background(), host),
 		"a schema read failure must not be reported as a successful migration")
+}
+
+// A transient peer read failure, such as Code 516 while a users.d ConfigMap update is still
+// propagating, must be retried instead of aborting the migration.
+func TestPeerSchemaReadRetriesTransientFailure(t *testing.T) {
+	attempts := 0
+	err := schemer.RetryPeerSchemaRead(context.Background(), func() error {
+		attempts++
+		if attempts == 1 {
+			return errors.New("Code: 516. DB::Exception: clickhouse_operator: Authentication failed")
+		}
+		return nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, 2, attempts)
+}
+
+// When every attempt fails, the last error must still be returned after exactly 3 attempts.
+func TestPeerSchemaReadReturnsErrorAfterThreeFailures(t *testing.T) {
+	readErr := errors.New("Code: 516. DB::Exception: clickhouse_operator: Authentication failed")
+	attempts := 0
+	err := schemer.RetryPeerSchemaRead(context.Background(), func() error {
+		attempts++
+		return readErr
+	})
+	require.ErrorIs(t, err, readErr)
+	require.Equal(t, 3, attempts)
 }
