@@ -50,6 +50,12 @@ const (
 	WATCH_NAMESPACES = "WATCH_NAMESPACES"
 	// WATCH_NAMESPACES_EXCLUDE specifies namespaces that should be excluded from reconciliation
 	WATCH_NAMESPACES_EXCLUDE = "WATCH_NAMESPACES_EXCLUDE"
+	// WATCH_LABEL_SELECTOR specifies a label selector restricting which CHI/CHK custom resources
+	// this operator instance manages (see watch.labelSelector in operator config)
+	WATCH_LABEL_SELECTOR = "WATCH_LABEL_SELECTOR"
+	// WATCH_LABEL_SELECTOR_REQUIRED makes an empty watch.labelSelector a fatal startup error
+	// (see watch.requireLabelSelector in operator config)
+	WATCH_LABEL_SELECTOR_REQUIRED = "WATCH_LABEL_SELECTOR_REQUIRED"
 
 	// CHOP_CONFIG path to clickhouse operator configuration file
 	CHOP_CONFIG = "CHOP_CONFIG"

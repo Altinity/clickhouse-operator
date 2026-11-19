@@ -21,6 +21,7 @@ import (
 	"time"
 
 	core "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/altinity/queue"
@@ -32,6 +33,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
+	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
@@ -418,22 +420,39 @@ func (w *worker) updateEndpoints(ctx context.Context, m meta.Object) error {
 	return nil
 }
 
-// finalizeCR re-derives the CR from the API server, lets the caller stamp its outcome via f, and
-// persists the result. It reports whether its own normalize refused the spec, so a caller that
-// announces success can stay consistent with the status actually written.
+type finalizeOutcome uint8
+
+const (
+	finalizeSkipped finalizeOutcome = iota
+	finalizeCompleted
+	finalizeAborted
+)
+
+// finalizeCR re-derives the CR, persists its outcome, and reports whether it completed.
 func (w *worker) finalizeCR(
 	ctx context.Context,
 	obj meta.Object,
 	updateStatusOpts types.UpdateStatusOptions,
 	f func(*api.ClickHouseInstallation),
-) (aborted bool, err error) {
-	chi, err := w.buildCRFromObj(ctx, obj)
+) (outcome finalizeOutcome, err error) {
+	raw, err := w.c.GetCR(obj)
 	if err != nil {
 		log.V(1).Error("Unable to finalize CR: %s err: %v", util.NamespacedName(obj), err)
-		return false, err
+		return finalizeSkipped, err
 	}
 
-	// Capture the verdict of the normalize just performed by buildCRFromObj, BEFORE f runs.
+	// Re-check ownership on the RAW live CR before the status/configmap writes — the shard
+	// label may have flipped since this work was enqueued. Must be checked pre-normalization:
+	// templates (CHIT) merge their ObjectMeta into the CR and could inject/override the shard
+	// label, making this guard disagree with the enqueue-time guards that see raw labels.
+	if !ownsCR(raw) {
+		log.V(1).Info("CR no longer matches this operator's watch scope, skip finalize: %s", util.NamespacedName(obj))
+		return finalizeSkipped, nil
+	}
+
+	chi := w.buildCR(ctx, raw)
+
+	// Capture the verdict of the normalize just performed by buildCR, BEFORE f runs.
 	// f is not read-only: finalizeReconcileAndMarkCompleted passes one that calls
 	// ReconcileComplete(), which overwrites Status unconditionally - so a check placed after it
 	// could never observe an abort. The other caller (updateEndpoints) passes a nil f.
@@ -444,7 +463,7 @@ func (w *worker) finalizeCR(
 	// here would publish config built from a spec the operator has refused - e.g. a user whose
 	// credential source was rejected and who therefore fell through to
 	// ClickHouse.Config.User.Default.Password.
-	aborted = chi.EnsureStatus().GetStatus() == api.StatusAborted
+	aborted := chi.EnsureStatus().GetStatus() == api.StatusAborted
 
 	if aborted {
 		// Skip f as well as the config map. finalizeReconcileAndMarkCompleted's f calls
@@ -474,9 +493,90 @@ func (w *worker) finalizeCR(
 	} else if f != nil {
 		f(chi)
 	}
-	_ = w.c.updateCRObjectStatus(ctx, chi, updateStatusOpts)
+	if statusErr := w.c.updateCRObjectStatus(ctx, chi, updateStatusOpts); err == nil {
+		err = statusErr
+	}
 
-	return aborted, err
+	if aborted {
+		return finalizeAborted, err
+	}
+	return finalizeCompleted, err
+}
+
+func (w *worker) unwatchCHI(ctx context.Context, old, new *api.ClickHouseInstallation) error {
+	observed := old
+	if observed == nil {
+		observed = new
+	}
+	cleanup := func() {
+		w.c.deleteWatch(observed)
+		metrics.CRUnregister(ctx, observed)
+	}
+
+	current, err := w.getHandoffCHI(ctx, new)
+	if err != nil {
+		if apiErrors.IsNotFound(err) && !util.IsContextDone(ctx) {
+			cleanup()
+			return nil
+		}
+		if util.IsContextDone(ctx) {
+			return nil
+		}
+		return err
+	}
+	if ownsCR(current) || util.IsContextDone(ctx) {
+		return nil
+	}
+	cleanup()
+	return nil
+}
+
+func (w *worker) watchCHI(ctx context.Context, old, new *api.ClickHouseInstallation) error {
+	current, err := w.getHandoffCHI(ctx, new)
+	if err != nil {
+		if apiErrors.IsNotFound(err) || util.IsContextDone(ctx) {
+			return nil
+		}
+		return err
+	}
+	live := current.(*api.ClickHouseInstallation)
+	if !ownsCR(live) || util.IsContextDone(ctx) {
+		return nil
+	}
+	w.c.restoreWatch(live)
+	if util.IsContextDone(ctx) {
+		return nil
+	}
+	return w.updateCHI(ctx, old, live)
+}
+
+const (
+	handoffReadRetryInitial = 100 * time.Millisecond
+	handoffReadRetryMax     = 30 * time.Second
+)
+
+func (w *worker) getHandoffCHI(ctx context.Context, cr *api.ClickHouseInstallation) (api.ICustomResource, error) {
+	backoff := handoffReadRetryInitial
+	for {
+		current, err := w.c.kube.CR().Get(ctx, cr.GetNamespace(), cr.GetName())
+		if err == nil || apiErrors.IsNotFound(err) {
+			return current, err
+		}
+		if !commonKube.IsTransientAPIError(err) {
+			return nil, err
+		}
+		if util.IsContextDone(ctx) {
+			return nil, ctx.Err()
+		}
+		log.V(1).Warning("unable to read CHI for watch handoff %s/%s, retrying in %s: %v", cr.GetNamespace(), cr.GetName(), backoff, err)
+		if util.WaitContextDoneOrTimeout(ctx, backoff) {
+			return nil, ctx.Err()
+		}
+		backoff *= 2
+		if backoff > handoffReadRetryMax {
+			backoff = handoffReadRetryMax
+		}
+	}
 }
 
 // updateCHI sync CHI which was already created earlier
@@ -500,6 +600,22 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 	w.a.V(1).M(new).S().P()
 	defer w.a.V(1).M(new).E().P()
 
+	if new != nil {
+		n, err := w.c.kube.CR().Get(ctx, new.GetNamespace(), new.GetName())
+		if err != nil {
+			return err
+		}
+		new = n.(*api.ClickHouseInstallation)
+	}
+
+	// Shard label may have flipped while this command sat in the queue; a stale reconcile
+	// would purge the gaining operator's objects. Checked before any write, including the
+	// finalizer install below.
+	if !ownsCR(new) {
+		w.a.V(1).M(new).F().Info("CHI no longer matches this operator's watch scope (shard label flipped?), skip reconcile: %s/%s", new.Namespace, new.Name)
+		return nil
+	}
+
 	if w.ensureFinalizer(context.Background(), new) {
 		w.a.M(new).F().Info("finalizer installed, let's restart reconcile cycle. CHI: %s/%s", new.Namespace, new.Name)
 		w.a.M(new).F().Info("---------------------------------------------------------------------")
@@ -511,14 +627,6 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted")
 		return nil
-	}
-
-	if new != nil {
-		n, err := w.c.kube.CR().Get(ctx, new.GetNamespace(), new.GetName())
-		if err != nil {
-			return err
-		}
-		new = n.(*api.ClickHouseInstallation)
 	}
 
 	metrics.CRRegister(ctx, new)
@@ -562,16 +670,16 @@ func (w *worker) markReconcileStart(ctx context.Context, cr *api.ClickHouseInsta
 	w.a.V(2).M(cr).F().Info("action plan\n%s\n", cr.EnsureRuntime().ActionPlan.String())
 }
 
-func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api.ClickHouseInstallation) {
+func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api.ClickHouseInstallation) bool {
 	if util.IsContextDone(ctx) {
 		log.V(1).Info("Reconcile is aborted. cr: %s ", _cr.GetName())
-		return
+		return false
 	}
 
 	w.a.V(1).M(_cr).F().S().Info("finalize reconcile")
 
 	// Update CR object
-	aborted, _ := w.finalizeCR(
+	outcome, err := w.finalizeCR(
 		ctx,
 		_cr,
 		types.UpdateStatusOptions{
@@ -587,8 +695,15 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 			c.EnsureStatus().ReconcileComplete()
 		},
 	)
+	if err != nil {
+		w.a.V(1).M(_cr).F().Error("unable to finalize reconcile: %v", err)
+		return false
+	}
 
-	if aborted {
+	switch outcome {
+	case finalizeSkipped:
+		return false
+	case finalizeAborted:
 		// finalizeCR's own re-normalize refused the spec, so it persisted Aborted and skipped the
 		// completion bookkeeping. Announcing success here would contradict the status just written
 		// and hand dashboards a ReconcileCompleted event for a spec the operator rejected.
@@ -597,7 +712,8 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 			WithAction(_cr).
 			M(_cr).F().
 			Warning("reconcile not marked completed - spec refused on finalize, task id: %s", _cr.GetSpecT().GetTaskID())
-		return
+		metrics.CRReconcilesAborted(ctx, _cr)
+		return false
 	}
 
 	w.a.V(1).
@@ -606,6 +722,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _cr *api
 		WithActions(_cr).
 		M(_cr).F().
 		Info("reconcile completed successfully, task id: %s", _cr.GetSpecT().GetTaskID())
+	return true
 }
 
 func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, cr *api.ClickHouseInstallation, err error) {

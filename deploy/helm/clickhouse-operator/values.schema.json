@@ -620,6 +620,12 @@
                                         "namespaces": {
                                             "type": ["array", "object"]
                                         },
+                                        "labelSelector": {
+                                            "type": "string"
+                                        },
+                                        "requireLabelSelector": {
+                                            "type": "boolean"
+                                        },
                                         "configuration": {
                                             "type": "object",
                                             "properties": {
