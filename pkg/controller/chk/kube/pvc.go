@@ -26,6 +26,7 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	chkNamer "github.com/altinity/clickhouse-operator/pkg/model/chk/namer"
 	chkLabeler "github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 )
 
@@ -106,8 +107,10 @@ func (c *PVC) ListForHost(ctx context.Context, host *api.Host) (*core.Persistent
 	// same set. Note that a PVC which lost the operator's labels is invisible here however it is
 	// read - that matters only if a Keeper path ever adopts this call, since today its sole
 	// consumer, WalkDiscoveredPVCs, is reached from the ClickHouse deleters alone.
-	err := c.apiReader.List(ctx, list, opts)
-	return list, err
+	if err := c.apiReader.List(ctx, list, opts); err != nil {
+		return list, err
+	}
+	return commonKube.FilterPVCsOfPod(list, chkNamer.New().Name(interfaces.NamePod, host)), nil
 }
 
 // labeler is the Keeper labeler: this adapter serves ClickHouseKeeperInstallation objects, which

@@ -25,6 +25,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	commonKube "github.com/altinity/clickhouse-operator/pkg/controller/common/kube"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	chiNamer "github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 )
 
@@ -73,13 +74,17 @@ func (c *PVC) List(ctx context.Context, namespace string, opts meta.ListOptions)
 
 func (c *PVC) ListForHost(ctx context.Context, host *api.Host) (*core.PersistentVolumeClaimList, error) {
 	ctx = k8sCtx(ctx)
-	return c.kubeClient.
+	list, err := c.kubeClient.
 		CoreV1().
 		PersistentVolumeClaims(host.Runtime.Address.Namespace).
 		List(
 			ctx,
 			controller.NewListOptions(labeler(host.GetCR()).Selector(interfaces.SelectorHostScope, host)),
 		)
+	if err != nil {
+		return list, err
+	}
+	return commonKube.FilterPVCsOfPod(list, chiNamer.New().Name(interfaces.NamePod, host)), nil
 }
 
 func labeler(cr api.ICustomResource) interfaces.ILabeler {

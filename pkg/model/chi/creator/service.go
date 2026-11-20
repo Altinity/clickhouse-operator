@@ -213,7 +213,7 @@ func (m *ServiceManager) createServiceHost(host *chi.Host) *core.Service {
 			m.namer.Name(interfaces.NameStatefulSetService, host),
 			m.tagger.Label(interfaces.LabelServiceHost, host),
 			m.tagger.Annotate(interfaces.AnnotateServiceHost, host),
-			m.tagger.Selector(interfaces.SelectorHostScope, host),
+			creator.HostServiceSelector(m.tagger.Selector(interfaces.SelectorHostScope, host), m.namer.Name(interfaces.NamePod, host)),
 			m.or.CreateOwnerReferences(m.cr),
 			m.macro.Scope(host),
 			m.labeler,
@@ -231,7 +231,7 @@ func (m *ServiceManager) createServiceHost(host *chi.Host) *core.Service {
 			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
 		Spec: core.ServiceSpec{
-			Selector:                 m.tagger.Selector(interfaces.SelectorHostScope, host),
+			Selector:                 creator.HostServiceSelector(m.tagger.Selector(interfaces.SelectorHostScope, host), m.namer.Name(interfaces.NamePod, host)),
 			ClusterIP:                TemplateDefaultsServiceClusterIP,
 			Type:                     "ClusterIP",
 			PublishNotReadyAddresses: true,

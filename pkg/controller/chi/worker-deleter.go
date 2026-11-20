@@ -33,6 +33,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -67,22 +68,93 @@ func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	st.SyncHostsWithReplicaCaughtUp()
 }
 
+// removedReplicas holds (Zoo)Keeper replicas of the hosts removed by the Action Plan, keyed by removedHostKey
+type removedReplicas map[string][]schemer.ZKReplica
+
+// removedHostKey identifies a removed host. Host name is short ("0-0") and is unique within a cluster only
+func removedHostKey(host *api.Host) string {
+	return host.Runtime.Address.ClusterName + "/" + host.GetName()
+}
+
+// collectRemovedReplicas lists (Zoo)Keeper replicas of the hosts removed by the Action Plan.
+// It has to be called while the removed hosts are alive - before clean() purges them.
+// A replica of a removed shard can be dropped by its (Zoo)Keeper path only, since no surviving host has the table.
+func (w *worker) collectRemovedReplicas(ctx context.Context, cr *api.ClickHouseInstallation) removedReplicas {
+	res := removedReplicas{}
+	for _, host := range removedHosts(cr) {
+		if util.IsContextDone(ctx) {
+			break
+		}
+		replicas, err := w.ensureClusterSchemer(host).HostZKReplicas(ctx, host)
+		if err != nil {
+			w.a.V(1).M(host).F().Warning("Unable to list (Zoo)Keeper replicas of the removed host %s: %v", host.GetName(), err)
+			continue
+		}
+		w.a.V(1).M(host).F().Info("(Zoo)Keeper replicas of the removed host %s: %v", host.GetName(), replicas)
+		res[removedHostKey(host)] = replicas
+	}
+	return res
+}
+
 // dropZKReplicas cleans Zookeeper for replicas that are properly deleted - via Action Plan
-func (w *worker) dropZKReplicas(ctx context.Context, cr *api.ClickHouseInstallation) {
+func (w *worker) dropZKReplicas(ctx context.Context, cr *api.ClickHouseInstallation, replicas removedReplicas) {
 	// Iterate over Action Plan and drop all replicas that are properly removed as removed hosts
 	w.a.V(1).M(cr).F().S().Info("drop replicas based on AP")
 	cnt := 0
-	cr.EnsureRuntime().ActionPlan.WalkRemoved(
-		func(cluster api.ICluster) {
-		},
-		func(shard api.IShard) {
-		},
-		func(host *api.Host) {
-			_ = w.dropZKReplica(ctx, host, NewDropReplicaOptions().SetRegularDrop())
-			cnt++
-		},
-	)
+	for _, host := range removedHosts(cr) {
+		_ = w.dropZKReplicaOn(ctx, survivingHost(cr, host), host, NewDropReplicaOptions().SetRegularDrop(), replicas[removedHostKey(host)])
+		cnt++
+	}
 	w.a.V(1).M(cr).F().E().Info("processed replicas: %d", cnt)
+}
+
+// survivingHost finds a host to run DROP REPLICA for the removed hostToDrop on.
+// Removed hosts come from the old CR and are already purged at this point, so look for a host in the new CR.
+// A host of the same shard is preferred, since it has the tables of the removed replica. When the whole shard
+// is removed, a host of another shard of the same cluster is used - it shares Replicated databases
+// and drops replicas of the tables by (Zoo)Keeper path. Returns nil when the cluster has no hosts left.
+func survivingHost(cr *api.ClickHouseInstallation, hostToDrop *api.Host) (res *api.Host) {
+	var sameCluster *api.Host
+	cr.WalkHosts(func(host *api.Host) error {
+		if (host.Runtime.Address.ClusterName != hostToDrop.Runtime.Address.ClusterName) ||
+			(host.GetName() == hostToDrop.GetName()) {
+			return nil
+		}
+		if (res == nil) && (host.Runtime.Address.ShardName == hostToDrop.Runtime.Address.ShardName) {
+			res = host
+		}
+		if sameCluster == nil {
+			sameCluster = host
+		}
+		return nil
+	})
+	if res == nil {
+		res = sameCluster
+	}
+	return res
+}
+
+// removedHosts enumerates the hosts this pass planned to remove.
+//
+// WalkRemoved reports the most specific removed item, so a removed cluster or shard arrives as ONE
+// entry rather than as its constituent hosts - both are expanded back into hosts here, the same
+// way runHostPreDeleteHooksOnRemovedHosts does.
+func removedHosts(cr *api.ClickHouseInstallation) (hosts []*api.Host) {
+	if cr == nil {
+		return nil
+	}
+	collect := func(host *api.Host) error {
+		if host != nil {
+			hosts = append(hosts, host)
+		}
+		return nil
+	}
+	cr.EnsureRuntime().ActionPlan.WalkRemoved(
+		func(cluster api.ICluster) { cluster.WalkHosts(collect) },
+		func(shard api.IShard) { shard.WalkHosts(collect) },
+		func(host *api.Host) { _ = collect(host) },
+	)
+	return hosts
 }
 
 // purge
@@ -475,6 +547,17 @@ func (w *worker) dropZKReplica(ctx context.Context, hostToDrop *api.Host, opts *
 		hostToRunOn = shard.FirstHost()
 	}
 
+	return w.dropZKReplicaOn(ctx, hostToRunOn, hostToDrop, opts, nil)
+}
+
+// dropZKReplicaOn drops replica hostToDrop running SQL statement on hostToRunOn.
+// zkReplicas are (Zoo)Keeper replicas of hostToDrop collected while it was alive, may be empty.
+func (w *worker) dropZKReplicaOn(ctx context.Context, hostToRunOn, hostToDrop *api.Host, opts *dropReplicaOptions, zkReplicas []schemer.ZKReplica) error {
+	if hostToDrop == nil {
+		w.a.V(1).F().Error("FAILED to drop replica. Need to have host to drop. hostToDrop: %s", hostToDrop.GetName())
+		return nil
+	}
+
 	if hostToRunOn == nil {
 		w.a.V(1).F().Error("FAILED to drop replica. hostToRunOn: %s, hostToDrop: %s", hostToRunOn.GetName(), hostToDrop.GetName())
 		return nil
@@ -485,7 +568,7 @@ func (w *worker) dropZKReplica(ctx context.Context, hostToDrop *api.Host, opts *
 		return nil
 	}
 
-	err := w.ensureClusterSchemer(hostToRunOn).HostDropReplica(ctx, hostToRunOn, hostToDrop)
+	err := w.ensureClusterSchemer(hostToRunOn).HostDropReplica(ctx, hostToRunOn, hostToDrop, zkReplicas)
 
 	if err == nil {
 		w.a.V(1).
@@ -800,26 +883,11 @@ func (w *worker) deleteCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 }
 
 // removedHostFQDNs enumerates the FQDNs of the hosts this pass planned to remove.
-//
-// WalkRemoved dispatches on the diff entry's type, so a removed cluster or shard arrives as ONE
-// entry rather than as its constituent hosts - both are expanded back into hosts here, the same
-// way runHostPreDeleteHooksOnRemovedHosts does. nameFQDN is injected so the walk is reachable
-// from a test without a live name manager.
+// nameFQDN is injected so the walk is reachable from a test without a live name manager.
 func removedHostFQDNs(cr *api.ClickHouseInstallation, nameFQDN func(*api.Host) string) (fqdns []string) {
-	if cr == nil {
-		return nil
+	for _, host := range removedHosts(cr) {
+		fqdns = append(fqdns, nameFQDN(host))
 	}
-	collect := func(host *api.Host) error {
-		if host != nil {
-			fqdns = append(fqdns, nameFQDN(host))
-		}
-		return nil
-	}
-	cr.EnsureRuntime().ActionPlan.WalkRemoved(
-		func(cluster api.ICluster) { cluster.WalkHosts(collect) },
-		func(shard api.IShard) { shard.WalkHosts(collect) },
-		func(host *api.Host) { _ = collect(host) },
-	)
 	return fqdns
 }
 
