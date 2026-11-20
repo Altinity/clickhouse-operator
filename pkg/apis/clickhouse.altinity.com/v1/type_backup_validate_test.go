@@ -88,6 +88,10 @@ func TestBackupSpecValidate(t *testing.T) {
 		"the longest starting deadline": {func() error {
 			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", StartingDeadlineSeconds: ptr.To(int64(BackupStartingDeadlineMaxSeconds))}).Validate()
 		}, true},
+		"a schedule starting deadline past any time": {func() error {
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: []BackupScheduleEntry{{Period: BackupPeriodHour, Keep: 1}},
+				StartingDeadlineSeconds: ptr.To(int64(BackupStartingDeadlineMaxSeconds) + 1)}).Validate()
+		}, false},
 		"a negative starting deadline": {func() error {
 			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", StartingDeadlineSeconds: ptr.To(int64(-1))}).Validate()
 		}, false},
@@ -261,6 +265,7 @@ func TestActiveDeadlineSeconds(t *testing.T) {
 	}{
 		"unset":    {deadline: nil, expected: defaultBackupActiveDeadlineSeconds, valid: true},
 		"positive": {deadline: ptr.To(int64(600)), expected: 600, valid: true},
+		"longest":  {deadline: ptr.To(int64(BackupActiveDeadlineMaxSeconds)), expected: BackupActiveDeadlineMaxSeconds, valid: true},
 		"zero":     {deadline: ptr.To(int64(0)), expected: defaultBackupActiveDeadlineSeconds},
 		"negative": {deadline: ptr.To(int64(-1)), expected: defaultBackupActiveDeadlineSeconds},
 	} {
@@ -285,6 +290,12 @@ func TestActiveDeadlineSeconds(t *testing.T) {
 			}
 		})
 	}
+	// Past the maximum, which the CRD schema and the validation refuse, seconds would overflow a time.Duration
+	tooLong := ptr.To(int64(BackupActiveDeadlineMaxSeconds) + 1)
+	require.EqualValues(t, BackupActiveDeadlineMaxSeconds, (&BackupOptions{ActiveDeadlineSeconds: tooLong}).GetActiveDeadlineSeconds())
+	require.ErrorIs(t, (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: BackupOptions{ActiveDeadlineSeconds: tooLong}}).Validate(), ErrInvalidBackupSpec)
+	require.ErrorIs(t, (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: []BackupScheduleEntry{{Period: BackupPeriodHour, Keep: 1}}, BackupOptions: BackupOptions{ActiveDeadlineSeconds: tooLong}}).Validate(), ErrInvalidBackupSpec)
+	require.ErrorIs(t, (&ClickHouseRestoreSpec{ClickHouseInstallation: "chi", BackupName: "daily-20261004-020000", ActiveDeadlineSeconds: tooLong}).Validate(), ErrInvalidBackupSpec)
 	require.Equal(t, defaultBackupActiveDeadlineSeconds, (*BackupOptions)(nil).GetActiveDeadlineSeconds())
 	require.Equal(t, defaultBackupActiveDeadlineSeconds, (*ClickHouseRestoreSpec)(nil).GetActiveDeadlineSeconds())
 }

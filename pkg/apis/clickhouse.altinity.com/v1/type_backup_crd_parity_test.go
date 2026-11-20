@@ -415,6 +415,29 @@ func TestBackupCRDBoundsTheStartingDeadline(t *testing.T) {
 	require.Equal(t, 0, deadline["minimum"])
 }
 
+// The deadlines of the backup CRDs are bounded alike by the CRD schemas and the spec validation: past the bound,
+// seconds make no time.Duration.
+func TestBackupCRDsBoundTheDeadlines(t *testing.T) {
+	for crd, paths := range map[string]map[string]int{
+		"clickhousebackupschedules.clickhouse.altinity.com": {
+			"spec.startingDeadlineSeconds": BackupStartingDeadlineMaxSeconds,
+			"spec.activeDeadlineSeconds":   BackupActiveDeadlineMaxSeconds,
+		},
+		"clickhousebackups.clickhouse.altinity.com": {
+			"spec.activeDeadlineSeconds": BackupActiveDeadlineMaxSeconds,
+		},
+		"clickhouserestores.clickhouse.altinity.com": {
+			"spec.activeDeadlineSeconds": BackupActiveDeadlineMaxSeconds,
+		},
+	} {
+		for path, maximum := range paths {
+			deadline := schemaProperty(loadCRDSchema(t, backupCRDTemplatePath, crd), path)
+			require.NotNil(t, deadline, crd+" "+path)
+			require.Equal(t, maximum, deadline["maximum"], crd+" "+path)
+		}
+	}
+}
+
 // The naming template of a cluster is bounded alike by the CRD schema and the spec validation.
 func TestNamingTemplateMatchesTheTypes(t *testing.T) {
 	schema := loadCRDSchema(t, chiCRDTemplatePath, "${PLURAL}.clickhouse.altinity.com")

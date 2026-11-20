@@ -1251,7 +1251,7 @@ spec:
                                   s3.access_key, s3.secret_key. The operator generates the configuration file of the sidecar from it,
                                   which follows a change of the Secret without a restart. A cluster that leaves it out takes the
                                   installation's; an explicit `secretKeyRef.name: ""` on a cluster leaves the cluster without one. Required:
-                                  without one, backup stays off. The configuration must set api.username and api.password of the REST API
+                                  without one, backup stays off. The operator sets the credentials of the REST API in the file itself.
                                 properties:
                                   valueFrom:
                                     description: "Source of the clickhouse-backup configuration"

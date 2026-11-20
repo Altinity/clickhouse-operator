@@ -1251,7 +1251,7 @@ spec:
                                   s3.access_key, s3.secret_key. The operator generates the configuration file of the sidecar from it,
                                   which follows a change of the Secret without a restart. A cluster that leaves it out takes the
                                   installation's; an explicit `secretKeyRef.name: ""` on a cluster leaves the cluster without one. Required:
-                                  without one, backup stays off. The configuration must set api.username and api.password of the REST API
+                                  without one, backup stays off. The operator sets the credentials of the REST API in the file itself.
                                 properties:
                                   valueFrom:
                                     description: "Source of the clickhouse-backup configuration"
@@ -3211,7 +3211,7 @@ spec:
                                   s3.access_key, s3.secret_key. The operator generates the configuration file of the sidecar from it,
                                   which follows a change of the Secret without a restart. A cluster that leaves it out takes the
                                   installation's; an explicit `secretKeyRef.name: ""` on a cluster leaves the cluster without one. Required:
-                                  without one, backup stays off. The configuration must set api.username and api.password of the REST API
+                                  without one, backup stays off. The operator sets the credentials of the REST API in the file itself.
                                 properties:
                                   valueFrom:
                                     description: "Source of the clickhouse-backup configuration"
@@ -5903,6 +5903,7 @@ spec:
                   type: integer
                   format: int64
                   minimum: 1
+                  maximum: 2147483647
                   description: "How long the run may run before it is stopped and the operation fails. Defaults to 24 hours"
                 timeouts:
                   type: object
@@ -6501,6 +6502,7 @@ spec:
                   type: integer
                   format: int64
                   minimum: 0
+                  maximum: 2147483647
                   description: "Deadline in seconds for starting a run that missed its scheduled time"
                 successfulRunsHistoryLimit:
                   type: integer
@@ -6547,6 +6549,7 @@ spec:
                   type: integer
                   format: int64
                   minimum: 1
+                  maximum: 2147483647
                   description: "How long each backup run may run before it is stopped and the run fails. Defaults to 24 hours"
                 timeouts:
                   type: object
@@ -7287,6 +7290,7 @@ spec:
                   type: integer
                   format: int64
                   minimum: 1
+                  maximum: 2147483647
                   description: "How long the restore run may run before it is stopped and the restore fails. Defaults to 24 hours"
                 timeouts:
                   type: object
@@ -7625,15 +7629,6 @@ rules:
       - update
       - watch
       - delete
-  # The backup controllers are leader-elected by a Lease in the namespace of the operator
-  - apiGroups:
-      - coordination.k8s.io
-    resources:
-      - leases
-    verbs:
-      - create
-      - get
-      - update
   - apiGroups:
       - ""
     resources:
@@ -7934,7 +7929,8 @@ rules:
       - update
       - watch
       - delete
-  # The backup controllers are leader-elected by a Lease in the namespace of the operator
+  # The backup controllers are leader-elected by a Lease in the namespace of the operator, which a Role of that
+  # namespace grants: a ClusterRole would grant it in every namespace
   - apiGroups:
       - coordination.k8s.io
     resources:

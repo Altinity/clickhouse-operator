@@ -143,6 +143,8 @@ func backupConfigAbortProblem(cr *api.ClickHouseInstallation, cluster string, ou
 		return fmt.Sprintf("cluster %s: Secret %s holds a %s that cannot be read: %v", cluster, storageSecret, outcome.storageKey, outcome.err)
 	case errors.Is(outcome.err, errBackupStorageSecretUnreadable):
 		return fmt.Sprintf("cluster %s: Secret %s %v", cluster, storageSecret, outcome.err)
+	case errors.Is(outcome.err, errBackupConfigSecretForeign):
+		return fmt.Sprintf("cluster %s: %v", cluster, outcome.err)
 	case outcome.noStorage != nil:
 		return fmt.Sprintf("cluster %s: Secret %s %v - it has to hold the clickhouse-backup configuration in key %s",
 			cluster, storageSecret, outcome.noStorage, outcome.storageKey)

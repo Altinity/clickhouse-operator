@@ -62,8 +62,8 @@ type ClusterBackup struct {
 	// valueFrom.secretKeyRef.name in the installation's namespace. The operator generates the configuration file of the
 	// sidecar from it, which follows a change of the Secret without a restart. A cluster that leaves it out takes the
 	// installation's, an installation a template's; an explicit name "" on a cluster leaves the cluster without one. It
-	// is required: without one, backup stays off. The configuration must set api.username and api.password of the
-	// clickhouse-backup REST API.
+	// is required: without one, backup stays off. The operator sets the credentials of the clickhouse-backup REST API
+	// in the file itself.
 	StorageConfig *StorageConfig `json:"storageConfig,omitempty" yaml:"storageConfig,omitempty"`
 	// PreferredReplica is the index, from 0, of the replica of each shard a backup works on, as the backupReplica of
 	// the Altinity usual backup workflow: a backup of one replica per shard (FirstPerShard) runs on the sidecar of that replica,

@@ -940,7 +940,7 @@ func heldReport(names []string) string {
 	return strings.Join(shown, " ") + more
 }
 
-// pathsOf returns the time of the ClickHouse of a host as a time.
+// parseClickHouseTime parses a time of the ClickHouse of a host, as clickHouseTimeLayout tells it.
 func parseClickHouseTime(value string) (time.Time, bool) {
 	t, err := time.Parse(clickHouseTimeLayout, value)
 	return t, err == nil

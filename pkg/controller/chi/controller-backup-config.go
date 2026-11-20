@@ -71,6 +71,11 @@ var (
 	errBackupStorageSecretUnreadable = errors.New("cannot be read")
 )
 
+// errBackupConfigSecretForeign: the Secret of the name the configuration file goes to exists, and is not the
+// operator's for this installation and cluster. Names of installations and clusters join with "-", so that
+// installation "a-b" with cluster "c" and installation "a" with cluster "b-c" name the same Secret.
+var errBackupConfigSecretForeign = errors.New("exists and is not the backup configuration of this cluster")
+
 // backupConfigOutcome is how the configuration file Secret of a cluster has been reconciled
 type backupConfigOutcome struct {
 	// secret is the Secret reconciled, or the one there kept as it is when the configuration file could not be
@@ -86,7 +91,8 @@ type backupConfigOutcome struct {
 	// keptStorage tells that, the storage Secret giving none, the configuration file kept the storage settings it had
 	keptStorage bool
 	// err is why the Secret was not reconciled: backupconfig.ErrInvalidStorageConfig for storage settings that
-	// cannot be read, or a failure to read or write a Secret
+	// cannot be read, errBackupConfigSecretForeign for a Secret of the name that is not the operator's for the
+	// cluster, or a failure to read or write a Secret
 	err error
 }
 
@@ -155,6 +161,11 @@ func (c *Controller) reconcileBackupConfigSecret(
 	current, err := c.getBackupConfigSecret(ctx, cr.GetNamespace(), c.namer.Name(interfaces.NameBackupConfigSecret, cr, cluster.GetName()))
 	if err != nil {
 		outcome.err = err
+		return outcome
+	}
+	if (current != nil) && !isBackupConfigSecretOwned(cr, current) {
+		// Neither read nor written, nor registered: it is not ours
+		outcome.err = fmt.Errorf("Secret %s %w", util.NamespaceNameString(current), errBackupConfigSecretForeign)
 		return outcome
 	}
 	if current != nil {
@@ -274,6 +285,17 @@ func (c *Controller) getBackupConfigSecret(ctx context.Context, namespace, name 
 	return secret, err
 }
 
+// isBackupConfigSecretOwned tells whether the Secret carries the labels the operator gives its Secrets of the
+// installation, which a Secret of the same name that another installation, or a user, made does not
+func isBackupConfigSecretOwned(cr *api.ClickHouseInstallation, secret *core.Secret) bool {
+	for key, value := range getLabeler(cr).Selector(interfaces.SelectorCRScope) {
+		if secret.GetLabels()[key] != value {
+			return false
+		}
+	}
+	return true
+}
+
 // applyBackupConfigSecret creates the Secret when there is none, current being nil, or updates the data of the one
 // there when it differs. The metadata of an existing Secret stays as it is: a pass that does not reconcile the
 // installation must not take labels or owners from another state of it than its reconcile does.
@@ -303,7 +325,7 @@ type backupConfigProblems struct {
 // which may well be gone by the next pass and is logged instead
 func backupConfigProblem(outcome backupConfigOutcome) string {
 	switch {
-	case errors.Is(outcome.err, backupconfig.ErrInvalidStorageConfig):
+	case errors.Is(outcome.err, backupconfig.ErrInvalidStorageConfig), errors.Is(outcome.err, errBackupConfigSecretForeign):
 		return outcome.err.Error()
 	case outcome.err != nil:
 		return ""
@@ -457,6 +479,10 @@ func (c *Controller) backupStorageUsable(ctx context.Context, cr *api.ClickHouse
 		backup := cluster.GetBackup().DeepCopy().MergeFrom(cr.GetSpecT().GetBackup(), api.MergeTypeFillEmptyValues)
 		if !backup.IsEnabled() {
 			continue
+		}
+		current, err := c.getBackupConfigSecret(ctx, cr.GetNamespace(), c.namer.Name(interfaces.NameBackupConfigSecret, cr, cluster.GetName()))
+		if (err != nil) || ((current != nil) && !isBackupConfigSecretOwned(cr, current)) {
+			return false
 		}
 		storage, err := c.getBackupStorageConfig(ctx, cr.GetNamespace(), backup.GetStorageConfigSecretName(), backup.GetStorageConfigSecretKey())
 		if (err != nil) || (storage.missing != nil) {

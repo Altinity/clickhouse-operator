@@ -273,6 +273,8 @@ const (
 	// BackupStartingDeadlineMaxSeconds bounds startingDeadlineSeconds, so the deadline it makes stays a time.Duration:
 	// the CRD schema maximum mirrors it, which the API server enforces before the operator reads a spec.
 	BackupStartingDeadlineMaxSeconds = math.MaxInt32
+	// BackupActiveDeadlineMaxSeconds bounds activeDeadlineSeconds likewise. The CRD schema maximum mirrors it.
+	BackupActiveDeadlineMaxSeconds = math.MaxInt32
 	// BackupNameScheduleSuffix is the form of the suffix a scheduled run appends to the backup name prefix, the time
 	// the run was due, as messages tell it.
 	BackupNameScheduleSuffix = "-YYYYMMDDHHMMSS"
@@ -359,7 +361,7 @@ func activeDeadlineSeconds(deadline *int64) int64 {
 	if (deadline == nil) || (*deadline <= 0) {
 		return defaultBackupActiveDeadlineSeconds
 	}
-	return *deadline
+	return min(*deadline, BackupActiveDeadlineMaxSeconds)
 }
 
 // validateStringBool checks an optional on/off field of a spec. Its CRD schema accepts any value, as it takes a
@@ -375,6 +377,9 @@ func validateStringBool(field string, value *types.StringBool) error {
 func validateActiveDeadlineSeconds(deadline *int64) error {
 	if (deadline != nil) && (*deadline <= 0) {
 		return ErrActiveDeadlineNotPositive
+	}
+	if (deadline != nil) && (*deadline > BackupActiveDeadlineMaxSeconds) {
+		return fmt.Errorf("%w: activeDeadlineSeconds must be at most %d", ErrInvalidBackupSpec, BackupActiveDeadlineMaxSeconds)
 	}
 	return nil
 }

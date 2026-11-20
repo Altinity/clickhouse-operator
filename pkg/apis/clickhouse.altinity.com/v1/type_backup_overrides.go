@@ -67,6 +67,20 @@ var (
 		// The disk embedded backups are made on, which deleting them reads from the settings of the sidecar
 		"CLICKHOUSE_EMBEDDED_BACKUP_DISK",
 	}
+	// BackupConfigOverrideSecurity are the settings a config override must not set as they weaken the security of
+	// the storage, or change who the sidecar is there: access control lists and server-side encryption of the
+	// objects, TLS, certificate and host key verification turned off, plain HTTP, no credentials, another role.
+	// They belong in the Secret of the clickhouse-backup configuration, where an administrator of the storage sets them
+	// for every backup alike.
+	BackupConfigOverrideSecurity = []string{
+		"S3_ACL", "S3_DISABLE_CERT_VERIFICATION", "S3_DISABLE_SSL", "S3_SSE", "S3_SSE_KMS_KEY_ID",
+		"S3_SSE_CUSTOMER_ALGORITHM", "S3_SSE_KMS_ENCRYPTION_CONTEXT", "S3_ASSUME_ROLE_ARN",
+		"GCS_FORCE_HTTP", "GCS_SKIP_CREDENTIALS",
+		"AZBLOB_ENDPOINT_SCHEMA", "AZBLOB_USE_MANAGED_IDENTITY",
+		"FTP_TLS", "FTP_SKIP_TLS_VERIFY",
+		"SFTP_KNOWN_HOSTS", "SFTP_KEY",
+		"CLICKHOUSE_TLS_CA", "CLICKHOUSE_TLS_CERT", "CLICKHOUSE_TLS_KEY",
+	}
 	// backupConfigOverrideForbiddenPrefixes start the keys of settings a config override must not set: those of the
 	// REST API, which the operator configures.
 	backupConfigOverrideForbiddenPrefixes = []string{"API_"}
@@ -119,6 +133,10 @@ func forbiddenConfigOverride(key string) string {
 	if slices.Contains(BackupConfigOverrideForbidden, key) {
 		return "the operator sets it, or it tells where the backups are, which the restores and the retention of the " +
 			"backup would not find it by"
+	}
+	if slices.Contains(BackupConfigOverrideSecurity, key) {
+		return "it sets the security of the storage or of the connection to it, which belongs in the Secret of the " +
+			"clickhouse-backup configuration"
 	}
 	for _, prefix := range backupConfigOverrideForbiddenPrefixes {
 		if strings.HasPrefix(key, prefix) {

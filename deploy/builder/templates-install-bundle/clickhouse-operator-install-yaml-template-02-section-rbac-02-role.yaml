@@ -79,7 +79,9 @@ rules:
       - update
       - watch
       - delete
-  # The backup controllers are leader-elected by a Lease in the namespace of the operator
+  # begin namespaced-only: dropped from the ClusterRole, see rbac-03-leader-election.yaml
+  # The backup controllers are leader-elected by a Lease in the namespace of the operator, which a Role of that
+  # namespace grants: a ClusterRole would grant it in every namespace
   - apiGroups:
       - coordination.k8s.io
     resources:
@@ -88,6 +90,7 @@ rules:
       - create
       - get
       - update
+  # end namespaced-only
   - apiGroups:
       - ""
     resources:

@@ -37,6 +37,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/backupconfig"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 )
 
@@ -115,7 +116,7 @@ func TestReconcileBackupConfigSecretFollowsTheStorageSecret(t *testing.T) {
 	require.Equal(t, updates, fake.updates, "an unchanged storage Secret leaves the configuration file alone")
 
 	fake.secrets[testStorageSecret] = storageSecretWith("s3:\n  bucket: second\n")
-	fake.secrets[configSecretName].Labels = map[string]string{"kept": "yes"}
+	fake.secrets[configSecretName].Labels["kept"] = "yes"
 	require.NoError(t, reconcile())
 	require.Equal(t, updates+1, fake.updates)
 	require.Equal(t, "second", configFile(t, fake.secrets[configSecretName])["s3"]["bucket"])
@@ -125,6 +126,38 @@ func TestReconcileBackupConfigSecretFollowsTheStorageSecret(t *testing.T) {
 	require.ErrorIs(t, reconcile(), common.ErrCRUDAbort, "storage settings that cannot be read abort the reconcile")
 	require.Equal(t, updates+1, fake.updates, "storage settings that cannot be read change nothing")
 	require.Equal(t, "second", configFile(t, fake.secrets[configSecretName])["s3"]["bucket"])
+}
+
+// A Secret of the name of the configuration file that the operator did not make for the installation - a user's, or
+// that of another installation whose name and cluster join to the same one - is left as it is, and the reconcile of
+// the installation is aborted as its backup cannot be configured.
+func TestReconcileBackupConfigSecretLeavesAForeignSecretAlone(t *testing.T) {
+	other := newBackupSecretCR(t, enabledBackup())
+	other.Name = "chi"
+	for name, foreign := range map[string]map[string]string{
+		"unlabeled":     nil,
+		"other install": chiLabeler.New(other).Label(interfaces.LabelSecretBackup),
+	} {
+		t.Run(name, func(t *testing.T) {
+			cr := newBackupSecretCR(t, enabledBackup())
+			fake := &backupSecretFakeSecret{secrets: map[string]*core.Secret{
+				testStorageSecret: storageSecretWith("s3:\n  bucket: first\n"),
+				configSecretName: {
+					ObjectMeta: meta.ObjectMeta{Namespace: "ns", Name: configSecretName, Labels: foreign},
+					Data:       map[string][]byte{"theirs": []byte("data")},
+				},
+			}}
+			w := newBackupSecretWorker(fake, cr)
+			w.a = a.NewAnnouncer(&recordingEventEmitter{}, nil)
+			err := w.reconcileCRAuxObjectsPreliminaryDomain(context.Background(), cr)
+			require.ErrorIs(t, err, common.ErrCRUDAbort)
+			require.Contains(t, err.Error(), api.StatusReasonBackupConfigInvalid)
+			require.Contains(t, err.Error(), "ns/"+configSecretName)
+			require.Equal(t, 0, fake.updates)
+			require.Equal(t, map[string][]byte{"theirs": []byte("data")}, fake.secrets[configSecretName].Data)
+			require.Equal(t, foreign, fake.secrets[configSecretName].Labels)
+		})
+	}
 }
 
 // backupConfigSyncFakeKube serves the Secrets of backupSecretFakeSecret, the ConfigMaps of configMaps and the

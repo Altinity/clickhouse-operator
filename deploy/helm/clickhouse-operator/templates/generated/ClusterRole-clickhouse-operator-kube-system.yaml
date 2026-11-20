@@ -67,15 +67,6 @@ rules:
       - update
       - watch
       - delete
-  # The backup controllers are leader-elected by a Lease in the namespace of the operator
-  - apiGroups:
-      - coordination.k8s.io
-    resources:
-      - leases
-    verbs:
-      - create
-      - get
-      - update
   - apiGroups:
       - ""
     resources:

@@ -514,8 +514,8 @@ func (spec *ClickHouseBackupScheduleSpec) Validate() error {
 	if err := validateStringBool("suspend", spec.Suspend); err != nil {
 		return err
 	}
-	if (spec.StartingDeadlineSeconds != nil) && (*spec.StartingDeadlineSeconds < 0) {
-		return fmt.Errorf("%w: startingDeadlineSeconds must not be negative", ErrInvalidBackupSpec)
+	if (spec.StartingDeadlineSeconds != nil) && ((*spec.StartingDeadlineSeconds < 0) || (*spec.StartingDeadlineSeconds > BackupStartingDeadlineMaxSeconds)) {
+		return fmt.Errorf("%w: startingDeadlineSeconds must be between 0 and %d", ErrInvalidBackupSpec, BackupStartingDeadlineMaxSeconds)
 	}
 	if (spec.SuccessfulRunsHistoryLimit != nil) && (*spec.SuccessfulRunsHistoryLimit < 1) {
 		return fmt.Errorf("%w: successfulRunsHistoryLimit must be at least 1", ErrInvalidBackupSpec)

@@ -1,0 +1,41 @@
+# Template Parameters:
+#
+# NAMESPACE=${NAMESPACE}
+# COMMENT=${COMMENT}
+#
+
+# The backup controllers of the operator are leader-elected by a Lease in the namespace of the operator, and nowhere
+# else: a Role of that namespace grants it, where a ClusterRole would grant it in every namespace.
+# Rendered where the operator's rules are a ClusterRole; a Role of the operator holds the rule itself.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: clickhouse-operator-leader-election
+  ${COMMENT}namespace: ${NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: ${OPERATOR_VERSION}
+rules:
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - create
+      - get
+      - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: clickhouse-operator-leader-election
+  ${COMMENT}namespace: ${NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: ${OPERATOR_VERSION}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: clickhouse-operator-leader-election
+subjects:
+  - kind: ServiceAccount
+    name: clickhouse-operator
+    namespace: ${NAMESPACE}

@@ -159,6 +159,20 @@ func TestStoragePathCheck(t *testing.T) {
 			clusters: []pathCluster{{name: "a", shards: "0", settings: s3("S3_PATH", " /backup/{shard}/")}, {name: "b", shards: "0", settings: s3("S3_PATH", "backup/{shard}")}},
 			refused:  "storage path 's3://backups/backup/0' is not unique: shard 0 of cluster a and shard 0 of cluster b both write their backups there",
 		},
+		"endpoints that differ in a trailing slash": {
+			clusters: []pathCluster{{name: "a", shards: "0", settings: s3("S3_PATH", "x", "S3_ENDPOINT", "https://minio:9000")}, {name: "b", shards: "0", settings: s3("S3_PATH", "x", "S3_ENDPOINT", "https://minio:9000/")}},
+			refused:  "storage path 's3://backups/x' is not unique: shard 0 of cluster a and shard 0 of cluster b both write their backups there",
+		},
+		"endpoints that differ in case and the default port": {
+			clusters: []pathCluster{{name: "a", shards: "0", settings: s3("S3_PATH", "x", "S3_ENDPOINT", "https://minio.example.com")}, {name: "b", shards: "0", settings: s3("S3_PATH", "x", "S3_ENDPOINT", " HTTPS://MINIO.Example.com:443/ ")}},
+			refused:  "storage path 's3://backups/x' is not unique: shard 0 of cluster a and shard 0 of cluster b both write their backups there",
+		},
+		"endpoints that differ in the port": {
+			clusters: []pathCluster{{name: "a", shards: "0", settings: s3("S3_PATH", "x", "S3_ENDPOINT", "https://minio:9000")}, {name: "b", shards: "0", settings: s3("S3_PATH", "x", "S3_ENDPOINT", "https://minio:9001")}},
+		},
+		"endpoints that differ in the scheme": {
+			clusters: []pathCluster{{name: "a", shards: "0", settings: s3("S3_PATH", "x", "S3_ENDPOINT", "http://minio")}, {name: "b", shards: "0", settings: s3("S3_PATH", "x", "S3_ENDPOINT", "https://minio")}},
+		},
 		"an azblob endpoint suffix unset and one set to its default": {
 			clusters: []pathCluster{
 				{name: "a", shards: "0", settings: storageSettings("azblob", "AZBLOB_ACCOUNT_NAME", "acc", "AZBLOB_CONTAINER", "one", "AZBLOB_PATH", "x")},
@@ -462,5 +476,26 @@ func TestStoragePathCheck(t *testing.T) {
 				require.Equal(t, expected, result.Log)
 			}
 		})
+	}
+}
+
+// The settings that tell one storage from another are compared in one form for every way to spell them.
+func TestNormalizeIdentity(t *testing.T) {
+	for _, tc := range []struct{ key, value, expected string }{
+		{"S3_ENDPOINT", "https://minio:9000/", "https://minio:9000"},
+		{"S3_ENDPOINT", "HTTPS://Minio:9000", "https://minio:9000"},
+		{"S3_ENDPOINT", "https://minio:443", "https://minio"},
+		{"S3_ENDPOINT", "http://minio:80/base/", "http://minio/base"},
+		{"S3_ENDPOINT", "http://minio:443", "http://minio:443"},
+		{"S3_ENDPOINT", "https://[::1]:443/", "https://[::1]"},
+		{"S3_ENDPOINT", "", ""},
+		{"GCS_ENDPOINT", " https://storage.googleapis.com/ ", "https://storage.googleapis.com"},
+		{"COS_URL", "https://Bucket.COS.example.com/", "https://bucket.cos.example.com"},
+		{"AZBLOB_ENDPOINT_SUFFIX", "Core.Windows.NET", "core.windows.net"},
+		{"SFTP_ADDRESS", "SFTP.Example.com", "sftp.example.com"},
+		{"SFTP_PORT", "022", "22"},
+		{"S3_BUCKET", "Backups", "Backups"},
+	} {
+		require.Equal(t, tc.expected, normalizeIdentity(tc.key, tc.value), tc.key+"="+tc.value)
 	}
 }

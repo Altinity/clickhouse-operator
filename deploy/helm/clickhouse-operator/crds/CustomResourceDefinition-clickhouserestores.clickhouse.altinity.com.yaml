@@ -182,6 +182,7 @@ spec:
                   type: integer
                   format: int64
                   minimum: 1
+                  maximum: 2147483647
                   description: "How long the restore run may run before it is stopped and the restore fails. Defaults to 24 hours"
                 timeouts:
                   type: object

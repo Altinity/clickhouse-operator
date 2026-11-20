@@ -266,7 +266,11 @@ For every Pod of a cluster with backup enabled, the operator adds a container na
   that locate the storage, under the names of their environment variables, for the
   [storage path check](#storage-paths) of the operator. A sidecar that starts before the Secret exists
   does not serve its REST API, which would let in anybody without credentials, but waits for the
-  file, leaving its Pod Ready.
+  file, leaving its Pod Ready. The name joins the names of the CHI and of the cluster with `-`, so CHI `a-b`
+  with cluster `c` and CHI `a` with cluster `b-c` name the same Secret. The operator touches only a Secret
+  that carries its labels for the CHI: on one that does not - another CHI's, or one of your own - it
+  changes nothing, aborts the reconcile of the CHI with the reason `BackupConfigInvalid` and a message
+  naming the Secret, and goes on once the Secret is gone or the CHI or the cluster is renamed.
 * **Backup user, when you set one.** Without `CLICKHOUSE_USERNAME` and `CLICKHOUSE_PASSWORD` in the
   Secret above, the configuration file sets no ClickHouse credentials beyond what the storage
   settings may set, and `clickhouse-backup` connects with its own defaults - user `default`, empty
@@ -553,7 +557,8 @@ environment-variable keys does, or holds storage settings that are no YAML mappi
 YAML at all, a section that is no mapping, a setting the operator reads that is a list - the operator
 aborts the reconcile of the whole CHI before it creates or changes anything: its status turns
 `Aborted` with the reason `BackupConfigInvalid` and a message naming the cluster, the Secret and what
-is wrong, with a `BackupStorageConfigInvalid` warning event on the CHI. The operator does not watch
+is wrong - for YAML that cannot be read, the line at most, never the content, which holds credentials - with a
+`BackupStorageConfigInvalid` warning event on the CHI. The operator does not watch
 the Secret: it checks the storage Secrets of such a CHI once a minute and reconciles it again by
 itself once they can be used. A Secret that goes bad after the configuration file was generated -
 deleted while it is recreated, say - leaves the sidecars with the storage settings they have, with a
@@ -676,7 +681,8 @@ backup-enabled clusters of the CHI, not only of its own cluster, on every host w
 macros - as `clickhouse-backup` expands them there, the way its
 `skip_restore_non_sharded_replicated_tables` expands the ZooKeeper paths of a table on every shard -
 and refuses two writers of a backup of one name at one location of one storage (the same storage
-type and bucket, container, endpoint or address). The writers are the shards of each cluster, and,
+type and bucket, container, endpoint or address; endpoints and addresses are compared without regard to the
+case of the scheme and host, a trailing `/` and the default port of the scheme). The writers are the shards of each cluster, and,
 for an `AllReplicas` backup, every replica of its own cluster: they all make the backup at once.
 The run fails without changing anything unless:
 
@@ -1029,14 +1035,14 @@ spec:
 | `cluster`                 | all             | Back up only this cluster. Empty means every cluster with backup enabled, each in a run of its own; with `scheduleRef`, every cluster the schedule backs up. |
 | `backupName`              | generated       | Backup name, the same on every cluster; generated from the resource name and the time it is due when empty, see `status.backupName`. Refused with `scheduleRef`, or if it ends like a schedule's, `-YYYYMMDDHHMMSS`.        |
 | `scheduledTime`           | when created    | RFC 3339 time, with its offset, the backup is due at, see [Back up at a later time](#back-up-at-a-later-time).                                                                                                               |
-| `startingDeadlineSeconds` |                 | How late, from the time it is due, the backup may start on a cluster; unset, it waits as long as it takes.                                                                                                                   |
+| `startingDeadlineSeconds` |                 | How late, from the time it is due, the backup may start on a cluster; unset, it waits as long as it takes. At most `2147483647`. |
 | `diffFromRemote`          |                 | Make this an [incremental backup](#incremental-backups) on top of this existing backup.                                                                                                                                      |
 | `configOverrides`         | none            | `clickhouse-backup` settings the backup is made with in place of the sidecar's, e.g. `["S3_STORAGE_CLASS=STANDARD_IA"]`, see [Config overrides](#config-overrides). Not with `scheduleRef`. |
 | `schemaOnly`              | `false`         | Back up table and database definitions only, no data.                                                                                                                                                                        |
 | `replicaSelection`        | `FirstPerShard` | `FirstPerShard` backs up one replica of each shard, which is complete for `Replicated*` tables. `AllReplicas` backs up every replica, needed when a cluster holds non-replicated tables whose data differs between replicas; a shard counts as backed up once any of its replicas made the backup. `AllReplicas` needs a storage path and an object disk path of its own on every replica, or the backup is `Aborted` (`StoragePathConflict`), see [Storage paths](#storage-paths). |
 | `tables`                  | all             | `clickhouse-backup --tables` pattern, e.g. `db.table`, `db.*`, comma-separated.                                                                                                                                              |
 | `partitions`              | all             | List of partition ids to back up.                                                                                                                                                                                            |
-| `activeDeadlineSeconds`   | `86400` (24h)   | How long the run of each cluster may take, from its start, before it is stopped and the backup of that cluster fails. |
+| `activeDeadlineSeconds`   | `86400` (24h)   | How long the run of each cluster may take, from its start, before it is stopped and the backup of that cluster fails. At most `2147483647`. |
 | `timeouts`                | see [Timeouts](#timeouts) | How the run waits for its commands on the sidecars. With `scheduleRef`, a field left unset is the schedule's. |
 
 The spec is validated when the resource is created: backup names (`backupName`, `diffFromRemote`,
@@ -1180,10 +1186,10 @@ spec:
 | `schedules[].configOverrides`                                                     | none                                  | `clickhouse-backup` settings the runs of the entry make their backups with, e.g. `["S3_STORAGE_CLASS=GLACIER_IR"]` on a monthly entry: those of the heaviest entry of a slot apply. See [Config overrides](#config-overrides). |
 | `timeZone`                                                                        | UTC                                   | IANA time zone the entries are read in, e.g. `Europe/Berlin`. Backup names carry the time of the slot in this zone. |
 | `suspend`                                                                         | `false`                               | Stop starting new runs. A run already in progress continues.                                                                                                                                                                  |
-| `startingDeadlineSeconds`                                                         |                                       | How late a run may still start after its slot, as one that waited for a run in progress, a restore or the operator: a slot missed by more is skipped. Runs never overlap. |
+| `startingDeadlineSeconds`                                                         |                                       | How late a run may still start after its slot, as one that waited for a run in progress, a restore or the operator: a slot missed by more is skipped. Runs never overlap. At most `2147483647`. |
 | `successfulRunsHistoryLimit`                                                      | `3`                                   | Successful finished runs `status.recentRuns` keeps, at least 1. |
 | `failedRunsHistoryLimit`                                                          | `1`                                   | Failed finished runs `status.recentRuns` keeps, at least 1. |
-| `schemaOnly`, `replicaSelection`, `tables`, `partitions`, `activeDeadlineSeconds` |                                       | As in [`ClickHouseBackup`](#clickhousebackup); `activeDeadlineSeconds` bounds the run of each cluster. |
+| `schemaOnly`, `replicaSelection`, `tables`, `partitions`, `activeDeadlineSeconds` |                                       | As in [`ClickHouseBackup`](#clickhousebackup); `activeDeadlineSeconds` bounds the run of each cluster, at most `2147483647`. |
 | `timeouts`                                                                        | see [Timeouts](#timeouts)             | How every run, and a `ClickHouseBackup` that runs the schedule and leaves a field unset, waits for its commands on the sidecars. |
 | `backupNamePrefix`                                                                | `<namespace>-<chi>-<schedule>`        | Backup names are `<prefix>-<YYYYMMDDHHMMSS>`, the time the run was due in `timeZone`, e.g. `default-backup-demo-nightly-20261003023000`. Also scopes [retention](#retention). Can be set once and is immutable after.         |
 | `retention.onScheduleChange` | `Hold` | What [retention](#schedule-changes) does with the backups the schedule kept before a change of its entries or `timeZone`: `Hold` keeps them all until the change is released, `Prune` applies the change at once. |
@@ -1320,7 +1326,7 @@ spec:
 | `validateTopology`       | `true`             | Refuse the restore unless every target shard holds the backup, and, from another CHI, a backup named as its base at the own paths.        |
 | `replicatedCopyToDetached` | `true`           | The replicas of a shard but the first copy the data into the `detached` directories of their `Replicated*` tables before the first one restores it, so replication attaches it from there instead of fetching it; `false` downloads the schema alone on them. See below. |
 | `resumeDownload`         | `true`             | A [rerun](#rerunning-with-spectaskid) resumes the downloads its earlier runs left, from another CHI too; `false` deletes them (`delete local <name>`, step `replaceLocal`) and downloads the backup again. The first run is the same either way. |
-| `activeDeadlineSeconds`  | `86400` (24h)      | How long the run of each cluster may take, from its start, before it is stopped and the restore of that cluster fails. |
+| `activeDeadlineSeconds`  | `86400` (24h)      | How long the run of each cluster may take, from its start, before it is stopped and the restore of that cluster fails. At most `2147483647`. |
 | `timeouts`               | see [Timeouts](#timeouts) | How the run waits for its commands on the sidecars. |
 
 `tables` follows the rules of a backup's `tables`. The target CHI needs backup enabled and the same
@@ -1623,7 +1629,8 @@ install bundle and the Helm chart set them in the Secret `clickhouse-operator`. 
 backup each makes or restores and the base of an incremental one, every command the run inserted in
 `actions`, with its `timeFrom` and the status the sidecar told, and the `plan` its preflight decided,
 such as the hosts that hold a local copy of the backup to restore. The operator runs the backup controllers
-leader-elected, by a `Lease` in its namespace, and the runs live in the leader: a new leader resumes
+leader-elected, by a `Lease` in its namespace - which a `Role` of that namespace alone grants, in every install
+flavor, never the cluster-wide role - and the runs live in the leader: a new leader resumes
 every run the status records running. An operator that loses the `Lease` - the API server did not
 answer in time to renew it - stops its backup controllers and its runs, builds new ones and enters the
 election again, waiting longer after each loss, up to a minute; it is not restarted, and the
@@ -1922,7 +1929,13 @@ spec:
   `CLICKHOUSE_EMBEDDED_BACKUP_DISK` - which the listings, retention and restores of
   the backup, made with the sidecar's settings, would not find it by, and any setting of a secret
   (a key holding `PASSWORD`, `SECRET`, `ACCESS_KEY`, `TOKEN`, `CREDENTIAL`, `SAS`, ...): secrets belong
-  in the configuration Secret.
+  in the configuration Secret. So do the settings that weaken the security of the storage or of the
+  connection to it, which an administrator of the storage sets for every backup alike: access control
+  lists and server-side encryption (`S3_ACL`, `S3_SSE`, `S3_SSE_KMS_KEY_ID`, `S3_SSE_CUSTOMER_ALGORITHM`,
+  `S3_SSE_KMS_ENCRYPTION_CONTEXT`), plain HTTP and TLS or certificate verification turned off
+  (`S3_DISABLE_SSL`, `S3_DISABLE_CERT_VERIFICATION`, `GCS_FORCE_HTTP`, `AZBLOB_ENDPOINT_SCHEMA`, `FTP_TLS`,
+  `FTP_SKIP_TLS_VERIFY`, `SFTP_KNOWN_HOSTS`, `CLICKHOUSE_TLS_*`), and those that change who the sidecar is
+  on the storage (`S3_ASSUME_ROLE_ARN`, `GCS_SKIP_CREDENTIALS`, `AZBLOB_USE_MANAGED_IDENTITY`, `SFTP_KEY`).
 * **A sidecar restart loses them.** A sidecar that restarts during the upload resumes it by itself,
   from what it keeps of the command, which leaves out the `--env` flags: the run follows the resumed
   upload, and the parts uploaded after the restart get the sidecar's settings.

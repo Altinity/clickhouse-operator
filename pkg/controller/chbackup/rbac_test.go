@@ -111,6 +111,29 @@ func TestOperatorRoleGrantsBackupControllers(t *testing.T) {
 	}
 }
 
+// The Lease the backup controllers are elected by is in the namespace of the operator: the cluster-wide role does not
+// grant it, a Role of that namespace does. The template marks the rule as the one a ClusterRole drops, and the
+// install bundles and the Helm chart grant it through a Role: see the builder and the chart.
+func TestLeasesAreGrantedByANamespacedRoleOnly(t *testing.T) {
+	raw, err := os.ReadFile(operatorRoleTemplatePath)
+	require.NoError(t, err)
+	template := string(raw)
+	begin, end := strings.Index(template, "# begin namespaced-only"), strings.Index(template, "# end namespaced-only")
+	require.True(t, (begin >= 0) && (end > begin), "the lease rule is marked as the one a ClusterRole drops")
+	require.Equal(t, 1, strings.Count(template, "- leases"))
+	require.Contains(t, template[begin:end], "- leases")
+
+	for _, path := range []string{
+		"../../../deploy/builder/templates-install-bundle/clickhouse-operator-install-yaml-template-02-section-rbac-03-leader-election.yaml",
+	} {
+		raw, err := os.ReadFile(path)
+		require.NoError(t, err)
+		require.Contains(t, string(raw), "kind: Role\n")
+		require.Contains(t, string(raw), "kind: RoleBinding\n")
+		require.Contains(t, string(raw), "- leases")
+	}
+}
+
 // The operator drives clickhouse-backup through SQL: it runs no Job, no CronJob and no Pod of its own, creates no
 // ServiceAccount, Role or RoleBinding, and its role grants none of that.
 func TestOperatorRoleGrantsNoBackupWorkloads(t *testing.T) {

@@ -187,6 +187,26 @@ func TestBuildRefusesInvalidStorageSettings(t *testing.T) {
 	}
 }
 
+// The error of storage settings that are no YAML names no content of them: it ends up in the status of the
+// installation, its events and the log
+func TestBuildInvalidStorageSettingsLeakNothing(t *testing.T) {
+	const secret = "AKIAsecret-value-123"
+	for name, storageConfig := range map[string]string{
+		"syntax error":  "s3:\n  secret_key: " + secret + "\n  bucket: [a\n",
+		"type mismatch": "s3: " + secret + "\n",
+		"a tab":         "s3:\n\tsecret_key: " + secret + "\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := Build([]byte(storageConfig), testCredentials, testDefaults)
+			require.ErrorIs(t, err, ErrInvalidStorageConfig)
+			require.NotContains(t, err.Error(), secret)
+			require.NotContains(t, err.Error(), "secret_key")
+		})
+	}
+	_, err := Build([]byte("s3:\n  bucket: [a\n"), testCredentials, testDefaults)
+	require.ErrorContains(t, err, "see line")
+}
+
 // The fingerprint of the credentials of the REST API changes with them alone, and gives none of them away
 func TestBuildAPIFingerprint(t *testing.T) {
 	first, err := Build([]byte("s3:\n  bucket: a\n"), testCredentials, testDefaults)

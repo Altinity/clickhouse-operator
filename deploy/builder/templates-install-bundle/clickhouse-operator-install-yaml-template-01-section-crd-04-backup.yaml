@@ -199,6 +199,7 @@ spec:
                   type: integer
                   format: int64
                   minimum: 1
+                  maximum: 2147483647
                   description: "How long the run may run before it is stopped and the operation fails. Defaults to 24 hours"
                 timeouts:
                   type: object
@@ -797,6 +798,7 @@ spec:
                   type: integer
                   format: int64
                   minimum: 0
+                  maximum: 2147483647
                   description: "Deadline in seconds for starting a run that missed its scheduled time"
                 successfulRunsHistoryLimit:
                   type: integer
@@ -843,6 +845,7 @@ spec:
                   type: integer
                   format: int64
                   minimum: 1
+                  maximum: 2147483647
                   description: "How long each backup run may run before it is stopped and the run fails. Defaults to 24 hours"
                 timeouts:
                   type: object
@@ -1583,6 +1586,7 @@ spec:
                   type: integer
                   format: int64
                   minimum: 1
+                  maximum: 2147483647
                   description: "How long the restore run may run before it is stopped and the restore fails. Defaults to 24 hours"
                 timeouts:
                   type: object

@@ -67,7 +67,8 @@ rules:
       - update
       - watch
       - delete
-  # The backup controllers are leader-elected by a Lease in the namespace of the operator
+  # The backup controllers are leader-elected by a Lease in the namespace of the operator, which a Role of that
+  # namespace grants: a ClusterRole would grant it in every namespace
   - apiGroups:
       - coordination.k8s.io
     resources:

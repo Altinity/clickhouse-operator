@@ -1243,7 +1243,7 @@ spec:
                               s3.access_key, s3.secret_key. The operator generates the configuration file of the sidecar from it,
                               which follows a change of the Secret without a restart. A cluster that leaves it out takes the
                               installation's; an explicit `secretKeyRef.name: ""` on a cluster leaves the cluster without one. Required:
-                              without one, backup stays off. The configuration must set api.username and api.password of the REST API
+                              without one, backup stays off. The operator sets the credentials of the REST API in the file itself.
                             properties:
                               valueFrom:
                                 description: "Source of the clickhouse-backup configuration"
@@ -3191,7 +3191,7 @@ spec:
                               s3.access_key, s3.secret_key. The operator generates the configuration file of the sidecar from it,
                               which follows a change of the Secret without a restart. A cluster that leaves it out takes the
                               installation's; an explicit `secretKeyRef.name: ""` on a cluster leaves the cluster without one. Required:
-                              without one, backup stays off. The configuration must set api.username and api.password of the REST API
+                              without one, backup stays off. The operator sets the credentials of the REST API in the file itself.
                             properties:
                               valueFrom:
                                 description: "Source of the clickhouse-backup configuration"
@@ -5860,6 +5860,7 @@ spec:
                   type: integer
                   format: int64
                   minimum: 1
+                  maximum: 2147483647
                   description: "How long the run may run before it is stopped and the operation fails. Defaults to 24 hours"
                 timeouts:
                   type: object
@@ -6453,6 +6454,7 @@ spec:
                   type: integer
                   format: int64
                   minimum: 0
+                  maximum: 2147483647
                   description: "Deadline in seconds for starting a run that missed its scheduled time"
                 successfulRunsHistoryLimit:
                   type: integer
@@ -6499,6 +6501,7 @@ spec:
                   type: integer
                   format: int64
                   minimum: 1
+                  maximum: 2147483647
                   description: "How long each backup run may run before it is stopped and the run fails. Defaults to 24 hours"
                 timeouts:
                   type: object
@@ -7234,6 +7237,7 @@ spec:
                   type: integer
                   format: int64
                   minimum: 1
+                  maximum: 2147483647
                   description: "How long the restore run may run before it is stopped and the restore fails. Defaults to 24 hours"
                 timeouts:
                   type: object
@@ -7568,15 +7572,6 @@ rules:
       - update
       - watch
       - delete
-  # The backup controllers are leader-elected by a Lease in the namespace of the operator
-  - apiGroups:
-      - coordination.k8s.io
-    resources:
-      - leases
-    verbs:
-      - create
-      - get
-      - update
   - apiGroups:
       - ""
     resources:
@@ -7780,6 +7775,47 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: clickhouse-operator-${OPERATOR_NAMESPACE}
+subjects:
+  - kind: ServiceAccount
+    name: clickhouse-operator
+    namespace: ${OPERATOR_NAMESPACE}
+# Template Parameters:
+#
+# NAMESPACE=${OPERATOR_NAMESPACE}
+# COMMENT=
+#
+---
+# The backup controllers of the operator are leader-elected by a Lease in the namespace of the operator, and nowhere
+# else: a Role of that namespace grants it, where a ClusterRole would grant it in every namespace.
+# Rendered where the operator's rules are a ClusterRole; a Role of the operator holds the rule itself.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: clickhouse-operator-leader-election
+  namespace: ${OPERATOR_NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: 0.28.0
+rules:
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - create
+      - get
+      - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: clickhouse-operator-leader-election
+  namespace: ${OPERATOR_NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: 0.28.0
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: clickhouse-operator-leader-election
 subjects:
   - kind: ServiceAccount
     name: clickhouse-operator

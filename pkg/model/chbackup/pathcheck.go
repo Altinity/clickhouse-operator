@@ -16,6 +16,7 @@ package chbackup
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"slices"
 	"strconv"
@@ -138,6 +139,46 @@ func identityDefault(key string) string {
 		return "22"
 	}
 	return ""
+}
+
+// normalizeIdentity writes a setting that tells one storage from another in one form for every way to spell it:
+// the scheme and the host of an endpoint in lower case, without the default port of its scheme and without the
+// trailing slashes of its path, the host of an address and the suffix of an endpoint in lower case, a port as a number.
+func normalizeIdentity(key, value string) string {
+	value = strings.TrimSpace(value)
+	switch {
+	case strings.HasSuffix(key, "_ENDPOINT") || (key == "COS_URL"):
+		return normalizeEndpoint(value)
+	case strings.HasSuffix(key, "_ADDRESS") || strings.HasSuffix(key, "_ENDPOINT_SUFFIX"):
+		return strings.ToLower(strings.TrimRight(value, "/"))
+	case strings.HasSuffix(key, "_PORT"):
+		if port, err := strconv.Atoi(value); err == nil {
+			return strconv.Itoa(port)
+		}
+	}
+	return value
+}
+
+// normalizeEndpoint writes an endpoint URL with its scheme and host in lower case, without the default port of its
+// scheme and without trailing slashes. What is no URL with a scheme and a host is left as it is, but for its case and
+// slashes.
+func normalizeEndpoint(endpoint string) string {
+	u, err := url.Parse(endpoint)
+	if (err != nil) || (u.Scheme == "") || (u.Host == "") {
+		return strings.ToLower(strings.TrimRight(endpoint, "/"))
+	}
+	u.Scheme = strings.ToLower(u.Scheme)
+	host := strings.ToLower(u.Hostname())
+	if strings.Contains(host, ":") {
+		host = "[" + host + "]"
+	}
+	if port := u.Port(); (port != "") && (port != map[string]string{"http": "80", "https": "443"}[u.Scheme]) {
+		host += ":" + port
+	}
+	u.Host = host
+	u.Path = strings.TrimRight(u.Path, "/")
+	u.RawPath = ""
+	return u.String()
 }
 
 func trimPath(storage, value string) string {
@@ -375,7 +416,7 @@ func (c PathCheck) Check() (PathCheckResult, error) {
 				if !set {
 					value = identityDefault(key)
 				}
-				identity = append(identity, value)
+				identity = append(identity, normalizeIdentity(key, value))
 			}
 		}
 		value, set := setting(cluster, prefix+"_PATH")

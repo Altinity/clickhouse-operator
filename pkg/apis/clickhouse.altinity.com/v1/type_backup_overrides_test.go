@@ -53,6 +53,14 @@ func TestValidateConfigOverrides(t *testing.T) {
 		"the object disk path":    {[]string{"GCS_OBJECT_DISK_PATH=x"}, false},
 		"a setting of the API":    {[]string{"API_FOO=1"}, false},
 		"the storage":             {[]string{"REMOTE_STORAGE=gcs"}, false},
+		"an acl":                  {[]string{"S3_ACL=public-read"}, false},
+		"certificate check off":   {[]string{"S3_DISABLE_CERT_VERIFICATION=true"}, false},
+		"plain http":              {[]string{"S3_DISABLE_SSL=true"}, false},
+		"server-side encryption":  {[]string{"S3_SSE=AES256"}, false},
+		"a kms key":               {[]string{"S3_SSE_KMS_KEY_ID=alias/x"}, false},
+		"an ftp tls check off":    {[]string{"FTP_SKIP_TLS_VERIFY=true"}, false},
+		"an azblob plain http":    {[]string{"AZBLOB_ENDPOINT_SCHEMA=http"}, false},
+		"gcs plain http":          {[]string{"GCS_FORCE_HTTP=true"}, false},
 		"the host of the sidecar": {[]string{"CLICKHOUSE_HOST=x"}, false},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -63,7 +71,7 @@ func TestValidateConfigOverrides(t *testing.T) {
 			require.Equal(t, tc.valid, backup.Validate() == nil)
 		})
 	}
-	require.Equal(t, []string{"S3_STORAGE_CLASS=X", "S3_ACL=private"}, ConfigOverrides([]string{"--env=S3_STORAGE_CLASS=X", "S3_ACL=private"}))
+	require.Equal(t, []string{"S3_STORAGE_CLASS=X", "S3_FORCE_PATH_STYLE=true"}, ConfigOverrides([]string{"--env=S3_STORAGE_CLASS=X", "S3_FORCE_PATH_STYLE=true"}))
 	run := ClickHouseBackupSpec{ScheduleRef: &BackupScheduleRef{Name: "s1"}, ConfigOverrides: []string{"S3_STORAGE_CLASS=X"}}
 	require.ErrorContains(t, run.Validate(), "takes no configOverrides")
 }
