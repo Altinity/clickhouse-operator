@@ -411,3 +411,32 @@ func TestUnfinishedHostsOfARunThatRecordedNoHosts(t *testing.T) {
 	require.Equal(t, []api.BackupRunHost{{Host: "h0", Backup: "manual"}, {Host: "h1", Backup: "manual"}},
 		unfinishedHosts(chb, cluster(&api.BackupRunStatus{Operation: op, Mutated: true})), "a command whose record was lost")
 }
+
+// The announcement that a deletion waits for its runs is made once, and only as it is emitted: a status write that
+// fails on a conflict drops it for the next reconcile to make, and a reconcile that changed no status makes it at once.
+func TestDeletionWaitingIsAnnouncedOnceItIsEmitted(t *testing.T) {
+	conflicts := 1
+	chbs := newScheduleCR("waiting")
+	chbs.UID = "waiting-announced-uid"
+	t.Cleanup(func() { deletions.forget(chbs) })
+	c := newClient(t, conflictingStatusUpdates(&conflicts), chbs)
+	controller := NewScheduleController(c, c, newScheme(t), nil)
+	waiting := func() func() {
+		return controller.info(chbs, "Delete", reasonDeletionWaitingForRun, "waiting")
+	}
+	require.NoError(t, c.Get(context.Background(), key("waiting"), chbs))
+
+	result, err := controller.commitWaiting(context.Background(), chbs, true, ctrl.Result{}, nil, waiting())
+	require.NoError(t, err)
+	require.True(t, result.Requeue, "the conflict requeues")
+	require.Empty(t, eventMessages(t, c, reasonDeletionWaitingForRun), "the dropped write announces nothing")
+	require.False(t, deletions.made(chbs, "waiting"))
+
+	_, err = controller.commitWaiting(context.Background(), chbs, false, ctrl.Result{}, nil, waiting())
+	require.NoError(t, err)
+	require.Len(t, eventMessages(t, c, reasonDeletionWaitingForRun), 1, "an unchanged status announces at once")
+
+	_, err = controller.commitWaiting(context.Background(), chbs, true, ctrl.Result{}, nil, waiting())
+	require.NoError(t, err)
+	require.Len(t, eventMessages(t, c, reasonDeletionWaitingForRun), 1, "it is announced once")
+}

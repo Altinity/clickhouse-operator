@@ -112,6 +112,33 @@ func (d *deletionNotices) forget(obj client.Object) {
 	})
 }
 
+// commitWaiting commits the status of a deleted restore or schedule that waits for its runs, with the announcements of
+// the reconcile, and announces once that the deletion waits. That announcement is marked made only as it is emitted:
+// one a status write that failed on a conflict drops is made at the next reconcile, and one of a reconcile that
+// changed no status is emitted at once, as commitStatus emits nothing then.
+func (r *reconciler) commitWaiting(
+	ctx context.Context,
+	obj client.Object,
+	changed bool,
+	result ctrl.Result,
+	out announcements,
+	waiting func(),
+) (ctrl.Result, error) {
+	if !deletions.made(obj, "waiting") {
+		announce := func() {
+			if deletions.once(obj, "waiting") {
+				waiting()
+			}
+		}
+		if !changed {
+			announce()
+		} else {
+			out = append(out, announce)
+		}
+	}
+	return r.commitStatus(ctx, obj, changed, result, out)
+}
+
 // deletionLeft is what the deletion of a backup that did not complete leaves on a cluster, and why: on the hosts, where
 // the deletion could not run, else as why tells.
 type deletionLeft struct {
@@ -350,12 +377,10 @@ func (c *RestoreController) finalize(ctx context.Context, cur *api.ClickHouseRes
 	}
 	changed := !apiEquality.Semantic.DeepEqual(cur.Status, next.Status)
 	if len(running) > 0 {
-		if deletions.once(next, "waiting") {
-			out.add(c.info(next, a.EventActionDelete, reasonDeletionWaitingForRun, "restore of backup %s is deleted while it runs on "+
-				"cluster(s) %s: waiting for the restore run to finish before deletion; a restore is never killed, and what it "+
-				"downloaded stays", restoredBackupName(next), strings.Join(running, ", ")))
-		}
-		return c.commitStatus(ctx, next, changed, result, out)
+		return c.commitWaiting(ctx, next, changed, result, out, c.info(next, a.EventActionDelete, reasonDeletionWaitingForRun,
+			"restore of backup %s is deleted while it runs on cluster(s) %s: waiting for the restore run to finish before "+
+				"deletion; a restore is never killed, and what it downloaded stays", restoredBackupName(next),
+			strings.Join(running, ", ")))
 	}
 	if deletions.made(next, "waiting") {
 		out.add(c.info(next, a.EventActionDelete, reasonDeletionRunFinished, "the restore run finished, the deleted restore of "+
@@ -381,16 +406,13 @@ func (c *ScheduleController) finalize(ctx context.Context, cur *api.ClickHouseBa
 	}
 	changed := !apiEquality.Semantic.DeepEqual(cur.Status, next.Status)
 	if len(next.Status.Active) > 0 {
-		if deletions.once(next, "waiting") {
-			var clusters []string
-			for _, scheduled := range next.Status.Active {
-				clusters = append(clusters, scheduled.Name)
-			}
-			out.add(c.info(next, a.EventActionDelete, reasonDeletionWaitingForRun, "schedule is deleted while it runs on cluster(s) "+
-				"%s: it starts no run more, and goes once the runs in progress, retention included, finish",
-				strings.Join(clusters, ", ")))
+		var clusters []string
+		for _, scheduled := range next.Status.Active {
+			clusters = append(clusters, scheduled.Name)
 		}
-		return c.commitStatus(ctx, next, changed, ctrl.Result{RequeueAfter: recheck}, out)
+		return c.commitWaiting(ctx, next, changed, ctrl.Result{RequeueAfter: recheck}, out, c.info(next, a.EventActionDelete,
+			reasonDeletionWaitingForRun, "schedule is deleted while it runs on cluster(s) %s: it starts no run more, and goes "+
+				"once the runs in progress, retention included, finish", strings.Join(clusters, ", ")))
 	}
 	if deletions.made(next, "waiting") {
 		out.add(c.info(next, a.EventActionDelete, reasonDeletionRunFinished, "the runs of the deleted schedule finished, it goes"))
