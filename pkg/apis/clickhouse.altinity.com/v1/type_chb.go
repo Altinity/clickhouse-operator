@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"strings"
 	"time"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -268,6 +269,8 @@ const (
 	defaultBackupActiveDeadlineSeconds int64 = 24 * 60 * 60
 	// backupTablesMaxLength bounds the --tables pattern. Mirrored by the CRD schema maxLength.
 	backupTablesMaxLength = 1024
+	// BackupTablesMaxItems bounds a list of table patterns. Mirrored by the CRD schema maxItems.
+	BackupTablesMaxItems = 64
 	// BackupNameMaxLength bounds backup names. Mirrored by the CRD schema maxLength.
 	BackupNameMaxLength = 128
 	// BackupStartingDeadlineMaxSeconds bounds startingDeadlineSeconds, so the deadline it makes stays a time.Duration:
@@ -304,9 +307,9 @@ var (
 	// line of clickhouse-backup actions. No "..", which clickhouse-backup strips from names, so
 	// the backup would land under a different name. Mirrored by the CRD schema patterns.
 	backupNameRegexp = regexp.MustCompile(`^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$`)
-	// backupTablesRegexp bounds clickhouse-backup --tables patterns: db.table, db.*, comma-separated.
-	// No leading "-": the operator passes the pattern as an argument, which must never read as a flag.
-	backupTablesRegexp = regexp.MustCompile(`^[A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*$`)
+	// backupTablesRegexp bounds one clickhouse-backup table pattern: db.table, db.*. No ",", which joins the patterns
+	// of a list, nor a leading "-": the operator passes the patterns as an argument, which must never read as a flag.
+	backupTablesRegexp = regexp.MustCompile(`^[A-Za-z0-9_.*?][A-Za-z0-9_.*?-]*$`)
 	// scheduledBackupNameRegexp matches the end of the names the runs of a schedule make, "-YYYYMMDDHHMMSS", which
 	// the retention of a schedule prunes: a one-off backup of such a name would join the series of the schedule whose
 	// prefix it carries, and push out the backups the schedule made.
@@ -346,12 +349,34 @@ func validateBackupSource(field, value string, maxLength int) error {
 	return nil
 }
 
-// validateTables checks an optional clickhouse-backup table pattern against the allowed character set
-// and length.
-func validateTables(tables string) error {
-	if (len(tables) > backupTablesMaxLength) || ((tables != "") && !backupTablesRegexp.MatchString(tables)) {
-		return fmt.Errorf("%w: tables %q must match %s and be at most %d characters", ErrInvalidBackupSpec,
-			tables, backupTablesRegexp, backupTablesMaxLength)
+// validateTables checks the optional clickhouse-backup table patterns of a field: at most BackupTablesMaxItems, each
+// of the allowed character set, which holds no comma as the patterns are joined by commas, and no more than
+// backupTablesMaxLength characters joined.
+func validateTables(field string, tables []string) error {
+	if len(tables) > BackupTablesMaxItems {
+		return fmt.Errorf("%w: %s holds more than %d patterns", ErrInvalidBackupSpec, field, BackupTablesMaxItems)
+	}
+	for _, pattern := range tables {
+		if !backupTablesRegexp.MatchString(pattern) {
+			return fmt.Errorf("%w: %s %q must match %s", ErrInvalidBackupSpec, field, pattern, backupTablesRegexp)
+		}
+	}
+	if joined := strings.Join(tables, ","); len(joined) > backupTablesMaxLength {
+		return fmt.Errorf("%w: %s must be at most %d characters joined by commas", ErrInvalidBackupSpec, field, backupTablesMaxLength)
+	}
+	return nil
+}
+
+// validateEngines checks the optional table engines of a field: at most BackupTablesMaxItems, each of the allowed
+// character set.
+func validateEngines(field string, engines []string) error {
+	if len(engines) > BackupTablesMaxItems {
+		return fmt.Errorf("%w: %s holds more than %d engines", ErrInvalidBackupSpec, field, BackupTablesMaxItems)
+	}
+	for _, engine := range engines {
+		if !backupEngineRegexp.MatchString(engine) {
+			return fmt.Errorf("%w: %s %q must match %s", ErrInvalidBackupSpec, field, engine, backupEngineRegexp)
+		}
 	}
 	return nil
 }
@@ -390,9 +415,15 @@ type BackupOptions struct {
 	SchemaOnly *types.StringBool `json:"schemaOnly,omitempty" yaml:"schemaOnly,omitempty"`
 	// ReplicaSelection controls which replicas are backed up. Defaults to FirstPerShard.
 	ReplicaSelection ReplicaSelection `json:"replicaSelection,omitempty" yaml:"replicaSelection,omitempty"`
-	// Tables optionally restricts the backup to tables matching this clickhouse-backup
-	// pattern (e.g. "db.table", "db.*"). Empty backs up everything.
-	Tables string `json:"tables,omitempty" yaml:"tables,omitempty"`
+	// Tables optionally restricts the backup to tables matching these clickhouse-backup patterns, one per item
+	// (e.g. "db.table", "db.*"), joined by commas. Empty backs up everything.
+	Tables []string `json:"tables,omitempty" yaml:"tables,omitempty"`
+	// SkipTables optionally leaves out of the backup the tables matching these clickhouse-backup patterns, one per
+	// item (e.g. "db.tmp*", "logs.*"), on top of the system databases (CLICKHOUSE_SKIP_TABLES).
+	SkipTables []string `json:"skipTables,omitempty" yaml:"skipTables,omitempty"`
+	// SkipTableEngines optionally leaves out of the backup the tables of these engines, e.g. Kafka
+	// (CLICKHOUSE_SKIP_TABLE_ENGINES).
+	SkipTableEngines []string `json:"skipTableEngines,omitempty" yaml:"skipTableEngines,omitempty"`
 	// Partitions optionally restricts the backup to the given partition ids.
 	Partitions []string `json:"partitions,omitempty" yaml:"partitions,omitempty"`
 	// ActiveDeadlineSeconds bounds how long a backup may run on a cluster. Defaults to 24 hours.
@@ -418,7 +449,7 @@ func (o *BackupOptions) GetActiveDeadlineSeconds() int64 {
 // isSet reports whether any of the options is set.
 func (o *BackupOptions) isSet() bool {
 	return (o != nil) &&
-		((o.SchemaOnly != nil) || (o.ReplicaSelection != "") || (o.Tables != "") || (o.Partitions != nil) || (o.ActiveDeadlineSeconds != nil))
+		((o.SchemaOnly != nil) || (o.ReplicaSelection != "") || (o.Tables != nil) || (o.SkipTables != nil) || (o.SkipTableEngines != nil) || (o.Partitions != nil) || (o.ActiveDeadlineSeconds != nil))
 }
 
 // Validate checks the options against the allowed character sets and values.
@@ -435,7 +466,13 @@ func (o *BackupOptions) Validate() error {
 		return fmt.Errorf("%w: replicaSelection %q is not one of %s, %s", ErrInvalidBackupSpec,
 			o.ReplicaSelection, ReplicaSelectionFirstPerShard, ReplicaSelectionAllReplicas)
 	}
-	if err := validateTables(o.Tables); err != nil {
+	if err := validateTables("tables", o.Tables); err != nil {
+		return err
+	}
+	if err := validateTables("skipTables", o.SkipTables); err != nil {
+		return err
+	}
+	if err := validateEngines("skipTableEngines", o.SkipTableEngines); err != nil {
 		return err
 	}
 	for _, partition := range o.Partitions {
@@ -580,7 +617,7 @@ func (spec *ClickHouseBackupSpec) Validate() error {
 		return fmt.Errorf("%w: scheduleRef.name %q is not the name of a resource", ErrInvalidBackupSpec, spec.ScheduleRef.Name)
 	case spec.BackupOptions.isSet():
 		return fmt.Errorf("%w: a backup that runs a schedule takes its options from the schedule: schemaOnly, "+
-			"replicaSelection, tables, partitions and activeDeadlineSeconds are not set with scheduleRef", ErrInvalidBackupSpec)
+			"replicaSelection, tables, skipTables, skipTableEngines, partitions and activeDeadlineSeconds are not set with scheduleRef", ErrInvalidBackupSpec)
 	case spec.BackupName != "":
 		return fmt.Errorf("%w: a backup that runs a schedule is named with the schedule's backupNamePrefix: "+
 			"backupName is not set with scheduleRef", ErrInvalidBackupSpec)

@@ -1040,7 +1040,9 @@ spec:
 | `configOverrides`         | none            | `clickhouse-backup` settings the backup is made with in place of the sidecar's, e.g. `["S3_STORAGE_CLASS=STANDARD_IA"]`, see [Config overrides](#config-overrides). Not with `scheduleRef`. |
 | `schemaOnly`              | `false`         | Back up table and database definitions only, no data.                                                                                                                                                                        |
 | `replicaSelection`        | `FirstPerShard` | `FirstPerShard` backs up one replica of each shard, which is complete for `Replicated*` tables. `AllReplicas` backs up every replica, needed when a cluster holds non-replicated tables whose data differs between replicas; a shard counts as backed up once any of its replicas made the backup. `AllReplicas` needs a storage path and an object disk path of its own on every replica, or the backup is `Aborted` (`StoragePathConflict`), see [Storage paths](#storage-paths). |
-| `tables`                  | all             | `clickhouse-backup --tables` pattern, e.g. `db.table`, `db.*`, comma-separated.                                                                                                                                              |
+| `tables`                  | all             | `clickhouse-backup --tables` patterns, one per item, e.g. `["db.table", "db.*"]`, joined by commas in the command.                                                                                                           |
+| `skipTables`              | none            | Leave out the tables matching these patterns, one per item, e.g. `["db.tmp_*"]`, on top of the system databases (`CLICKHOUSE_SKIP_TABLES`).                                                                                  |
+| `skipTableEngines`        | none            | Leave out the tables of these engines, e.g. `["Kafka", "RabbitMQ"]` (`CLICKHOUSE_SKIP_TABLE_ENGINES`).                                                                                                                       |
 | `partitions`              | all             | List of partition ids to back up.                                                                                                                                                                                            |
 | `activeDeadlineSeconds`   | `86400` (24h)   | How long the run of each cluster may take, from its start, before it is stopped and the backup of that cluster fails. At most `2147483647`. |
 | `timeouts`                | see [Timeouts](#timeouts) | How the run waits for its commands on the sidecars. With `scheduleRef`, a field left unset is the schedule's. |
@@ -1051,8 +1053,10 @@ dots in a row (`clickhouse-backup` would strip them and store the backup under a
 at most 128 characters - a schedule's `backupNamePrefix` at most 112, leaving room for the timestamp.
 A one-off backup's `backupName` must not end like the backups of a schedule, `-YYYYMMDDHHMMSS`: the
 [retention](#retention) of a schedule of that prefix would take it for one of its own.
-`tables` may only contain letters, digits and `_ . * ? , -` (up to 1024 characters), and each
-partition id must match `^[A-Za-z0-9_-]{1,128}$`. The on/off fields of backups, schedules and
+Every item of `tables` and `skipTables` may only contain letters, digits and `_ . * ? -`, not start
+with `-`, and hold no comma - the items are joined by commas, so one item is one pattern; at most 64
+items, 1024 characters joined. Every item of `skipTableEngines` is an engine name (letters, digits and
+`_`, at most 64 items), and each partition id must match `^[A-Za-z0-9_-]{1,128}$`. The on/off fields of backups, schedules and
 restores (`schemaOnly`, `suspend`, `overwrite`, `validateTopology`, `rbac`) take the yes/no
 forms `spec.backup.enabled` takes - `true`, `false`, `"yes"`, `"no"`, `1`, `0` and the like - and any
 other value, a number with a fraction, a list or an object included, is refused like an invalid name.
@@ -1065,6 +1069,20 @@ resource.
 A backup runs once. To back up again, create a new resource (or use a schedule). Deleting a
 `ClickHouseBackup` stops its runs - a command a sidecar runs already goes on there - and deletes not
 the backup in the storage.
+
+**A one-off backup is never pruned.** A `ClickHouseBackup` without `scheduleRef` is outside every
+[retention](#retention): the operator never deletes it, and its remote backup stays in the storage
+when the resource is deleted (`DeletionRemoteBackupKept`). To get rid of it, delete the remote backup
+by hand on a host of each shard, through SQL, the way
+[Deleting a backup, restore or schedule](#deleting-a-backup-restore-or-schedule) shows:
+
+```sql
+INSERT INTO system.backup_actions(command) VALUES ('delete remote <backup>')
+```
+
+or make the backup with `scheduleRef` ([Run a schedule now](#run-a-schedule-now)), which has the
+retention of the schedule cover it. A schedule's `retention.keepBackups[].until` pins a backup until a
+time, after which retention treats it as any other.
 
 ### Run a schedule now
 
@@ -1084,7 +1102,7 @@ spec:
 
 * It takes the CHI, the clusters (unless `cluster` names one of them), the `backupNamePrefix` and
   every backup option of the schedule (`schemaOnly`, `replicaSelection`,
-  `tables`, `partitions`, `activeDeadlineSeconds`) as they are when the backup is validated, and records
+  `tables`, `skipTables`, `skipTableEngines`, `partitions`, `activeDeadlineSeconds`) as they are when the backup is validated, and records
   them in `status.schedule`: an edit of the schedule afterwards changes nothing about it. None of these
   options can be set on the backup itself, nor can `backupName`; its own fields, `cluster` (one of
   the clusters the schedule backs up), `diffFromRemote`, `scheduledTime`,
@@ -1189,7 +1207,7 @@ spec:
 | `startingDeadlineSeconds`                                                         |                                       | How late a run may still start after its slot, as one that waited for a run in progress, a restore or the operator: a slot missed by more is skipped. Runs never overlap. At most `2147483647`. |
 | `successfulRunsHistoryLimit`                                                      | `3`                                   | Successful finished runs `status.recentRuns` keeps, at least 1. |
 | `failedRunsHistoryLimit`                                                          | `1`                                   | Failed finished runs `status.recentRuns` keeps, at least 1. |
-| `schemaOnly`, `replicaSelection`, `tables`, `partitions`, `activeDeadlineSeconds` |                                       | As in [`ClickHouseBackup`](#clickhousebackup); `activeDeadlineSeconds` bounds the run of each cluster, at most `2147483647`. |
+| `schemaOnly`, `replicaSelection`, `tables`, `skipTables`, `skipTableEngines`, `partitions`, `activeDeadlineSeconds` |                                       | As in [`ClickHouseBackup`](#clickhousebackup); `activeDeadlineSeconds` bounds the run of each cluster, at most `2147483647`. |
 | `timeouts`                                                                        | see [Timeouts](#timeouts)             | How every run, and a `ClickHouseBackup` that runs the schedule and leaves a field unset, waits for its commands on the sidecars. |
 | `backupNamePrefix`                                                                | `<namespace>-<chi>-<schedule>`        | Backup names are `<prefix>-<YYYYMMDDHHMMSS>`, the time the run was due in `timeZone`, e.g. `default-backup-demo-nightly-20261003023000`. Also scopes [retention](#retention). Can be set once and is immutable after.         |
 | `retention.onScheduleChange` | `Hold` | What [retention](#schedule-changes) does with the backups the schedule kept before a change of its entries or `timeZone`: `Hold` keeps them all until the change is released, `Prune` applies the change at once. |
@@ -1211,6 +1229,30 @@ created never runs. A late run still makes the backup of its slot, so the runs o
 backup name on every cluster. A cluster that joins - added to the CHI, backup enabled - runs from its
 next slot once the CHI has completed its reconcile; a cluster that leaves runs no more (see
 [Hosts that leave a schedule](#hosts-that-leave-a-schedule)).
+
+**Missed slots.** As a `CronJob` does, a schedule runs only the latest slot it missed - while the
+operator was down, or a run, a restore or a held state kept it waiting - and runs it late, unless
+`startingDeadlineSeconds` passed since that slot, which skips it with a `ScheduledRunSkipped` warning.
+The slots before it never run, so a long outage makes one backup, not one for each slot. As
+[retention](#retention) counts the backups that exist, never the slots, a missed slot deletes nothing
+earlier: it only leaves the older backups longer, until newer ones push them out.
+
+**No jitter.** A run starts the backup on every shard at the same time, with no random delay between
+shards or clusters. By default it runs on one replica of each shard (`replicaSelection: FirstPerShard`),
+so that the backups of the shards are as close in time as `clickhouse-backup` allows, for the most
+consistent snapshot a backup of several shards gets, see
+[No consistency across shards or clusters](#installations-and-clusters).
+
+**The day of an entry.** `weekly` takes `0`..`6`, `0` being Sunday, as `cron` and `CronJob` do.
+`monthly` takes `1`..`31`, and a day past the end of the month means its last day: `day: 31` is the last
+day of every month - the 31st, the 30th, the 28th or the 29th of February - and `day: 30` is the 30th
+and the last day of February.
+
+```yaml
+schedules:
+  - {period: weekly,  time: "03:00", day: 0,  keep: 4}    # every Sunday
+  - {period: monthly, time: "03:00", day: 31, keep: 12}   # the last day of every month
+```
 
 **Daylight saving time.** A backup is named after the wall-clock time of its slot in `timeZone`, so
 the two nights a year the clocks change are handled by that name:
@@ -1316,9 +1358,9 @@ spec:
 | `sourceInstallation`     | the restored CHI   | CHI that made the backup, when another: the backup is read from the paths its name gives, see [Storage paths](#storage-paths). Immutable. |
 | `sourceNamespace`        | the restored CHI's | Namespace of the CHI that made the backup, when another and the paths hold `{namespace}`. Immutable.                                      |
 | `schemaOnly`             | `false`            | Restore table and database definitions only, no data.                                                                                     |
-| `tables`                 | all                | Restore only the matching tables: a `clickhouse-backup` pattern as for a backup, e.g. `db.table`, `db.*`, comma-separated.                |
+| `tables`                 | all                | Restore only the matching tables: `clickhouse-backup` patterns as for a backup, one per item, e.g. `["db.table", "db.*"]`.               |
 | `partitions`             | all                | Restore the data of only these partition ids (`--partitions`), e.g. `["202601", "202602"]`, into the existing tables, replacing those partitions; the schema is not restored. Not with `schemaOnly` or `rbac`. See [Restore filters](#restore-filters). |
-| `skipTables`             | none               | Leave out the matching tables: a `clickhouse-backup` pattern, as `tables` (`CLICKHOUSE_SKIP_TABLES`).                                    |
+| `skipTables`             | none               | Leave out the matching tables: patterns, one per item, as `tables` (`CLICKHOUSE_SKIP_TABLES`).                                           |
 | `skipTableEngines`       | none               | Leave out the tables of these engines, e.g. `["Kafka", "RabbitMQ"]` (`CLICKHOUSE_SKIP_TABLE_ENGINES`).                                    |
 | `databaseMapping`        | none               | Restore the tables of a database of the backup into another one: `{source: target}` (`--restore-database-mapping`).                      |
 | `rbac`                   | `false`            | Also restore the [access entities](#access-entities) of the backup. Only with an empty `cluster`.                                         |
@@ -1329,7 +1371,7 @@ spec:
 | `activeDeadlineSeconds`  | `86400` (24h)      | How long the run of each cluster may take, from its start, before it is stopped and the restore of that cluster fails. At most `2147483647`. |
 | `timeouts`               | see [Timeouts](#timeouts) | How the run waits for its commands on the sidecars. |
 
-`tables` follows the rules of a backup's `tables`. The target CHI needs backup enabled and the same
+`tables` and `skipTables` follow the rules of a backup's `tables`. The target CHI needs backup enabled and the same
 backup storage configuration as the source, with the same cluster names and shard layout; a backup
 of a CHI of another name, or of another namespace, is found by naming that CHI in
 `sourceInstallation`, and its namespace in `sourceNamespace`, see
@@ -1425,11 +1467,11 @@ metadata:
 spec:
   clickHouseInstallation: backup-demo-restored
   backupName: default-backup-demo-nightly-20261003023000
-  tables: "analytics.*"
+  tables: ["analytics.*"]
   # The data of two months only
   partitions: ["202609", "202610"]
   # Neither the scratch tables nor the queue consumers
-  skipTables: "analytics.tmp_*"
+  skipTables: ["analytics.tmp_*"]
   skipTableEngines: ["Kafka"]
   # Into a database of another name, next to the live one
   databaseMapping:
@@ -1446,7 +1488,8 @@ spec:
   is letters, digits, `_` and `-`, the form `system.parts` shows as `partition_id`.
 * `skipTables` and `skipTableEngines` leave tables out of every step, through `CLICKHOUSE_SKIP_TABLES`
   - on top of the system databases `clickhouse-backup` leaves out anyway - and
-  `CLICKHOUSE_SKIP_TABLE_ENGINES`.
+  `CLICKHOUSE_SKIP_TABLE_ENGINES`. A [backup](#clickhousebackup) takes both as well, on its
+  `create_remote` command.
 * `databaseMapping` restores the schema and the data of each database it names into the database it
   maps it to (`--restore-database-mapping`), which overrides the empty `RESTORE_DATABASE_MAPPING` the
   sidecar pins: the tables of `analytics_restored` the backup holds are recreated, and `analytics` is
@@ -1599,7 +1642,7 @@ The commands are those of `clickhouse-backup`, as the Altinity usual backup work
 
 | Step                                      | Command                                                                                        |
 |-------------------------------------------|------------------------------------------------------------------------------------------------|
-| backup                                    | `create_remote --rbac [--env=K=V ...] [--schema] [--tables=..] [--partitions=..] [--diff-from-remote=<base>] <name>` |
+| backup                                    | `create_remote --rbac [--env=K=V ...] [--schema] [--tables=..] [--partitions=..] [--env=CLICKHOUSE_SKIP_TABLES=..] [--env=CLICKHOUSE_SKIP_TABLE_ENGINES=..] [--diff-from-remote=<base>] <name>` |
 | restore: download, on every replica       | `download --hardlink-exists-files <name>`; with `replicatedCopyToDetached: false`, on the replicas but the first of each shard `download --schema <name>` |
 | restore: schema, on every replica         | `restore --schema=1 [--rm] --ignore-dependencies [--rbac] <name>`, `--rm` with `overwrite` and no `tables`, on the first replica of the first shard with `--env=RESTORE_SCHEMA_ON_CLUSTER={cluster}` |
 | restore: copyToDetached, on the other replicas of each shard | `restore --data=1 --ignore-dependencies --replicated-copy-to-detached <name>`, with `replicatedCopyToDetached` |
@@ -1609,7 +1652,11 @@ The commands are those of `clickhouse-backup`, as the Altinity usual backup work
 
 A restore adds its [filters](#restore-filters) to each of its commands: `--tables=`,
 `--partitions=` with `--env=CLICKHOUSE_CHECK_REPLICAS_BEFORE_ATTACH=0`, `--restore-database-mapping=`,
-`--env=CLICKHOUSE_SKIP_TABLES=` and `--env=CLICKHOUSE_SKIP_TABLE_ENGINES=`.
+`--env=CLICKHOUSE_SKIP_TABLES=` and `--env=CLICKHOUSE_SKIP_TABLE_ENGINES=`. The items of a list are
+joined by commas, as `partitions` are: `tables: ["a.*", "b.t"]` is `--tables=a.*,b.t`. A backup adds the same
+filters to its `create_remote`, and `skipTables` is always
+`--env=CLICKHOUSE_SKIP_TABLES=system.*,INFORMATION_SCHEMA.*,information_schema.*,_temporary_and_external_tables.*,<items>`:
+the system databases `clickhouse-backup` leaves out by default stay left out, as a list of its own would replace them.
 
 **ClickHouse credentials.** The operator queries every host with the ClickHouse credentials of its own
 configuration, `clickhouse.access` - a username and a password, or a Secret holding them - as it does
@@ -1716,6 +1763,13 @@ configuration is ignored, the built-in default standing for it.
 
 After every successful scheduled run, the run prunes the schedule's backups on the cluster it ran
 on, newest first, as the cleanup of the Altinity usual backup workflow does:
+
+> **Warning: adding a shard makes the backups before it incomplete, and retention deletes them.** A
+> backup is complete only when every shard of the cluster lists it. Those made before a shard was added
+> lack it, so none of them is complete for the new topology, and once a newer backup is complete they are
+> pruned, whatever `keep` says: the 7 daily backups of a `keep: 7` are gone at the run that makes the first complete
+> backup with the new shard. To keep them, pin them in `retention.keepBackups` before that backup
+> completes: a pin keeps an incomplete backup too.
 
 * **Only the schedule's own backups count.** Retention looks at the backups named
   `<backupNamePrefix>-YYYYMMDDHHMMSS` - the scheduled ones, the time being their slot in `timeZone` -
@@ -1924,7 +1978,8 @@ spec:
   [How the operator runs an operation](#how-the-operator-runs-an-operation).
 * **Refused** - by the operator (`InvalidSpec`) and again by the run - are the settings the operator
   pins or sets in the sidecar (see [What the operator runs](#what-the-operator-runs)), every `API_*`
-  setting, the credentials, those that tell where the backups are - `REMOTE_STORAGE`, bucket,
+  setting, `CLICKHOUSE_SKIP_TABLES` and `CLICKHOUSE_SKIP_TABLE_ENGINES`, which the `skipTables` and
+  `skipTableEngines` fields set (`skipTables` keeps the system databases left out), the credentials, those that tell where the backups are - `REMOTE_STORAGE`, bucket,
   endpoint, account, `*_PATH`, `*_OBJECT_DISK_PATH`, and the disk of embedded backups,
   `CLICKHOUSE_EMBEDDED_BACKUP_DISK` - which the listings, retention and restores of
   the backup, made with the sidecar's settings, would not find it by, and any setting of a secret
@@ -1957,6 +2012,13 @@ of incremental backups is shorter than that entry's `keep`; the run after makes 
 The series takes the backups [run now](#run-a-schedule-now) from the schedule too, ordered by the time
 they are named after, as the Altinity usual backup workflow bases a backup on the newest backup
 whether made by hand or on schedule.
+**Which run is incremental.** The heaviest entry whose slot the run is decides, as it does for
+`configOverrides`: the run is incremental only when that entry is the `incremental: true` one, and at most
+one entry sets `incremental`. With `incremental` on a daily entry, the Sunday run is the weekly one, which is
+heavier, so it is a full backup, unless the weekly entry is the incremental one. An incremental run falls
+back to a full backup when the chain of incremental backups reached the `keep` of that entry, or when no
+base exists that every host holds.
+
 Restoring an incremental backup needs its whole chain of bases in the storage. Retention rebases a
 base that a kept backup still needs before it deletes it, but
 deleting bases by other means (`BACKUPS_TO_KEEP_REMOTE`, a bucket lifecycle rule, manual removal)

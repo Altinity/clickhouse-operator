@@ -11,4 +11,4 @@ spec:
   clickHouseInstallation: test-087-backup
   cluster: cold
   backupName: e2e-087-full
-  tables: "test_087.*"
+  tables: ["test_087.*"]

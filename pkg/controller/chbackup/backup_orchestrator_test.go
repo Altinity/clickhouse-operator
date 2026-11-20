@@ -410,11 +410,14 @@ func TestOrchestratorBacksUpWithOverridesAndABase(t *testing.T) {
 	spec := backupSpec("b1", "h0")
 	spec.ConfigOverrides = []string{"S3_STORAGE_CLASS=GLACIER"}
 	spec.DiffFromRemote = "base"
-	spec.Tables = "db.*"
+	spec.Tables = []string{"db.*", "other.t?"}
+	spec.SkipTables = []string{"db.tmp_*", "logs.*"}
+	spec.SkipTableEngines = []string{"Kafka", "RabbitMQ"}
 	spec.Partitions = []string{"2026", "2027"}
 	outcome, status, _ := runOf(t, sc, spec, nil)
 	require.False(t, outcome.failed, outcome.message)
-	require.Equal(t, []string{"h0: create_remote --rbac --env=S3_STORAGE_CLASS=GLACIER --tables=db.* --partitions=2026,2027 " +
+	require.Equal(t, []string{"h0: create_remote --rbac --env=S3_STORAGE_CLASS=GLACIER --tables=db.*,other.t? --partitions=2026,2027 " +
+		"--env=CLICKHOUSE_SKIP_TABLES=" + defaultSkipTables + ",db.tmp_*,logs.* --env=CLICKHOUSE_SKIP_TABLE_ENGINES=Kafka,RabbitMQ " +
 		"--diff-from-remote=base b1"}, sc.commands())
 	require.Equal(t, "base", status.Hosts[0].Base)
 
@@ -818,19 +821,19 @@ func TestOrchestratorOverwrites(t *testing.T) {
 	}
 	spec := restoreSpec("h0", "h1")
 	spec.Overwrite = true
-	spec.Tables = "db.*"
-	spec.SkipTables = "db.tmp_*"
+	spec.Tables = []string{"db.*", "other.t?"}
+	spec.SkipTables = []string{"db.tmp_*", "logs.*"}
 	spec.DatabaseMapping = "db:db2"
 	outcome, _, _ := runOf(t, sc, spec, nil)
 	require.False(t, outcome.failed, outcome.message)
-	skip := "--env=CLICKHOUSE_SKIP_TABLES=" + defaultSkipTables + ",db.tmp_*"
+	skip := "--env=CLICKHOUSE_SKIP_TABLES=" + defaultSkipTables + ",db.tmp_*,logs.*"
 	require.Equal(t, []string{
-		"h0: download --hardlink-exists-files --tables=db.* " + skip + " b1",
-		"h1: download --hardlink-exists-files --tables=db.* " + skip + " b1",
-		"h0: restore --schema=1 --ignore-dependencies --tables=db.* " + skip + " --restore-database-mapping=db:db2 --env=RESTORE_SCHEMA_ON_CLUSTER={cluster} b1",
-		"h1: restore --schema=1 --ignore-dependencies --tables=db.* " + skip + " --restore-database-mapping=db:db2 b1",
-		"h1: restore --data=1 --ignore-dependencies --replicated-copy-to-detached --tables=db.* " + skip + " --restore-database-mapping=db:db2 b1",
-		"h0: restore --data=1 --ignore-dependencies --tables=db.* " + skip + " --restore-database-mapping=db:db2 b1",
+		"h0: download --hardlink-exists-files --tables=db.*,other.t? " + skip + " b1",
+		"h1: download --hardlink-exists-files --tables=db.*,other.t? " + skip + " b1",
+		"h0: restore --schema=1 --ignore-dependencies --tables=db.*,other.t? " + skip + " --restore-database-mapping=db:db2 --env=RESTORE_SCHEMA_ON_CLUSTER={cluster} b1",
+		"h1: restore --schema=1 --ignore-dependencies --tables=db.*,other.t? " + skip + " --restore-database-mapping=db:db2 b1",
+		"h1: restore --data=1 --ignore-dependencies --replicated-copy-to-detached --tables=db.*,other.t? " + skip + " --restore-database-mapping=db:db2 b1",
+		"h0: restore --data=1 --ignore-dependencies --tables=db.*,other.t? " + skip + " --restore-database-mapping=db:db2 b1",
 		"h0: delete local b1", "h1: delete local b1",
 	}, sc.commands())
 	require.True(t, outcome.rbacNotRestored, "the backup holds access entities the restore left out")

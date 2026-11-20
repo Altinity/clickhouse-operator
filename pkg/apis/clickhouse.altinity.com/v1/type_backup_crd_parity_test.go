@@ -384,26 +384,45 @@ func optionalPattern(re *regexp.Regexp) string {
 	return "^(" + strings.TrimSuffix(strings.TrimPrefix(re.String(), "^"), "$") + ")?$"
 }
 
-// A tables pattern is optional in the spec of a backup, a schedule and a restore alike: the API server
-// admits an explicit empty one, which the operator reads as every table, and refuses what the operator
-// would refuse.
+// The table patterns are optional lists in the spec of a backup, a schedule and a restore alike, one pattern per
+// item: the API server admits what the operator admits and refuses what it would refuse.
 func TestBackupCRDTablesPatternMatchesTheTypes(t *testing.T) {
-	for name, path := range map[string]string{
-		"clickhousebackups.clickhouse.altinity.com":         "spec.tables",
-		"clickhousebackupschedules.clickhouse.altinity.com": "spec.tables",
-		"clickhouserestores.clickhouse.altinity.com":        "spec.tables",
+	for name, paths := range map[string][]string{
+		"clickhousebackups.clickhouse.altinity.com":         {"spec.tables", "spec.skipTables"},
+		"clickhousebackupschedules.clickhouse.altinity.com": {"spec.tables", "spec.skipTables"},
+		"clickhouserestores.clickhouse.altinity.com":        {"spec.tables", "spec.skipTables"},
 	} {
-		t.Run(name, func(t *testing.T) {
-			tables := schemaProperty(loadCRDSchema(t, backupCRDTemplatePath, name), path)
-			require.NotNil(t, tables)
-			require.Equal(t, optionalPattern(backupTablesRegexp), tables["pattern"])
-			require.Equal(t, backupTablesMaxLength, tables["maxLength"])
-			pattern := regexp.MustCompile(tables["pattern"].(string))
-			for value, valid := range map[string]bool{"": true, "db.*": true, "db.t,other.*": true, "-db.*": false, "db t": false} {
-				require.Equal(t, valid, pattern.MatchString(value), value)
-				require.Equal(t, valid, validateTables(value) == nil, value)
-			}
-		})
+		for _, path := range paths {
+			t.Run(name+" "+path, func(t *testing.T) {
+				tables := schemaProperty(loadCRDSchema(t, backupCRDTemplatePath, name), path)
+				require.NotNil(t, tables)
+				require.Equal(t, "array", tables["type"])
+				require.Equal(t, BackupTablesMaxItems, tables["maxItems"])
+				items := tables["items"].(map[string]any)
+				require.Equal(t, backupTablesRegexp.String(), items["pattern"])
+				require.Equal(t, backupTablesMaxLength, items["maxLength"])
+				pattern := regexp.MustCompile(items["pattern"].(string))
+				for value, valid := range map[string]bool{"": false, "db.*": true, "db.t,other.*": false, "-db.*": false, "db t": false} {
+					require.Equal(t, valid, pattern.MatchString(value), value)
+					require.Equal(t, valid, validateTables("tables", []string{value}) == nil, value)
+				}
+			})
+		}
+	}
+}
+
+// The table engines left out are bounded alike by the CRD schema and the spec validation, in a backup, a schedule and a
+// restore.
+func TestBackupCRDSkipTableEnginesMatchTheTypes(t *testing.T) {
+	for _, name := range []string{
+		"clickhousebackups.clickhouse.altinity.com",
+		"clickhousebackupschedules.clickhouse.altinity.com",
+		"clickhouserestores.clickhouse.altinity.com",
+	} {
+		engines := schemaProperty(loadCRDSchema(t, backupCRDTemplatePath, name), "spec.skipTableEngines")
+		require.NotNil(t, engines, name)
+		require.Equal(t, BackupTablesMaxItems, engines["maxItems"], name)
+		require.Equal(t, backupEngineRegexp.String(), engines["items"].(map[string]any)["pattern"], name)
 	}
 }
 

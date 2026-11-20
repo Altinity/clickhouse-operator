@@ -99,8 +99,12 @@ spec:
   # the other replicas hold in tables that are not replicated is backed up, but not restored.
   replicaSelection: FirstPerShard
 
-  # Only the matching tables: a clickhouse-backup pattern such as db.table or db.*, comma-separated
-  # tables: "mydb.*"
+  # Only the matching tables: clickhouse-backup patterns such as db.table or db.*, one per item
+  # tables: ["mydb.*"]
+
+  # Leave out the matching tables, on top of the system databases, and the tables of these engines
+  # skipTables: ["mydb.tmp_*"]
+  # skipTableEngines: ["Kafka"]
 
   # How long each run may take, in seconds counted from its start, before the operator stops it: 24 hours by default.
   # Each run gets this long: the backup of each cluster. A run stopped at the deadline fails the backup of its

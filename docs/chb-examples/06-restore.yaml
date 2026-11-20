@@ -49,8 +49,12 @@ spec:
   # Table and database definitions only, no data
   # schemaOnly: true
 
-  # Only the matching tables: a clickhouse-backup pattern such as db.table or db.*, comma-separated
-  # tables: "mydb.*"
+  # Only the matching tables: clickhouse-backup patterns such as db.table or db.*, one per item
+  # tables: ["mydb.*"]
+
+  # Leave out the matching tables, on top of the system databases, and the tables of these engines
+  # skipTables: ["mydb.tmp_*"]
+  # skipTableEngines: ["Kafka"]
 
   # Also users, roles, grants...; only without spec.cluster
   # rbac: true

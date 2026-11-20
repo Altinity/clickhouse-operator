@@ -326,11 +326,14 @@ func (o *orchestrator) planBackup(ctx context.Context) (*backupPlan, error) {
 		if spec.SchemaOnly {
 			command += " --schema"
 		}
-		if spec.Tables != "" {
-			command += " --tables=" + spec.Tables
+		if len(spec.Tables) > 0 {
+			command += " --tables=" + strings.Join(spec.Tables, ",")
 		}
 		if len(spec.Partitions) > 0 {
 			command += " --partitions=" + strings.Join(spec.Partitions, ",")
+		}
+		for _, flag := range skipEnv(spec.SkipTables, spec.SkipTableEngines) {
+			command += " " + flag
 		}
 		if bases[host] != "" {
 			command += " --diff-from-remote=" + bases[host]
@@ -511,8 +514,8 @@ func (o *orchestrator) reportData(ctx context.Context, hosts []string, name stri
 // holds data.
 func noDataCause(spec *model.RunSpec) string {
 	switch {
-	case spec.Tables != "":
-		return fmt.Sprintf("no table matches %q, or none of those that do holds data", spec.Tables)
+	case len(spec.Tables) > 0:
+		return fmt.Sprintf("no table matches %q, or none of those that do holds data", strings.Join(spec.Tables, ","))
 	case len(spec.Partitions) > 0:
 		return fmt.Sprintf("no table holds data in the partitions %s", strings.Join(spec.Partitions, ","))
 	}

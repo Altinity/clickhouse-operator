@@ -64,12 +64,14 @@ type RunSpec struct {
 	RestoreInProgress bool
 	// BackupHosts are the hosts the backup is made on, the preferred replica of every shard, and FallbackHosts the
 	// host of every shard it is made on when the preferred one does not answer, none when they are the same
-	BackupHosts    []string
-	FallbackHosts  []string
-	RetentionHosts []string
-	SchemaOnly     bool
-	Tables         string
-	Partitions     []string
+	BackupHosts      []string
+	FallbackHosts    []string
+	RetentionHosts   []string
+	SchemaOnly       bool
+	Tables           []string
+	SkipTables       []string
+	SkipTableEngines []string
+	Partitions       []string
 	// ConfigOverrides are those of a one-off backup
 	ConfigOverrides []string
 	DiffFromRemote  string
@@ -80,8 +82,6 @@ type RunSpec struct {
 	Overwrite          bool
 	ValidateTopology   bool
 	RestoreRBAC        bool
-	SkipTables         string
-	SkipTableEngines   []string
 	DatabaseMapping    string
 	SourceInstallation string
 	SourceNamespace    string
@@ -150,7 +150,9 @@ func (spec *RunSpec) backupHosts(options *api.BackupOptions, topology *Topology)
 		spec.FallbackHosts = fallback
 	}
 	spec.SchemaOnly = options.SchemaOnly.IsTrue()
-	spec.Tables = options.Tables
+	spec.Tables = slices.Clone(options.Tables)
+	spec.SkipTables = slices.Clone(options.SkipTables)
+	spec.SkipTableEngines = slices.Clone(options.SkipTableEngines)
 	spec.Partitions = slices.Clone(options.Partitions)
 }
 
@@ -204,9 +206,9 @@ func RestoreRunSpec(chr *api.ClickHouseRestore, topology *Topology) *RunSpec {
 	spec.SchemaHosts = topology.AllReplicas()
 	spec.DataHosts = topology.FirstPerShard()
 	spec.SchemaOnly = chr.Spec.SchemaOnly.IsTrue()
-	spec.Tables = chr.Spec.Tables
+	spec.Tables = slices.Clone(chr.Spec.Tables)
 	spec.Partitions = slices.Clone(chr.Spec.Partitions)
-	spec.SkipTables = chr.Spec.SkipTables
+	spec.SkipTables = slices.Clone(chr.Spec.SkipTables)
 	spec.SkipTableEngines = slices.Clone(chr.Spec.SkipTableEngines)
 	spec.DatabaseMapping = chr.Spec.GetDatabaseMapping()
 	spec.Overwrite = chr.Spec.Overwrite.IsTrue()

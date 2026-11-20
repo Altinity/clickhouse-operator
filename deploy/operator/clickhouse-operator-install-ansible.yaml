@@ -5895,10 +5895,31 @@ spec:
                     - FirstPerShard
                     - AllReplicas
                 tables:
-                  type: string
-                  description: "Optional clickhouse-backup --tables pattern, e.g. db.table or db.*, comma-separated. Empty backs up every table"
-                  maxLength: 1024
-                  pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
+                  type: array
+                  description: "Optional clickhouse-backup --tables patterns, one per item, e.g. db.table or db.*, joined by commas (at most 1024 characters). Empty backs up every table"
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    maxLength: 1024
+                    pattern: "^[A-Za-z0-9_.*?][A-Za-z0-9_.*?-]*$"
+                skipTables:
+                  type: array
+                  description: "Optional clickhouse-backup table patterns, one per item, e.g. db.tmp* or logs.*, of the tables the backup leaves out, on top of the system databases (CLICKHOUSE_SKIP_TABLES), joined by commas (at most 1024 characters)"
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    maxLength: 1024
+                    pattern: "^[A-Za-z0-9_.*?][A-Za-z0-9_.*?-]*$"
+                skipTableEngines:
+                  type: array
+                  description: "Optional table engines, e.g. Kafka, whose tables the backup leaves out (CLICKHOUSE_SKIP_TABLE_ENGINES)"
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    pattern: "^[A-Za-z][A-Za-z0-9_]{0,127}$"
                 partitions:
                   type: array
                   description: "Optional partition ids to back up (clickhouse-backup --partitions)"
@@ -6080,8 +6101,23 @@ spec:
                       type: string
                       description: "The schedule's replicaSelection"
                     tables:
-                      type: string
+                      type: array
+                      nullable: true
                       description: "The schedule's tables"
+                      items:
+                        type: string
+                    skipTables:
+                      type: array
+                      nullable: true
+                      description: "The schedule's skipTables"
+                      items:
+                        type: string
+                    skipTableEngines:
+                      type: array
+                      nullable: true
+                      description: "The schedule's skipTableEngines"
+                      items:
+                        type: string
                     partitions:
                       type: array
                       nullable: true
@@ -6541,10 +6577,31 @@ spec:
                     - FirstPerShard
                     - AllReplicas
                 tables:
-                  type: string
-                  description: "Optional clickhouse-backup --tables pattern, e.g. db.table or db.*, comma-separated. Empty backs up every table"
-                  maxLength: 1024
-                  pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
+                  type: array
+                  description: "Optional clickhouse-backup --tables patterns, one per item, e.g. db.table or db.*, joined by commas (at most 1024 characters). Empty backs up every table"
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    maxLength: 1024
+                    pattern: "^[A-Za-z0-9_.*?][A-Za-z0-9_.*?-]*$"
+                skipTables:
+                  type: array
+                  description: "Optional clickhouse-backup table patterns, one per item, e.g. db.tmp* or logs.*, of the tables the backup leaves out, on top of the system databases (CLICKHOUSE_SKIP_TABLES), joined by commas (at most 1024 characters)"
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    maxLength: 1024
+                    pattern: "^[A-Za-z0-9_.*?][A-Za-z0-9_.*?-]*$"
+                skipTableEngines:
+                  type: array
+                  description: "Optional table engines, e.g. Kafka, whose tables the backup leaves out (CLICKHOUSE_SKIP_TABLE_ENGINES)"
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    pattern: "^[A-Za-z][A-Za-z0-9_]{0,127}$"
                 partitions:
                   type: array
                   description: "Optional partition ids to back up (clickhouse-backup --partitions)"
@@ -7238,10 +7295,14 @@ spec:
                   <<: *TypeStringBool
                   description: "When true (default) the restore is refused unless every target shard holds the backup, so a backup taken from a different layout is not half-applied"
                 tables:
-                  type: string
-                  description: "Optional clickhouse-backup --tables pattern, e.g. db.table or db.*, comma-separated, restricting the schema and the data restored. Empty restores every table"
-                  maxLength: 1024
-                  pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
+                  type: array
+                  description: "Optional clickhouse-backup --tables patterns, one per item, e.g. db.table or db.*, joined by commas (at most 1024 characters), restricting the schema and the data restored. Empty restores every table"
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    maxLength: 1024
+                    pattern: "^[A-Za-z0-9_.*?][A-Za-z0-9_.*?-]*$"
                 partitions:
                   type: array
                   description: "Optional partition ids the restore is restricted to (clickhouse-backup --partitions): their data is downloaded and attached into the existing tables, replacing those partitions, and the schema is not restored, as the Altinity usual backup workflow restores partitions. Not with schemaOnly or rbac"
@@ -7250,14 +7311,19 @@ spec:
                     type: string
                     pattern: "^[A-Za-z0-9_-]{1,128}$"
                 skipTables:
-                  type: string
-                  description: "Optional clickhouse-backup table pattern, e.g. db.tmp* or logs.*, comma-separated, of the tables the restore leaves out, on top of the system databases (CLICKHOUSE_SKIP_TABLES)"
-                  maxLength: 1024
-                  pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
+                  type: array
+                  description: "Optional clickhouse-backup table patterns, one per item, e.g. db.tmp* or logs.*, of the tables the restore leaves out, on top of the system databases (CLICKHOUSE_SKIP_TABLES), joined by commas (at most 1024 characters)"
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    maxLength: 1024
+                    pattern: "^[A-Za-z0-9_.*?][A-Za-z0-9_.*?-]*$"
                 skipTableEngines:
                   type: array
                   description: "Optional table engines, e.g. Kafka, whose tables the restore leaves out (CLICKHOUSE_SKIP_TABLE_ENGINES)"
                   nullable: true
+                  maxItems: 64
                   items:
                     type: string
                     pattern: "^[A-Za-z][A-Za-z0-9_]{0,127}$"

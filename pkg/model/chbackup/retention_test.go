@@ -16,6 +16,7 @@ package chbackup
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -712,6 +713,29 @@ func TestRetentionOfIncompleteBackups(t *testing.T) {
 	plan = planOf(t, schedules, names, incomplete, nil, []api.BackupRetentionPin{{Name: "d-20261102020000", Until: "2026-11-03T00:00:00Z"}}, now, nil)
 	require.Equal(t, []string{"d-20261102020000", "d-20261101020000"}, plan.Obsolete)
 	require.Equal(t, []string{"d-20261102020000"}, plan.Expired)
+}
+
+// The backups made before a shard was added lack the new shard, so none is complete for the new topology: once a
+// backup that is complete is newer they go, whatever keep says, unless keepBackups pins them.
+func TestRetentionOfBackupsBeforeAShardWasAdded(t *testing.T) {
+	const schedules = "period=daily time=02:00 keep=7"
+	before := []string{"d-20261101020000", "d-20261102020000", "d-20261103020000"}
+	names := append(slices.Clone(before), "d-20261104020000", "d-20261105020000")
+	now := utc(2026, time.November, 6, 0, 0, 0)
+
+	// Before the first backup of the new topology is complete, nothing goes: no complete backup is newer
+	plan := planOf(t, schedules, before, before, nil, nil, now, nil)
+	require.Empty(t, plan.Obsolete)
+
+	plan = planOf(t, schedules, names, before, nil, nil, now, nil)
+	require.Equal(t, []string{"d-20261103020000", "d-20261102020000", "d-20261101020000"}, plan.Obsolete)
+	require.Equal(t, map[string]bool{"d-20261104020000": true, "d-20261105020000": true}, plan.Keep)
+
+	pins := []api.BackupRetentionPin{{Name: "d-20261101020000"}, {Name: "d-20261102020000", Until: "2027-01-01T00:00:00Z"}}
+	plan = planOf(t, schedules, names, before, nil, pins, now, nil)
+	require.Equal(t, []string{"d-20261103020000"}, plan.Obsolete)
+	require.True(t, plan.Keep["d-20261101020000"])
+	require.True(t, plan.Keep["d-20261102020000"])
 }
 
 // A backup named after a slot whose time does not exist the day the clocks go forward, 02:30 in Berlin on 2026-03-29,

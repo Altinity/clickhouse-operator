@@ -347,7 +347,7 @@ func (o *orchestrator) restoreCommand(step, host string) string {
 		flags = []string{commandRestore, "--schema=1"}
 		// --rm drops the databases of the backup whole, which a restore of some tables must not: overwrite drops
 		// them only for a restore of every table. clickhouse-backup drops the tables of the backup that exist anyway.
-		if spec.Overwrite && (spec.Tables == "") {
+		if spec.Overwrite && (len(spec.Tables) == 0) {
 			flags = append(flags, "--rm")
 		}
 		flags = append(flags, "--ignore-dependencies")
@@ -359,8 +359,8 @@ func (o *orchestrator) restoreCommand(step, host string) string {
 	case stepCopy:
 		flags = []string{commandRestore, "--data=1", "--ignore-dependencies", "--replicated-copy-to-detached"}
 	}
-	if spec.Tables != "" {
-		flags = append(flags, "--tables="+spec.Tables)
+	if len(spec.Tables) > 0 {
+		flags = append(flags, "--tables="+strings.Join(spec.Tables, ","))
 	}
 	if len(spec.Partitions) > 0 {
 		flags = append(flags, "--partitions="+strings.Join(spec.Partitions, ","))
@@ -384,12 +384,7 @@ func (o *orchestrator) restoreEnv() string {
 	if o.sourceEnv != "" {
 		flags = append(flags, o.sourceEnv)
 	}
-	if spec.SkipTables != "" {
-		flags = append(flags, "--env=CLICKHOUSE_SKIP_TABLES="+defaultSkipTables+","+spec.SkipTables)
-	}
-	if len(spec.SkipTableEngines) > 0 {
-		flags = append(flags, "--env=CLICKHOUSE_SKIP_TABLE_ENGINES="+strings.Join(spec.SkipTableEngines, ","))
-	}
+	flags = append(flags, skipEnv(spec.SkipTables, spec.SkipTableEngines)...)
 	if len(spec.Partitions) > 0 {
 		flags = append(flags, "--env=CLICKHOUSE_CHECK_REPLICAS_BEFORE_ATTACH=0")
 	}

@@ -71,11 +71,15 @@ spec:
   # the other replicas hold in tables that are not replicated is backed up, but not restored.
   # replicaSelection: FirstPerShard
 
-  # Only the matching tables: a clickhouse-backup pattern such as db.table or db.*, comma-separated
-  # tables: "mydb.*"
+  # Only the matching tables: clickhouse-backup patterns such as db.table or db.*, one per item
+  # tables: ["mydb.*"]
+
+  # Leave out the matching tables, on top of the system databases, and the tables of these engines
+  # skipTables: ["mydb.tmp_*"]
+  # skipTableEngines: ["Kafka"]
 
   # Back up the data of these partitions only, in every table the backup takes (all of them, or
-  # those the spec.tables pattern matches). A partition is named by its partition_id in
+  # those the spec.tables patterns match). A partition is named by its partition_id in
   # system.parts, such as 202610 for PARTITION BY toYYYYMM(date), or all for a table without
   # PARTITION BY. Every table keeps its schema in the backup; one without any of these partitions
   # keeps only that. A backup left without any data succeeds with the reason CompletedWithoutData.

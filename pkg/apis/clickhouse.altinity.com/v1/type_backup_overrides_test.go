@@ -62,6 +62,8 @@ func TestValidateConfigOverrides(t *testing.T) {
 		"an azblob plain http":    {[]string{"AZBLOB_ENDPOINT_SCHEMA=http"}, false},
 		"gcs plain http":          {[]string{"GCS_FORCE_HTTP=true"}, false},
 		"the host of the sidecar": {[]string{"CLICKHOUSE_HOST=x"}, false},
+		"the tables left out":     {[]string{"CLICKHOUSE_SKIP_TABLES=db.t"}, false},
+		"the engines left out":    {[]string{"CLICKHOUSE_SKIP_TABLE_ENGINES=Kafka"}, false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			require.Equal(t, tc.valid, ValidateConfigOverrides("configOverrides", tc.items) == nil, "%v", tc.items)

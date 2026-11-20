@@ -53,6 +53,9 @@ var (
 		"REBASE_BEFORE_REMOVE_OLD_REMOTE", "TZ",
 		// The credentials and the file of the configuration, see backupConfigFileEnvVarNames of the creator
 		"API_USERNAME", "API_PASSWORD", "CLICKHOUSE_USERNAME", "CLICKHOUSE_PASSWORD", "CLICKHOUSE_BACKUP_CONFIG",
+		// The tables and engines left out, which the skipTables and skipTableEngines fields set, on top of the system
+		// databases
+		"CLICKHOUSE_SKIP_TABLES", "CLICKHOUSE_SKIP_TABLE_ENGINES",
 		// Set by the operator
 		"CLICKHOUSE_HOST", "CLICKHOUSE_PORT", "CLICKHOUSE_SECURE", "CLICKHOUSE_SKIP_VERIFY", "BACKUPS_TO_KEEP_LOCAL",
 		"ALLOW_EMPTY_BACKUPS", "API_CREATE_INTEGRATION_TABLES", "API_INTEGRATION_TABLES_HOST",
@@ -130,6 +133,12 @@ func ValidateConfigOverrides(field string, items []string) error {
 
 // forbiddenConfigOverride tells why a config override must not set the setting key, "" when it may.
 func forbiddenConfigOverride(key string) string {
+	switch key {
+	case "CLICKHOUSE_SKIP_TABLES":
+		return "set the tables to leave out with the skipTables field, which keeps the system databases left out"
+	case "CLICKHOUSE_SKIP_TABLE_ENGINES":
+		return "set the table engines to leave out with the skipTableEngines field"
+	}
 	if slices.Contains(BackupConfigOverrideForbidden, key) {
 		return "the operator sets it, or it tells where the backups are, which the restores and the retention of the " +
 			"backup would not find it by"

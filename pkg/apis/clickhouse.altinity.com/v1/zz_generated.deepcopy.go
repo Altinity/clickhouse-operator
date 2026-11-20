@@ -129,6 +129,21 @@ func (in *BackupOptions) DeepCopyInto(out *BackupOptions) {
 		*out = new(types.StringBool)
 		**out = **in
 	}
+	if in.Tables != nil {
+		in, out := &in.Tables, &out.Tables
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.SkipTables != nil {
+		in, out := &in.SkipTables, &out.SkipTables
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.SkipTableEngines != nil {
+		in, out := &in.SkipTableEngines, &out.SkipTableEngines
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.Partitions != nil {
 		in, out := &in.Partitions, &out.Partitions
 		*out = make([]string, len(*in))
@@ -1562,8 +1577,18 @@ func (in *ClickHouseRestoreSpec) DeepCopyInto(out *ClickHouseRestoreSpec) {
 		*out = new(types.StringBool)
 		**out = **in
 	}
+	if in.Tables != nil {
+		in, out := &in.Tables, &out.Tables
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.Partitions != nil {
 		in, out := &in.Partitions, &out.Partitions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.SkipTables != nil {
+		in, out := &in.SkipTables, &out.SkipTables
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}

@@ -107,7 +107,7 @@ func TestRestoreCopiesTheDataToDetachedBeforeTheFirstReplicaRestoresIt(t *testin
 func TestRestoreWithoutCopyDownloadsTheSchemaAloneOnTheOtherReplicas(t *testing.T) {
 	sc := copySidecars()
 	spec := copySpec(false)
-	spec.Tables = "db.*"
+	spec.Tables = []string{"db.*"}
 	outcome, status, _ := runOf(t, sc, spec, nil)
 	require.False(t, outcome.failed, outcome.message)
 	require.Equal(t, []string{

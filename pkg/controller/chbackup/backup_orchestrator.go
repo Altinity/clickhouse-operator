@@ -912,6 +912,19 @@ func configOverrides(overrides []string) string {
 	return flags.String()
 }
 
+// skipEnv returns the --env flags that leave tables and table engines out of a backup or a restore: the tables on top of
+// the system databases the sidecar leaves out by default, which a list of its own would replace.
+func skipEnv(skipTables, skipEngines []string) []string {
+	var flags []string
+	if len(skipTables) > 0 {
+		flags = append(flags, "--env=CLICKHOUSE_SKIP_TABLES="+defaultSkipTables+","+strings.Join(skipTables, ","))
+	}
+	if len(skipEngines) > 0 {
+		flags = append(flags, "--env=CLICKHOUSE_SKIP_TABLE_ENGINES="+strings.Join(skipEngines, ","))
+	}
+	return flags
+}
+
 // splitHosts returns the hosts of a space-separated list.
 func splitHosts(value string) []string {
 	return strings.Fields(value)

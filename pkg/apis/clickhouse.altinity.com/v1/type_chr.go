@@ -66,17 +66,17 @@ type ClickHouseRestoreSpec struct {
 	// ValidateTopology, when true (default), refuses the restore unless every target shard
 	// holds the backup, so a backup taken from a different layout is not half-applied.
 	ValidateTopology *types.StringBool `json:"validateTopology,omitempty" yaml:"validateTopology,omitempty"`
-	// Tables optionally restricts the restore to tables matching this clickhouse-backup pattern
-	// (e.g. "db.table", "db.*"), in the schema and the data alike. Empty restores everything.
-	Tables string `json:"tables,omitempty" yaml:"tables,omitempty"`
+	// Tables optionally restricts the restore to tables matching these clickhouse-backup patterns, one per item
+	// (e.g. "db.table", "db.*"), joined by commas, in the schema and the data alike. Empty restores everything.
+	Tables []string `json:"tables,omitempty" yaml:"tables,omitempty"`
 	// Partitions optionally restricts the restore to the data of the given partition ids of the tables
 	// (clickhouse-backup --partitions), downloaded and attached into the tables as they are, as the Altinity usual
 	// backup workflow restores partitions: the schema is not restored, nothing is dropped but those partitions, which
 	// clickhouse-backup drops before it attaches them, and the tables must exist. Not with schemaOnly or rbac.
 	Partitions []string `json:"partitions,omitempty" yaml:"partitions,omitempty"`
-	// SkipTables optionally leaves out of the restore the tables matching this clickhouse-backup pattern (e.g.
-	// "db.table", "db.*"), on top of the system databases (CLICKHOUSE_SKIP_TABLES).
-	SkipTables string `json:"skipTables,omitempty" yaml:"skipTables,omitempty"`
+	// SkipTables optionally leaves out of the restore the tables matching these clickhouse-backup patterns, one per
+	// item (e.g. "db.table", "db.*"), on top of the system databases (CLICKHOUSE_SKIP_TABLES).
+	SkipTables []string `json:"skipTables,omitempty" yaml:"skipTables,omitempty"`
 	// SkipTableEngines optionally leaves out of the restore the tables of these engines, e.g. Kafka
 	// (CLICKHOUSE_SKIP_TABLE_ENGINES).
 	SkipTableEngines []string `json:"skipTableEngines,omitempty" yaml:"skipTableEngines,omitempty"`
@@ -184,7 +184,7 @@ func (spec *ClickHouseRestoreSpec) Validate() error {
 	if err := validateBackupName("backupName", spec.BackupName, BackupNameMaxLength); err != nil {
 		return err
 	}
-	if err := validateTables(spec.Tables); err != nil {
+	if err := validateTables("tables", spec.Tables); err != nil {
 		return err
 	}
 	if err := validateRestoreFilters(spec); err != nil {
@@ -273,14 +273,11 @@ func validateRestoreFilters(spec *ClickHouseRestoreSpec) error {
 			return fmt.Errorf("%w: partition %q must match %s", ErrInvalidBackupSpec, partition, backupPartitionRegexp)
 		}
 	}
-	if (len(spec.SkipTables) > backupTablesMaxLength) || ((spec.SkipTables != "") && !backupTablesRegexp.MatchString(spec.SkipTables)) {
-		return fmt.Errorf("%w: skipTables %q must match %s and be at most %d characters", ErrInvalidBackupSpec,
-			spec.SkipTables, backupTablesRegexp, backupTablesMaxLength)
+	if err := validateTables("skipTables", spec.SkipTables); err != nil {
+		return err
 	}
-	for _, engine := range spec.SkipTableEngines {
-		if !backupEngineRegexp.MatchString(engine) {
-			return fmt.Errorf("%w: skipTableEngines %q must match %s", ErrInvalidBackupSpec, engine, backupEngineRegexp)
-		}
+	if err := validateEngines("skipTableEngines", spec.SkipTableEngines); err != nil {
+		return err
 	}
 	targets := map[string]string{}
 	for source, target := range spec.DatabaseMapping {

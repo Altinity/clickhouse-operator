@@ -112,10 +112,40 @@ func TestBackupSpecValidate(t *testing.T) {
 			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", DiffFromRemote: "base;rm"}).Validate()
 		}, false},
 		"table patterns": {func() error {
-			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: BackupOptions{Tables: "db.*,other.t?"}}).Validate()
+			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: BackupOptions{Tables: []string{"db.*", "other.t?"}}}).Validate()
 		}, true},
 		"a table pattern with a quote": {func() error {
-			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: BackupOptions{Tables: "db.t'"}}).Validate()
+			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: BackupOptions{Tables: []string{"db.t'"}}}).Validate()
+		}, false},
+		"a table pattern with a comma": {func() error {
+			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: BackupOptions{Tables: []string{"db.*,other.*"}}}).Validate()
+		}, false},
+		"an empty table pattern": {func() error {
+			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: BackupOptions{Tables: []string{""}}}).Validate()
+		}, false},
+		"too many table patterns": {func() error {
+			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi",
+				BackupOptions: BackupOptions{Tables: make([]string, BackupTablesMaxItems+1)}}).Validate()
+		}, false},
+		"table patterns too long joined": {func() error {
+			half := strings.Repeat("t", backupTablesMaxLength/2)
+			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: BackupOptions{Tables: []string{half, half}}}).Validate()
+		}, false},
+		"tables left out of a backup": {func() error {
+			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: BackupOptions{
+				SkipTables: []string{"db.tmp*", "logs.*"}, SkipTableEngines: []string{"Kafka"}}}).Validate()
+		}, true},
+		"tables left out of a backup, reading a flag": {func() error {
+			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: BackupOptions{SkipTables: []string{"--rbac"}}}).Validate()
+		}, false},
+		"tables left out of a backup, with a comma": {func() error {
+			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: BackupOptions{SkipTables: []string{"a.*,b.*"}}}).Validate()
+		}, false},
+		"an engine left out of a backup, with a comma": {func() error {
+			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: BackupOptions{SkipTableEngines: []string{"Kafka,Null"}}}).Validate()
+		}, false},
+		"tables left out of a backup that runs a schedule": {func() error {
+			return (&ClickHouseBackupSpec{ScheduleRef: &BackupScheduleRef{Name: "s1"}, BackupOptions: BackupOptions{SkipTables: []string{"db.*"}}}).Validate()
 		}, false},
 		"a partition with a space": {func() error {
 			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: BackupOptions{Partitions: []string{"2026 10"}}}).Validate()
@@ -166,7 +196,7 @@ func TestBackupSpecValidate(t *testing.T) {
 		"options of a schedule": {func() error {
 			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
 				BackupOptions: BackupOptions{SchemaOnly: types.NewStringBool(true), ReplicaSelection: ReplicaSelectionAllReplicas,
-					Tables: "db.*", Partitions: []string{"202610"}, ActiveDeadlineSeconds: ptr.To(int64(3600))}}).Validate()
+					Tables: []string{"db.*"}, SkipTables: []string{"db.tmp*"}, SkipTableEngines: []string{"Kafka"}, Partitions: []string{"202610"}, ActiveDeadlineSeconds: ptr.To(int64(3600))}}).Validate()
 		}, true},
 		"an unknown replica selection of a schedule": {func() error {
 			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
@@ -174,7 +204,7 @@ func TestBackupSpecValidate(t *testing.T) {
 		}, false},
 		"a table pattern of a schedule that reads as a flag": {func() error {
 			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
-				BackupOptions: BackupOptions{Tables: "-db.*"}}).Validate()
+				BackupOptions: BackupOptions{Tables: []string{"-db.*"}}}).Validate()
 		}, false},
 		"a partition of a schedule with a space": {func() error {
 			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
@@ -198,21 +228,21 @@ func TestBackupSpecValidate(t *testing.T) {
 		}, true},
 		"a restore without a backup": {func() error { return (&ClickHouseRestoreSpec{ClickHouseInstallation: "chi"}).Validate() }, false},
 		"a restore of tables": {func() error {
-			return (&ClickHouseRestoreSpec{ClickHouseInstallation: "chi", BackupName: "daily-20261004-020000", Tables: "db.*,other-db.t?"}).Validate()
+			return (&ClickHouseRestoreSpec{ClickHouseInstallation: "chi", BackupName: "daily-20261004-020000", Tables: []string{"db.*", "other-db.t?"}}).Validate()
 		}, true},
 		"a restore of tables with a quote": {func() error {
-			return (&ClickHouseRestoreSpec{ClickHouseInstallation: "chi", BackupName: "daily-20261004-020000", Tables: "db.t'"}).Validate()
+			return (&ClickHouseRestoreSpec{ClickHouseInstallation: "chi", BackupName: "daily-20261004-020000", Tables: []string{"db.t'"}}).Validate()
 		}, false},
 		// A Job passes the pattern as an argument, which must never read as a flag
 		"a restore of tables that reads as a flag": {func() error {
-			return (&ClickHouseRestoreSpec{ClickHouseInstallation: "chi", BackupName: "daily-20261004-020000", Tables: "--rbac"}).Validate()
+			return (&ClickHouseRestoreSpec{ClickHouseInstallation: "chi", BackupName: "daily-20261004-020000", Tables: []string{"--rbac"}}).Validate()
 		}, false},
 		"a table pattern that reads as a flag": {func() error {
-			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: BackupOptions{Tables: "-db.*"}}).Validate()
+			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: BackupOptions{Tables: []string{"-db.*"}}}).Validate()
 		}, false},
 		"a restore of tables too long": {func() error {
 			return (&ClickHouseRestoreSpec{ClickHouseInstallation: "chi", BackupName: "daily-20261004-020000",
-				Tables: strings.Repeat("t", backupTablesMaxLength+1)}).Validate()
+				Tables: []string{strings.Repeat("t", backupTablesMaxLength+1)}}).Validate()
 		}, false},
 		"a restore of a backup another installation made": {func() error {
 			return (&ClickHouseRestoreSpec{ClickHouseInstallation: "chi", BackupName: "daily-20261004-020000",
@@ -324,8 +354,8 @@ func TestValidateRestoreFilters(t *testing.T) {
 		"partitions over existing tables": {func(s *ClickHouseRestoreSpec) {
 			s.Partitions, s.Overwrite = []string{"202601"}, types.NewStringBool(true)
 		}, true},
-		"tables left out":                {func(s *ClickHouseRestoreSpec) { s.SkipTables = "db.tmp*,logs.*" }, true},
-		"tables left out reading a flag": {func(s *ClickHouseRestoreSpec) { s.SkipTables = "--rbac" }, false},
+		"tables left out":                {func(s *ClickHouseRestoreSpec) { s.SkipTables = []string{"db.tmp*", "logs.*"} }, true},
+		"tables left out reading a flag": {func(s *ClickHouseRestoreSpec) { s.SkipTables = []string{"--rbac"} }, false},
 		"engines left out":               {func(s *ClickHouseRestoreSpec) { s.SkipTableEngines = []string{"Kafka", "RabbitMQ"} }, true},
 		"an engine with a blank":         {func(s *ClickHouseRestoreSpec) { s.SkipTableEngines = []string{"Kafka x"} }, false},
 		"an engine with a comma":         {func(s *ClickHouseRestoreSpec) { s.SkipTableEngines = []string{"Kafka,Null"} }, false},
