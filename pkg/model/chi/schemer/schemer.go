@@ -17,6 +17,7 @@ package schemer
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -26,6 +27,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/altinity/clickhouse-operator/pkg/util/retry"
 )
 
 // ClusterSchemer specifies cluster schema manager
@@ -78,6 +80,16 @@ func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostT
 		clickhouse.NewQueryOptions().SetRetry(false).SetLogQueries(true))
 }
 
+// schemaReadRetryAttempts is the number of attempts to read the schema from peers.
+// Three attempts (5s and 10s backoff) cover a users.d ConfigMap update that has not yet
+// reached every peer, which shows up as a transient Code 516 authentication failure.
+const schemaReadRetryAttempts = 3
+
+// retryPeerSchemaRead runs read up to schemaReadRetryAttempts times and returns the last error
+func retryPeerSchemaRead(ctx context.Context, read func() error) error {
+	return retry.Retry(ctx, schemaReadRetryAttempts, "Reading schema from peers", log.V(1), read)
+}
+
 // createTablesSQLs makes all SQL for migrating tables
 func (s *ClusterSchemer) createTablesSQLs(
 	ctx context.Context,
@@ -87,14 +99,19 @@ func (s *ClusterSchemer) createTablesSQLs(
 	replicatedCreateSQLs []string,
 	distributedObjectNames []string,
 	distributedCreateSQLs []string,
+	err error,
 ) {
-	if names, sql, err := s.getReplicatedObjectsSQLs(ctx, host); err == nil {
-		replicatedObjectNames = names
-		replicatedCreateSQLs = sql
-	}
-	if names, sql, err := s.getDistributedObjectsSQLs(ctx, host); err == nil {
-		distributedObjectNames = names
-		distributedCreateSQLs = sql
+	// No DDL runs until both reads complete, so a failed attempt can safely repeat both.
+	err = retryPeerSchemaRead(ctx, func() error {
+		var readErr error
+		if replicatedObjectNames, replicatedCreateSQLs, readErr = s.getReplicatedObjectsSQLs(ctx, host); readErr != nil {
+			return readErr
+		}
+		distributedObjectNames, distributedCreateSQLs, readErr = s.getDistributedObjectsSQLs(ctx, host)
+		return readErr
+	})
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
 	return
 }
@@ -112,7 +129,13 @@ func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *api.Host) e
 	replicatedObjectNames,
 		replicatedCreateSQLs,
 		distributedObjectNames,
-		distributedCreateSQLs := s.createTablesSQLs(ctx, host)
+		distributedCreateSQLs,
+		err := s.createTablesSQLs(ctx, host)
+	if err != nil {
+		// Without the peer schema there is nothing to create. Report it, so the host is not
+		// recorded as migrated and the migration is retried.
+		return fmt.Errorf("unable to read schema from peers of host %s: %w", host.Runtime.Address.HostName, err)
+	}
 
 	var err1 error
 	if len(replicatedCreateSQLs) > 0 {
@@ -216,7 +239,7 @@ func (s *ClusterSchemer) HostShutdown(ctx context.Context, host *api.Host) error
 		clickhouse.NewQueryOptions().SetRetry(false).SetLogQueries(true))
 }
 
-func debugCreateSQLs(names, sqls []string, err error) ([]string, []string) {
+func debugCreateSQLs(names, sqls []string, err error) ([]string, []string, error) {
 	if err != nil {
 		log.V(1).Warning("got error: %v", err)
 	}
@@ -228,5 +251,5 @@ func debugCreateSQLs(names, sqls []string, err error) ([]string, []string) {
 	for _, v := range sqls {
 		log.V(2).Info("sql: %s", v)
 	}
-	return names, sqls
+	return names, sqls, err
 }
