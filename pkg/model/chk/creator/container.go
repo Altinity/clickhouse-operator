@@ -58,6 +58,11 @@ func (cm *ContainerManager) NewBackupContainer(host *chi.Host) (core.Container, 
 	return core.Container{}, false
 }
 
+// NewBackupServerContainer builds no clickhouse-backup container: ClickHouse Keeper is not backed up
+func (cm *ContainerManager) NewBackupServerContainer(host *chi.Host) (core.Container, bool) {
+	return core.Container{}, false
+}
+
 func (cm *ContainerManager) EnsureBackupContainer(statefulSet *apps.StatefulSet, host *chi.Host) {
 }
 

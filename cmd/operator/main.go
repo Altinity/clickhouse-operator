@@ -15,6 +15,10 @@
 package main
 
 import (
+	// The time zones are embedded, so that spec.timeZone of a ClickHouseBackupSchedule works on an image without
+	// zoneinfo
+	_ "time/tzdata"
+
 	"github.com/altinity/clickhouse-operator/cmd/operator/app"
 )
 

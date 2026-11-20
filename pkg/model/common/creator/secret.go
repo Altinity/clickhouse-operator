@@ -82,7 +82,7 @@ func (c *Creator) CreateBackupSecret() *core.Secret {
 }
 
 // CreateBackupConfigSecret creates the Secret with the configuration file of the operator-managed clickhouse-backup
-// sidecars of the cluster, along with the settings of it the storage path check of the backup Jobs reads, each
+// sidecars of the cluster, along with the settings of it the storage path check of the operator reads, each
 // under the name of the env var clickhouse-backup knows it by
 func (c *Creator) CreateBackupConfigSecret(cluster string, backupConfig *backupconfig.Config) *core.Secret {
 	data := map[string][]byte{

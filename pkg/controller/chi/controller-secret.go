@@ -48,8 +48,8 @@ func (c *Controller) createSecret(ctx context.Context, secret *core.Secret) erro
 }
 
 // enqueueBackupSecretOwner reconciles the CR whose backup Secret has been deleted, which creates the Secret anew.
-// Without it the Secret stays missing until something else reconciles the CR, while the backup and restore Jobs,
-// which take their credentials from it, do not start. Enqueueing a CR cancels its reconcile in progress, so a CR
+// Without it the Secret stays missing until something else reconciles the CR, while the sidecars, which take their
+// REST API credentials from it, keep the old ones. Enqueueing a CR cancels its reconcile in progress, so a CR
 // that deletes its backup Secret itself - being deleted, or reconciled with backup turned off - is left alone.
 func (c *Controller) enqueueBackupSecretOwner(secret *core.Secret) {
 	if cr := c.backupSecretOwner(secret); cr != nil {

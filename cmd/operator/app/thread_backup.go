@@ -21,9 +21,9 @@ import (
 
 	"github.com/go-logr/logr"
 
-	batch "k8s.io/api/batch/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	apiMachineryRuntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	clientGoScheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -35,14 +35,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	ctrlManager "sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	controller "github.com/altinity/clickhouse-operator/pkg/controller/chbackup"
 	chiKube "github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/chbackup"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -117,30 +118,48 @@ func missingBackupKinds(discovery discovery.DiscoveryInterface) ([]string, error
 	return missing, nil
 }
 
-// newBackupCacheOptions builds the backup manager cache config. Jobs and CronJobs are narrowed to
-// the ones the backup controllers build; without that, the cache would hold every Job and CronJob
-// in the watched namespaces. The custom resources and installations stay unfiltered: they are
-// user-authored and carry no operator label. Installations are trimmed instead, to the metadata
+// newBackupCacheOptions builds the backup manager cache config. The custom resources and installations stay
+// unfiltered: they are user-authored and carry no operator label. Installations are trimmed instead, to the metadata
 // and status the watches need.
 //
 // log is a parameter rather than the package-level logger because a logr zero value discards Info
 // silently, so reading that var would let this line vanish if the sole call site ever moved.
 func newBackupCacheOptions(log logr.Logger, cacheNamespaces []string) cache.Options {
-	selector := chbackup.JobSelector()
 	byObject := map[client.Object]cache.ByObject{
-		&batch.Job{}:                  {Label: selector},
-		&batch.CronJob{}:              {Label: selector},
 		&api.ClickHouseInstallation{}: {Transform: controller.TrimInstallation},
 	}
-
-	// A wrong selector fails silently - the cache just stays empty - so the effective one goes in
-	// the boot log.
-	log.Info("init backup - cache label selector", "selector", selector.String(), "types", len(byObject))
+	log.Info("init backup - cache", "types", len(byObject))
 
 	return cache.Options{
 		DefaultNamespaces: newCacheNamespaces(cacheNamespaces),
 		ByObject:          byObject,
 	}
+}
+
+// backupLeaderElectionID names the Lease the backup controllers are elected by.
+const backupLeaderElectionID = "clickhouse-operator-backup"
+
+// newBackupManagerOptions builds the options of the backup manager. Its controllers are leader-elected, in the
+// namespace of the operator: they run backups and restores, and prune backups by schedule, which two operators side
+// by side must never do twice. An operator that runs outside a pod, with no namespace of its own,
+// runs them unelected.
+func newBackupManagerOptions(log logr.Logger) ctrlRuntime.Options {
+	options := ctrlRuntime.Options{
+		Scheme: backupScheme,
+		Cache:  newBackupCacheOptions(log, chop.Config().GetCacheNamespaces()),
+		// Disable controller-runtime's built-in metrics listener: operator metrics, backup
+		// metrics included, are served by pkg/metrics/operator on the operator's own endpoint.
+		Metrics: metricsserver.Options{BindAddress: "0"},
+	}
+	if namespace, ok := chop.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE); ok && (namespace != "") {
+		options.LeaderElection = true
+		options.LeaderElectionID = backupLeaderElectionID
+		options.LeaderElectionNamespace = namespace
+		// A stopping operator hands the Lease over at once, so a restart does not wait for it to expire
+		options.LeaderElectionReleaseOnCancel = true
+	}
+	log.Info("init backup - leader election", "enabled", options.LeaderElection, "namespace", options.LeaderElectionNamespace)
+	return options
 }
 
 // newBackupInitializer resolves the clients that must be built exactly once, then returns the
@@ -186,13 +205,7 @@ func initBackup(ctx context.Context, cr interfaces.IKubeCR) error {
 		return err
 	}
 
-	backupManager, err = ctrlRuntime.NewManager(restConfig, ctrlRuntime.Options{
-		Scheme: backupScheme,
-		Cache:  newBackupCacheOptions(backupLogger, chop.Config().GetCacheNamespaces()),
-		// Disable controller-runtime's built-in metrics listener: operator metrics, backup
-		// metrics included, are served by pkg/metrics/operator on the operator's own endpoint.
-		Metrics: metricsserver.Options{BindAddress: "0"},
-	})
+	backupManager, err = ctrlRuntime.NewManager(restConfig, newBackupManagerOptions(backupLogger))
 	if err != nil {
 		// Not terminal: building the manager depends on the API server.
 		backupLogger.Error(err, "init backup - unable to ctrlRuntime.NewManager")
@@ -203,6 +216,11 @@ func initBackup(ctx context.Context, cr interfaces.IKubeCR) error {
 		// Building controllers resolves the scheme and records watches without API calls, so a
 		// failure is a programming fault.
 		backupLogger.Error(err, "init backup - unable to set up controllers")
+		return fmt.Errorf("%w: %w", errInitTerminal, err)
+	}
+
+	// The runs of the backup controllers live as long as the manager leads
+	if err = backupManager.Add(controller.Runs()); err != nil {
 		return fmt.Errorf("%w: %w", errInitTerminal, err)
 	}
 
@@ -224,10 +242,14 @@ func initBackup(ctx context.Context, cr interfaces.IKubeCR) error {
 func setupBackupControllers(manager ctrlRuntime.Manager, cr interfaces.IKubeCR) error {
 	c, apiReader, scheme := manager.GetClient(), manager.GetAPIReader(), manager.GetScheme()
 
+	// A run tells the resource it works for when its status changes, which the resource then records
+	runs := func(kind string) source.Source {
+		return source.Channel(controller.Runs().Notifications(kind), &handler.EnqueueRequestForObject{})
+	}
 	if err := ctrlRuntime.
 		NewControllerManagedBy(manager).
 		For(&api.ClickHouseBackup{}).
-		Owns(&batch.Job{}).
+		WatchesRawSource(runs(api.ClickHouseBackupCRDResourceKind)).
 		WithEventFilter(controller.WatchedNamespacePredicate()).
 		Complete(controller.NewBackupController(c, apiReader, scheme, cr)); err != nil {
 		return err
@@ -237,14 +259,13 @@ func setupBackupControllers(manager ctrlRuntime.Manager, cr interfaces.IKubeCR) 
 	if err := ctrlRuntime.
 		NewControllerManagedBy(manager).
 		For(&api.ClickHouseBackupSchedule{}).
-		Owns(&batch.CronJob{}).
+		WatchesRawSource(runs(api.ClickHouseBackupScheduleCRDResourceKind)).
 		Watches(
 			&api.ClickHouseInstallation{},
 			handler.EnqueueRequestsFromMapFunc(schedule.SchedulesForCHI),
 			builder.WithPredicates(controller.CHITopologyPredicate()),
 		).
 		Watches(&api.ClickHouseRestore{}, handler.EnqueueRequestsFromMapFunc(schedule.SchedulesForRestore)).
-		Watches(&batch.Job{}, handler.EnqueueRequestsFromMapFunc(schedule.SchedulesForJob)).
 		WithEventFilter(controller.WatchedNamespacePredicate()).
 		Complete(schedule); err != nil {
 		return err
@@ -253,7 +274,7 @@ func setupBackupControllers(manager ctrlRuntime.Manager, cr interfaces.IKubeCR) 
 	if err := ctrlRuntime.
 		NewControllerManagedBy(manager).
 		For(&api.ClickHouseRestore{}).
-		Owns(&batch.Job{}).
+		WatchesRawSource(runs(api.ClickHouseRestoreCRDResourceKind)).
 		WithEventFilter(controller.WatchedNamespacePredicate()).
 		Complete(controller.NewRestoreController(c, apiReader, scheme, cr)); err != nil {
 		return err
@@ -270,11 +291,61 @@ func setupBackupControllers(manager ctrlRuntime.Manager, cr interfaces.IKubeCR) 
 		Complete(controller.NewRecoveryController(c, apiReader, scheme, cr))
 }
 
-func runBackup(ctx context.Context) error {
+// backupRestartBackoff paces the manager of the backup controllers that is built again, and elected again, after its
+// lease was lost: the waits grow as the leadership keeps being lost, up to the cap.
+var backupRestartBackoff = wait.Backoff{
+	Duration: time.Second,
+	Factor:   2.0,
+	Jitter:   0.1,
+	Cap:      time.Minute,
+	// Steps only bounds the doubling, as of initRetryBackoff
+	Steps: 7,
+}
+
+// runBackup runs the manager of the backup controllers built by initBackup until ctx is done, and builds a new one, and
+// enters the leader election again, each time it stops as a manager does when it loses the Lease: it returns from Start,
+// and a manager is never started twice. The operator is not terminated, as the controllers of ClickHouse go on, and the
+// leader that wins the Lease next, this operator or another, resumes the runs in flight from their status, as after a
+// restart of the operator.
+func runBackup(ctx context.Context, rebuild func(context.Context) error) error {
+	return serveBackup(ctx, startBackupManager, rebuild, backupRestartBackoff)
+}
+
+// startBackupManager runs the manager that initBackup built, until it stops.
+func startBackupManager(ctx context.Context) error {
 	if err := backupManager.Start(ctx); err != nil {
 		backupLogger.Error(err, "run backup - unable to backupManager.Start")
 		return err
 	}
 	// Run successful
 	return nil
+}
+
+// serveBackup starts a manager by start until ctx is done, then, as long as it is not, builds the next one by rebuild,
+// which is retried until it succeeds, or fails for a reason no retry clears, and starts it. The wait between two
+// managers that stopped one after another is the longer, as backoff tells; a manager that ran, as leader or not, longer
+// than the cap of the backoff starts the backoff over, as the leadership it lost was held for a while. It returns nil
+// once ctx is done, else the error that stops the controllers for good.
+func serveBackup(ctx context.Context, start, rebuild func(context.Context) error, backoff wait.Backoff) error {
+	for {
+		started := time.Now()
+		err := start(ctx)
+		if util.IsContextDone(ctx) {
+			return nil
+		}
+		log.Warning("backup controllers stopped, the leader election is entered again, err: %v", err)
+
+		if time.Since(started) > backoff.Cap {
+			backoff.Steps, backoff.Duration = backupRestartBackoff.Steps, backupRestartBackoff.Duration
+		}
+		if util.WaitContextDoneOrTimeout(ctx, backoff.Step()) {
+			return nil
+		}
+		if err := initWithRetry(ctx, backupComponent, rebuild); err != nil {
+			if util.IsContextDone(ctx) {
+				return nil
+			}
+			return err
+		}
+	}
 }

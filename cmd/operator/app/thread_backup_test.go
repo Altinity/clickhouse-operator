@@ -19,18 +19,19 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/go-logr/logr/funcr"
 	"github.com/stretchr/testify/require"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	fakeDiscovery "k8s.io/client-go/discovery/fake"
 	k8sTesting "k8s.io/client-go/testing"
 	ctrlCache "sigs.k8s.io/controller-runtime/pkg/cache"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chbackup"
 )
 
 // stagedDiscovery serves the backup group version without the restore kind for the first
@@ -104,19 +105,13 @@ func TestMissingBackupKindsWhenGroupVersionIsNotServed(t *testing.T) {
 	require.Equal(t, backupKinds, missing)
 }
 
-// TestBackupCacheOptionsNarrowsJobsAndCronJobs pins the backup cache wiring. Jobs and CronJobs are
-// narrowed to the ones the backup controllers build, by a key of their own - the CHI key would
-// hide every backup Job. The custom resources and installations must stay readable: they carry no
-// operator label, and a cache-wide selector would turn every read of them into a silent NotFound.
-// Installations are trimmed instead, so the cache holds no second full copy of each of them.
-func TestBackupCacheOptionsNarrowsJobsAndCronJobs(t *testing.T) {
-	var logged []string
-	log := funcr.New(func(prefix, args string) { logged = append(logged, args) }, funcr.Options{})
+// TestBackupCacheOptions pins the backup cache wiring. The custom resources and installations must stay readable: they
+// carry no operator label, and a cache-wide selector would turn every read of them into a silent NotFound.
+// Installations are trimmed instead, so the cache holds no second full copy of each of them. The backup controllers
+// run no Job, CronJob or Pod, and cache none.
+func TestBackupCacheOptions(t *testing.T) {
+	opts := newBackupCacheOptions(funcr.New(func(prefix, args string) {}, funcr.Options{}), []string{"ns1", "ns2"})
 
-	opts := newBackupCacheOptions(log, []string{"ns1", "ns2"})
-
-	require.Contains(t, strings.Join(logged, "\n"), chbackup.LabelBackupCRKind,
-		"the effective selector must reach the boot log")
 	require.Nil(t, opts.DefaultLabelSelector,
 		"a cache-wide selector would hide the user-authored custom resources from the reconcilers")
 	require.Len(t, opts.DefaultNamespaces, 2, "ByObject must not replace the namespace scoping")
@@ -125,13 +120,7 @@ func TestBackupCacheOptionsNarrowsJobsAndCronJobs(t *testing.T) {
 	for obj, byObject := range opts.ByObject {
 		narrowed[fmt.Sprintf("%T", obj)] = byObject
 	}
-	require.Len(t, narrowed, 3, "narrowed set changed - update this test deliberately")
-	for _, typeName := range []string{"*v1.Job", "*v1.CronJob"} {
-		byObject, ok := narrowed[typeName]
-		require.True(t, ok, "%s must be narrowed - an unfiltered type caches every instance in scope", typeName)
-		require.Equal(t, chbackup.JobSelector().String(), byObject.Label.String())
-		require.Nil(t, byObject.Namespaces, "%s must inherit DefaultNamespaces", typeName)
-	}
+	require.Len(t, narrowed, 1, "narrowed set changed - update this test deliberately")
 
 	installations, ok := narrowed["*v1.ClickHouseInstallation"]
 	require.True(t, ok, "installations must be trimmed - the CHI controller caches them in full already")
@@ -148,4 +137,56 @@ func TestBackupCacheOptionsNarrowsJobsAndCronJobs(t *testing.T) {
 	require.Equal(t, "demo", trimmed.Name)
 	require.Nil(t, trimmed.Spec.Configuration)
 	require.Equal(t, api.StatusCompleted, trimmed.Status.GetStatus())
+}
+
+// A manager of the backup controllers that stops as the leader Lease is lost is built again, and elected again, until
+// the operator stops, never started twice; the process is not terminated, which the return of serveBackup tells.
+func TestServeBackupElectsAgainAfterTheLeaseIsLost(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var started, built atomic.Int32
+	// The managers of the first two terms lose the Lease, the third one leads until the operator stops
+	start := func(ctx context.Context) error {
+		if started.Add(1) <= 2 {
+			return errors.New("leader election lost")
+		}
+		<-ctx.Done()
+		return nil
+	}
+	rebuild := func(context.Context) error {
+		require.Equal(t, started.Load(), built.Add(1), "a new manager is built after each manager that stopped")
+		return nil
+	}
+	served := make(chan error, 1)
+	go func() {
+		served <- serveBackup(ctx, start, rebuild, wait.Backoff{Duration: time.Millisecond, Factor: 2, Cap: time.Minute, Steps: 5})
+	}()
+	require.Eventually(t, func() bool { return started.Load() == 3 }, 5*time.Second, time.Millisecond, "the third manager is started")
+	require.Equal(t, int32(2), built.Load())
+	cancel()
+	select {
+	case err := <-served:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("serveBackup does not return once the operator stops")
+	}
+}
+
+// A manager that cannot be built again is retried, and a failure no retry clears ends the serving, with its error.
+func TestServeBackupStopsOnAFailureNoRetryClears(t *testing.T) {
+	start := func(context.Context) error { return errors.New("leader election lost") }
+	attempts := 0
+	rebuild := func(context.Context) error {
+		attempts++
+		if attempts == 1 {
+			return errors.New("API server unavailable")
+		}
+		return fmt.Errorf("%w: scheme", errInitTerminal)
+	}
+	saved := initRetryBackoff
+	initRetryBackoff.Duration = time.Millisecond
+	defer func() { initRetryBackoff = saved }()
+	err := serveBackup(context.Background(), start, rebuild, wait.Backoff{Duration: time.Millisecond, Steps: 1})
+	require.ErrorIs(t, err, errInitTerminal)
+	require.Equal(t, 2, attempts)
 }

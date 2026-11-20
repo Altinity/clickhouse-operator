@@ -24,8 +24,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
-// Backup turned on is on only where the spec names where the storage settings of the sidecar come from:
-// without them the sidecar could never upload or download a backup, so backup stays off there instead.
+// Backup turned on is on only where the spec names the Secret of the clickhouse-backup configuration, the only source
+// of the storage settings and of the REST API credentials: a pod template alone only overrides the container.
 func TestClusterBackupNeedsStorage(t *testing.T) {
 	const secret = "s3-credentials"
 	for name, tc := range map[string]struct {
@@ -35,21 +35,26 @@ func TestClusterBackupNeedsStorage(t *testing.T) {
 	}{
 		"none":        {},
 		"nothing set": {backup: &ClusterBackup{}},
-		"turned off":  {backup: &ClusterBackup{Enabled: types.NewStringBool(false), ConfigSecretRef: secretRef(secret)}},
+		"turned off":  {backup: &ClusterBackup{Enabled: types.NewStringBool(false), StorageConfig: NewStorageConfig(secret, "config.yml")}},
 		"not a bool":  {backup: &ClusterBackup{Enabled: ptr.To(types.StringBool("maybe")), PodTemplate: types.NewString("backup")}},
 		"turned on":   {backup: &ClusterBackup{Enabled: types.NewStringBool(true)}, requested: true},
 		"with a Secret": {
-			backup:    &ClusterBackup{Enabled: types.NewStringBool(true), ConfigSecretRef: secretRef(secret)},
+			backup:    &ClusterBackup{Enabled: types.NewStringBool(true), StorageConfig: NewStorageConfig(secret, "config.yml")},
 			requested: true,
 			enabled:   true,
 		},
 		"with a pod template": {
 			backup:    &ClusterBackup{Enabled: types.NewStringBool(true), PodTemplate: types.NewString("backup")},
 			requested: true,
+		},
+		"with a pod template and a Secret": {
+			backup: &ClusterBackup{Enabled: types.NewStringBool(true), PodTemplate: types.NewString("backup"),
+				StorageConfig: NewStorageConfig(secret, "config.yml")},
+			requested: true,
 			enabled:   true,
 		},
 		"with a Secret of no name": {
-			backup:    &ClusterBackup{Enabled: types.NewStringBool(true), ConfigSecretRef: secretRef("")},
+			backup:    &ClusterBackup{Enabled: types.NewStringBool(true), StorageConfig: NewStorageConfig("", "config.yml")},
 			requested: true,
 		},
 		"with a pod template of no name": {
@@ -73,7 +78,7 @@ func secretRef(name string) *core.LocalObjectReference {
 // The configuration Secret of a level wins over the one of the level it takes others from: a cluster's over the
 // installation's, an installation's over a template's. An explicit name "" on a cluster leaves it without one.
 func TestClusterBackupMergeConfigSecret(t *testing.T) {
-	installation := &ClusterBackup{ConfigSecretRef: secretRef("s3")}
+	installation := &ClusterBackup{StorageConfig: NewStorageConfig("s3", "config.yml")}
 	for name, tc := range map[string]struct {
 		to, from *ClusterBackup
 		_type    MergeType
@@ -83,24 +88,24 @@ func TestClusterBackupMergeConfigSecret(t *testing.T) {
 			to: &ClusterBackup{}, from: installation, _type: MergeTypeFillEmptyValues, secret: "s3",
 		},
 		"a cluster of a Secret of its own": {
-			to: &ClusterBackup{ConfigSecretRef: secretRef("s3-cold")}, from: installation, _type: MergeTypeFillEmptyValues,
+			to: &ClusterBackup{StorageConfig: NewStorageConfig("s3-cold", "config.yml")}, from: installation, _type: MergeTypeFillEmptyValues,
 			secret: "s3-cold",
 		},
 		"a cluster of no Secret": {
-			to: &ClusterBackup{ConfigSecretRef: secretRef("")}, from: installation, _type: MergeTypeFillEmptyValues,
+			to: &ClusterBackup{StorageConfig: NewStorageConfig("", "config.yml")}, from: installation, _type: MergeTypeFillEmptyValues,
 		},
 		"an installation over a template": {
-			to: &ClusterBackup{ConfigSecretRef: secretRef("s3-shared")}, from: &ClusterBackup{ConfigSecretRef: secretRef("s3-own")},
+			to: &ClusterBackup{StorageConfig: NewStorageConfig("s3-shared", "config.yml")}, from: &ClusterBackup{StorageConfig: NewStorageConfig("s3-own", "config.yml")},
 			_type: MergeTypeOverrideByNonEmptyValues, secret: "s3-own",
 		},
 		"an installation of nothing over a template": {
-			to: &ClusterBackup{ConfigSecretRef: secretRef("s3-shared")}, from: &ClusterBackup{Enabled: types.NewStringBool(true)},
+			to: &ClusterBackup{StorageConfig: NewStorageConfig("s3-shared", "config.yml")}, from: &ClusterBackup{Enabled: types.NewStringBool(true)},
 			_type: MergeTypeOverrideByNonEmptyValues, secret: "s3-shared",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			got := tc.to.DeepCopy().MergeFrom(tc.from, tc._type)
-			require.Equal(t, tc.secret, got.GetConfigSecretName())
+			require.Equal(t, tc.secret, got.GetStorageConfigSecretName())
 			require.Equal(t, got, got.DeepCopy().MergeFrom(tc.from, tc._type), "inheriting again changes nothing")
 		})
 	}
@@ -109,8 +114,55 @@ func TestClusterBackupMergeConfigSecret(t *testing.T) {
 // Merging never shares the reference of the source: that of a cached template, or of the installation level, is
 // read for every cluster and every installation.
 func TestClusterBackupMergeConfigSecretLeavesTheSourceAlone(t *testing.T) {
-	from := &ClusterBackup{ConfigSecretRef: secretRef("s3-shared")}
+	from := &ClusterBackup{StorageConfig: NewStorageConfig("s3-shared", "config.yml")}
 	got := (&ClusterBackup{}).MergeFrom(from, MergeTypeFillEmptyValues)
-	got.ConfigSecretRef.Name = "changed"
-	require.Equal(t, "s3-shared", from.ConfigSecretRef.Name)
+	got.StorageConfig.ValueFrom.SecretKeyRef.Name = "changed"
+	require.Equal(t, "s3-shared", from.GetStorageConfigSecretName())
+}
+
+// The storage config names a Secret and a key of it, both required for a storage; a hot reload and an optional key
+// are refused, and a name "" is the way a cluster leaves itself without a storage, which needs no key.
+func TestClusterBackupStorageConfig(t *testing.T) {
+	secretKey := func(name, key string, optional *bool) *StorageConfig {
+		return &StorageConfig{ValueFrom: &types.DataSource{
+			SecretKeyRef: &core.SecretKeySelector{LocalObjectReference: core.LocalObjectReference{Name: name}, Key: key, Optional: optional},
+		}}
+	}
+	for name, tc := range map[string]struct {
+		config  *StorageConfig
+		secret  string
+		key     string
+		invalid string
+		enabled bool
+	}{
+		"none":              {},
+		"no source":         {config: &StorageConfig{}},
+		"a Secret key":      {config: secretKey("s3", "storage.yaml", nil), secret: "s3", key: "storage.yaml", enabled: true},
+		"an optional false": {config: secretKey("s3", "config.yml", ptr.To(false)), secret: "s3", key: "config.yml", enabled: true},
+		"a Secret of no key": {
+			config: secretKey("s3", "", nil), secret: "s3", invalid: "backup.storageConfig.valueFrom.secretKeyRef.key",
+		},
+		"no Secret": {config: secretKey("", "", nil)},
+		"an optional Secret": {
+			config: secretKey("s3", "config.yml", ptr.To(true)), secret: "s3", key: "config.yml",
+			invalid: "backup.storageConfig.valueFrom.secretKeyRef.optional", enabled: true,
+		},
+		"a hot reload": {
+			config: &StorageConfig{ValueFrom: &types.DataSource{HotReload: true}}, invalid: "backup.storageConfig.valueFrom.hotReload",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			backup := &ClusterBackup{Enabled: types.NewStringBool(true), StorageConfig: tc.config}
+			require.Equal(t, tc.secret, backup.GetStorageConfigSecretName())
+			require.Equal(t, tc.key, backup.GetStorageConfigSecretKey())
+			require.Equal(t, tc.enabled, backup.IsEnabled())
+			require.Equal(t, !tc.enabled, backup.LacksStorage())
+			if tc.invalid == "" {
+				require.NoError(t, backup.Validate())
+			} else {
+				require.ErrorIs(t, backup.Validate(), ErrInvalidBackupSpec)
+				require.ErrorContains(t, backup.Validate(), tc.invalid)
+			}
+		})
+	}
 }

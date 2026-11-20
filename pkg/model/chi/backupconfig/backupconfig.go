@@ -24,6 +24,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -48,6 +49,19 @@ const ManagedClickHouseUserKey = "managed-clickhouse-user"
 // configuration file of clickhouse-backup.
 var ErrInvalidStorageConfig = errors.New("invalid backup storage configuration")
 
+// yamlErrorLine finds the line a YAML error names
+var yamlErrorLine = regexp.MustCompile(`line (\d+)`)
+
+// invalidYAML is ErrInvalidStorageConfig for storage settings that are no YAML, with the line the error names, if
+// any, and nothing else of it: the text of a YAML error quotes the input, which holds credentials, and the error
+// ends up in the status of the installation, its events and the log.
+func invalidYAML(err error) error {
+	if match := yamlErrorLine.FindStringSubmatch(err.Error()); match != nil {
+		return fmt.Errorf("%w: not valid YAML, see line %s", ErrInvalidStorageConfig, match[1])
+	}
+	return fmt.Errorf("%w: not valid YAML", ErrInvalidStorageConfig)
+}
+
 // Sections and keys of the configuration file of clickhouse-backup
 const (
 	sectionGeneral    = "general"
@@ -55,10 +69,22 @@ const (
 	sectionAPI        = "api"
 
 	keyDisableEnvironmentOverride = "disable_environment_override"
+	keyBackupsToKeepRemote        = "backups_to_keep_remote"
+	keyRebaseDuringDelete         = "rebase_during_delete"
+	keyRebaseBeforeRemoveOld      = "rebase_before_remove_old_remote"
 	keyUsername                   = "username"
-	keyPassword                   = "password"
-	keyPath                       = "path"
-	keyObjectDiskPath             = "object_disk_path"
+	keyCreateIntegrationTables    = "create_integration_tables"
+	keyIntegrationTablesHost      = "integration_tables_host"
+	// IntegrationTablesHost is the host ClickHouse reaches the API of the sidecar of its pod at, which the integration
+	// tables call
+	IntegrationTablesHost = "127.0.0.1"
+	keyPassword           = "password"
+	keyPath               = "path"
+	keyObjectDiskPath     = "object_disk_path"
+	keyRestoreDistributed = "restore_distributed_cluster"
+	// RestoreDistributedCluster is the cluster a restore points a Distributed table of the backup at whose cluster
+	// does not exist on the restored host: the restored cluster, by the macro ClickHouse expands
+	RestoreDistributedCluster = "{cluster}"
 )
 
 // storageSections are the sections of the storage types of clickhouse-backup, each of which takes a path of the
@@ -66,7 +92,8 @@ const (
 var storageSections = []string{"s3", "gcs", "azblob", "cos", "ftp", "sftp"}
 
 // Settings maps the env var a setting of clickhouse-backup is known by to its section and key in the configuration
-// file: the storage path check of the backup Jobs reads them by their env var names.
+// file: the storage path check of the operator reads them by their env var names, those that tell where the backups
+// are.
 var Settings = map[string]Setting{
 	"REMOTE_STORAGE":          {"general", "remote_storage"},
 	"S3_BUCKET":               {"s3", "bucket"},
@@ -92,6 +119,9 @@ var Settings = map[string]Setting{
 	"SFTP_PORT":               {"sftp", "port"},
 	"SFTP_PATH":               {"sftp", keyPath},
 	"SFTP_OBJECT_DISK_PATH":   {"sftp", keyObjectDiskPath},
+	// Whether, and on which disk, the backups are embedded ones, which ClickHouse writes itself
+	"CLICKHOUSE_USE_EMBEDDED_BACKUP_RESTORE": {sectionClickHouse, "use_embedded_backup_restore"},
+	"CLICKHOUSE_EMBEDDED_BACKUP_DISK":        {sectionClickHouse, "embedded_backup_disk"},
 }
 
 // Setting is where the configuration file holds a setting
@@ -100,8 +130,8 @@ type Setting struct {
 	Key     string
 }
 
-// Credentials are what the sidecar authenticates with: the ones of its REST API, which the backup Jobs call it
-// with, and the ones it connects to ClickHouse with
+// Credentials are what the sidecar authenticates with: the ones of its REST API, which the integration tables call
+// it with, and the ones it connects to ClickHouse with
 type Credentials struct {
 	APIUsername        string
 	APIPassword        string
@@ -130,13 +160,13 @@ type Config struct {
 
 // Build builds the configuration file of the sidecar from the storage settings, a YAML mapping of the sections of
 // the configuration file of clickhouse-backup, empty for none. The file takes the default paths of every storage
-// type the settings name none of, and the credentials over whatever the settings hold. The operator sets what the
-// backup Jobs rely on as env vars of the sidecar, which take precedence over the file: the file never turns that
+// type the settings name none of, and the credentials over whatever the settings hold. The operator sets what it
+// relies on as env vars of the sidecar, which take precedence over the file: the file never turns that
 // off.
 func Build(storageConfig []byte, credentials Credentials, defaults Defaults) (*Config, error) {
 	file := map[string]any{}
 	if err := yaml.Unmarshal(storageConfig, &file); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidStorageConfig, err)
+		return nil, invalidYAML(err)
 	}
 	if file == nil {
 		file = map[string]any{}
@@ -156,6 +186,12 @@ func Build(storageConfig []byte, credentials Credentials, defaults Defaults) (*C
 		return nil, err
 	}
 	general[keyDisableEnvironmentOverride] = false
+	// Retention is the orchestrator's alone, by the schedules: clickhouse-backup deleting remote backups on its own
+	// would remove what the schedules keep. Deleting a backup another one is incremental to rebases that one on the
+	// next older backup, so that no backup loses its base.
+	general[keyBackupsToKeepRemote] = 0
+	general[keyRebaseDuringDelete] = true
+	general[keyRebaseBeforeRemoveOld] = true
 
 	api, err := sectionOf(file, sectionAPI)
 	if err != nil {
@@ -163,17 +199,23 @@ func Build(storageConfig []byte, credentials Credentials, defaults Defaults) (*C
 	}
 	api[keyUsername] = credentials.APIUsername
 	api[keyPassword] = credentials.APIPassword
+	// The operator drives clickhouse-backup through SQL, by the integration tables the server creates in ClickHouse,
+	// which reach its API in the pod
+	api[keyCreateIntegrationTables] = true
+	api[keyIntegrationTablesHost] = IntegrationTablesHost
 
+	clickHouse, err := sectionOf(file, sectionClickHouse)
+	if err != nil {
+		return nil, err
+	}
+	// A schema restore that does not run ON CLUSTER - on every replica but the first one of the first shard - points
+	// a Distributed table of the backup over a cluster the restored host does not have at the restored cluster, as
+	// the Altinity usual backup workflow does. The storage settings may set another cluster, or "" for none.
+	setDefault(clickHouse, keyRestoreDistributed, RestoreDistributedCluster)
 	// ClickHouse credentials the Secret does not set leave the file with what the storage settings say, or none,
 	// which clickhouse-backup takes its own defaults for
-	if (credentials.ClickHouseUsername != "") || (credentials.ClickHousePassword != "") {
-		clickHouse, err := sectionOf(file, sectionClickHouse)
-		if err != nil {
-			return nil, err
-		}
-		setNonEmpty(clickHouse, keyUsername, credentials.ClickHouseUsername)
-		setNonEmpty(clickHouse, keyPassword, credentials.ClickHousePassword)
-	}
+	setNonEmpty(clickHouse, keyUsername, credentials.ClickHouseUsername)
+	setNonEmpty(clickHouse, keyPassword, credentials.ClickHousePassword)
 
 	settings := map[string]string{}
 	for name, setting := range Settings {
@@ -189,7 +231,7 @@ func Build(storageConfig []byte, credentials Credentials, defaults Defaults) (*C
 	// Marshalling sorts the keys of every mapping, so equal settings always make an equal file
 	out, err := yaml.Marshal(file)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidStorageConfig, err)
+		return nil, invalidYAML(err)
 	}
 	managed := ""
 	if (credentials.ClickHouseUsername != "") && (credentials.ClickHousePassword != "") {

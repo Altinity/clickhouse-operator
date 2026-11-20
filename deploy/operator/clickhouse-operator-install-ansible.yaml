@@ -1034,7 +1034,7 @@ spec:
                           type: string
                           description: "optional access credentials string with `user:password` format used when use digest authorization in Zookeeper"
                         use_compression:
-                          !!merge <<: *TypeStringBool
+                          <<: *TypeStringBool
                           description: "Enables compression in Keeper protocol if set to true"
                     users:
                       type: object
@@ -1231,40 +1231,83 @@ spec:
                             description: |
                               EXPERIMENTAL. Operator-managed backup for this cluster, overriding `chi.spec.backup`.
                               Fields left empty are inherited from `chi.spec.backup`; set `enabled: "no"` to opt this cluster out.
-                              When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
-                              so turning it on or off rolls the cluster's Pods. Customize the sidecar through a container named
-                              clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the cluster
-                              has a `configSecretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
-                              so backup stays off and the operator warns.
+                              When enabled in mode sidecar, the operator injects a clickhouse-backup sidecar into every Pod of the
+                              cluster, so turning it on or off rolls the cluster's Pods. Customize the container through a container
+                              named clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the
+                              cluster has a `storageConfig`: without it clickhouse-backup would have no storage and no API
+                              credentials, so backup stays off and the operator warns.
                               See docs/backup.md for details.
                             properties:
                               enabled:
                                 <<: *TypeStringBool
                                 description: |
                                   Enable operator-managed backup: inject the clickhouse-backup sidecar and allow backup/restore resources to target
-                                  the cluster. Takes effect only with `configSecretRef` or `podTemplate` set, which name where the sidecar takes
-                                  its storage from: without either, backup stays off
+                                  the cluster. Takes effect only with `storageConfig` set, which names where clickhouse-backup takes its
+                                  storage and API credentials from: without it, backup stays off
                               podTemplate:
                                 type: string
                                 description: |
                                   Pod template whose container named clickhouse-backup the sidecar is built on: what the container sets is kept,
                                   and the operator fills in only what it lacks. Only that container is taken, not the other containers, volumes
                                   or Pod settings of the template. Left empty, the operator builds the sidecar on its own
-                              configSecretRef:
+                              storageConfig:
                                 type: object
                                 description: |
-                                  Secret in the installation's namespace whose key `config.yml` holds the clickhouse-backup configuration
-                                  of the sidecar, a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket, s3.path,
+                                  Where the clickhouse-backup configuration of the sidecar is: a key of a Secret in the installation's
+                                  namespace, which holds a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket, s3.path,
                                   s3.access_key, s3.secret_key. The operator generates the configuration file of the sidecar from it,
                                   which follows a change of the Secret without a restart. A cluster that leaves it out takes the
-                                  installation's; an explicit `name: ""` on a cluster leaves the cluster without one. Without one, the
-                                  storage is configured by the container of the Pod template `podTemplate` names
+                                  installation's; an explicit `secretKeyRef.name: ""` on a cluster leaves the cluster without one. Required:
+                                  without one, backup stays off. The operator sets the credentials of the REST API in the file itself.
                                 properties:
-                                  name:
-                                    description: |
-                                      Name of the referent. More info:
-                                      https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                    type: string
+                                  valueFrom:
+                                    description: "Source of the clickhouse-backup configuration"
+                                    type: object
+                                    properties:
+                                      secretKeyRef:
+                                        description: |
+                                          Selects a key of a secret in the clickhouse installation namespace.
+                                        type: object
+                                        properties:
+                                          name:
+                                            description: |
+                                              Name of the referent. More info:
+                                              https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                            type: string
+                                          key:
+                                            description: The key of the secret that holds the clickhouse-backup configuration, e.g. `config.yml`. Required.
+                                            type: string
+                                          optional:
+                                            description: Not supported, an optional source is refused
+                                            type: boolean
+                                        required:
+                                          - key
+                                      hotReload:
+                                        description: Not supported, a hot reload is refused
+                                        type: boolean
+                              preferredReplica:
+                                type: integer
+                                minimum: 0
+                                description: |
+                                  Index, from 0, of the replica of each shard a backup works on, as the backupReplica of the Altinity usual backup workflow.
+                                  With mode pod the backup Pod of the shard works next to it: it mounts the volumes of that replica's Pod and runs
+                                  on the same node, by a nodeSelector on the node's hostname; a shard with fewer replicas, or whose preferred replica
+                                  is not ready, falls back to its next ready replica. With mode sidecar a backup of one replica per shard
+                                  (FirstPerShard) runs on the sidecar of that replica, or on that of the first replica when the shard has fewer
+                                  replicas or the preferred one does not answer when the Job starts. Empty means 0, the first replica
+                              naming:
+                                type: string
+                                maxLength: 128
+                                pattern: '^([A-Za-z0-9._-]|\{[A-Za-z]+\})+$'
+                                description: |
+                                  Template the backups of the cluster are named by, one name for the backup of each shard, e.g.
+                                  "shard{shardNum}-{YYYYMMDDHHIISS}" as the Altinity usual backup workflow names them. Placeholders: {shard}, the
+                                  shard name, the value of the {shard} macro of system.macros of the host, which the storage path takes too: the
+                                  index of the shard from 0 unless the layout names it; {shardNum}, the number of the shard from 1, its shard_num
+                                  of system.clusters; one of them required; {cluster}, {chi}, {namespace}; {prefix}, the backupNamePrefix of the schedule;
+                                  the time by the tokens YYYY, MM, DD, HH, II (minutes) and SS, all required, in braces, e.g. {YYYYMMDDHHIISS}.
+                                  A backup made at once has a T before the hour. Empty, the default, names a backup "<prefix>-<YYYYMMDDHHMMSS>"
+                                  alike on every shard. See docs/backup.md
                               recovery:
                                 type: object
                                 description: |
@@ -1891,10 +1934,10 @@ spec:
                   description: |
                     EXPERIMENTAL. Operator-managed backup defaults, applied to every cluster. Each cluster can override
                     them via `chi.spec.configuration.clusters[].backup`, e.g. `enabled: "no"` to opt a cluster out.
-                    When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
-                    so turning it on or off rolls the cluster's Pods. Backup takes effect only where a cluster has a
-                    `configSecretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
-                    so backup stays off and the operator warns.
+                    When enabled in mode sidecar, the operator injects a clickhouse-backup sidecar into every Pod of the
+                    cluster, so turning it on or off rolls the cluster's Pods. Backup takes effect only where a cluster has
+                    a `storageConfig`: without it clickhouse-backup would have no storage and no API credentials, so
+                    backup stays off and the operator warns.
                     See docs/backup.md for details.
                 useTemplates:
                   type: array
@@ -2951,7 +2994,7 @@ spec:
                           type: string
                           description: "optional access credentials string with `user:password` format used when use digest authorization in Zookeeper"
                         use_compression:
-                          !!merge <<: *TypeStringBool
+                          <<: *TypeStringBool
                           description: "Enables compression in Keeper protocol if set to true"
                     users:
                       type: object
@@ -3148,40 +3191,83 @@ spec:
                             description: |
                               EXPERIMENTAL. Operator-managed backup for this cluster, overriding `chi.spec.backup`.
                               Fields left empty are inherited from `chi.spec.backup`; set `enabled: "no"` to opt this cluster out.
-                              When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
-                              so turning it on or off rolls the cluster's Pods. Customize the sidecar through a container named
-                              clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the cluster
-                              has a `configSecretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
-                              so backup stays off and the operator warns.
+                              When enabled in mode sidecar, the operator injects a clickhouse-backup sidecar into every Pod of the
+                              cluster, so turning it on or off rolls the cluster's Pods. Customize the container through a container
+                              named clickhouse-backup in the Pod template `podTemplate` names. Backup takes effect only where the
+                              cluster has a `storageConfig`: without it clickhouse-backup would have no storage and no API
+                              credentials, so backup stays off and the operator warns.
                               See docs/backup.md for details.
                             properties:
                               enabled:
                                 <<: *TypeStringBool
                                 description: |
                                   Enable operator-managed backup: inject the clickhouse-backup sidecar and allow backup/restore resources to target
-                                  the cluster. Takes effect only with `configSecretRef` or `podTemplate` set, which name where the sidecar takes
-                                  its storage from: without either, backup stays off
+                                  the cluster. Takes effect only with `storageConfig` set, which names where clickhouse-backup takes its
+                                  storage and API credentials from: without it, backup stays off
                               podTemplate:
                                 type: string
                                 description: |
                                   Pod template whose container named clickhouse-backup the sidecar is built on: what the container sets is kept,
                                   and the operator fills in only what it lacks. Only that container is taken, not the other containers, volumes
                                   or Pod settings of the template. Left empty, the operator builds the sidecar on its own
-                              configSecretRef:
+                              storageConfig:
                                 type: object
                                 description: |
-                                  Secret in the installation's namespace whose key `config.yml` holds the clickhouse-backup configuration
-                                  of the sidecar, a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket, s3.path,
+                                  Where the clickhouse-backup configuration of the sidecar is: a key of a Secret in the installation's
+                                  namespace, which holds a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket, s3.path,
                                   s3.access_key, s3.secret_key. The operator generates the configuration file of the sidecar from it,
                                   which follows a change of the Secret without a restart. A cluster that leaves it out takes the
-                                  installation's; an explicit `name: ""` on a cluster leaves the cluster without one. Without one, the
-                                  storage is configured by the container of the Pod template `podTemplate` names
+                                  installation's; an explicit `secretKeyRef.name: ""` on a cluster leaves the cluster without one. Required:
+                                  without one, backup stays off. The operator sets the credentials of the REST API in the file itself.
                                 properties:
-                                  name:
-                                    description: |
-                                      Name of the referent. More info:
-                                      https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                    type: string
+                                  valueFrom:
+                                    description: "Source of the clickhouse-backup configuration"
+                                    type: object
+                                    properties:
+                                      secretKeyRef:
+                                        description: |
+                                          Selects a key of a secret in the clickhouse installation namespace.
+                                        type: object
+                                        properties:
+                                          name:
+                                            description: |
+                                              Name of the referent. More info:
+                                              https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                            type: string
+                                          key:
+                                            description: The key of the secret that holds the clickhouse-backup configuration, e.g. `config.yml`. Required.
+                                            type: string
+                                          optional:
+                                            description: Not supported, an optional source is refused
+                                            type: boolean
+                                        required:
+                                          - key
+                                      hotReload:
+                                        description: Not supported, a hot reload is refused
+                                        type: boolean
+                              preferredReplica:
+                                type: integer
+                                minimum: 0
+                                description: |
+                                  Index, from 0, of the replica of each shard a backup works on, as the backupReplica of the Altinity usual backup workflow.
+                                  With mode pod the backup Pod of the shard works next to it: it mounts the volumes of that replica's Pod and runs
+                                  on the same node, by a nodeSelector on the node's hostname; a shard with fewer replicas, or whose preferred replica
+                                  is not ready, falls back to its next ready replica. With mode sidecar a backup of one replica per shard
+                                  (FirstPerShard) runs on the sidecar of that replica, or on that of the first replica when the shard has fewer
+                                  replicas or the preferred one does not answer when the Job starts. Empty means 0, the first replica
+                              naming:
+                                type: string
+                                maxLength: 128
+                                pattern: '^([A-Za-z0-9._-]|\{[A-Za-z]+\})+$'
+                                description: |
+                                  Template the backups of the cluster are named by, one name for the backup of each shard, e.g.
+                                  "shard{shardNum}-{YYYYMMDDHHIISS}" as the Altinity usual backup workflow names them. Placeholders: {shard}, the
+                                  shard name, the value of the {shard} macro of system.macros of the host, which the storage path takes too: the
+                                  index of the shard from 0 unless the layout names it; {shardNum}, the number of the shard from 1, its shard_num
+                                  of system.clusters; one of them required; {cluster}, {chi}, {namespace}; {prefix}, the backupNamePrefix of the schedule;
+                                  the time by the tokens YYYY, MM, DD, HH, II (minutes) and SS, all required, in braces, e.g. {YYYYMMDDHHIISS}.
+                                  A backup made at once has a T before the hour. Empty, the default, names a backup "<prefix>-<YYYYMMDDHHMMSS>"
+                                  alike on every shard. See docs/backup.md
                               recovery:
                                 type: object
                                 description: |
@@ -3808,10 +3894,10 @@ spec:
                   description: |
                     EXPERIMENTAL. Operator-managed backup defaults, applied to every cluster. Each cluster can override
                     them via `chi.spec.configuration.clusters[].backup`, e.g. `enabled: "no"` to opt a cluster out.
-                    When enabled, the operator injects a clickhouse-backup sidecar into every Pod of the cluster,
-                    so turning it on or off rolls the cluster's Pods. Backup takes effect only where a cluster has a
-                    `configSecretRef`, or `podTemplate` is set: without either the sidecar would have no backup storage,
-                    so backup stays off and the operator warns.
+                    When enabled in mode sidecar, the operator injects a clickhouse-backup sidecar into every Pod of the
+                    cluster, so turning it on or off rolls the cluster's Pods. Backup takes effect only where a cluster has
+                    a `storageConfig`: without it clickhouse-backup would have no storage and no API credentials, so
+                    backup stays off and the operator warns.
                     See docs/backup.md for details.
                 useTemplates:
                   type: array
@@ -4641,6 +4727,30 @@ spec:
                         Where in its storage the clickhouse-backup sidecar of a host keeps the object disk data of its backups when
                         the settings of that storage set no object disk path. A template like storagePath.
                         Default: object_disks/{namespace}/{installation}/{cluster}/{shard}
+                    timeouts:
+                      type: object
+                      description: |
+                        Defaults of spec.timeouts of every ClickHouseBackup, ClickHouseRestore and ClickHouseBackupSchedule, which a
+                        resource overrides field by field: how the operator waits for the commands it runs on the clickhouse-backup
+                        sidecars. A field unset here is the built-in default
+                      properties:
+                        actionTimeout:
+                          type: string
+                          format: duration
+                          description: "How long the operator waits for one command on one host, a Go duration, e.g. 12h or 90m. Default 12h. At most 720h"
+                        unreachableTimeout:
+                          type: string
+                          format: duration
+                          description: "How long a host whose ClickHouse does not answer, or whose sidecar answers the URL engine with an error, is retried from the first error in a row before the host fails, a Go duration. Default 10m. At most 168h"
+                        errorResponsesMax:
+                          type: integer
+                          minimum: 1
+                          maximum: 1000
+                          description: "How many polls in a row may find no row of a submitted command before it is taken as lost. Default 5"
+                        httpReceiveTimeout:
+                          type: string
+                          format: duration
+                          description: "http_receive_timeout and http_send_timeout of every insert into system.backup_actions, a Go duration: a synchronous delete local or delete remote answers once it is done. Default 4h. At most 168h"
                 logger:
                   type: object
                   description: "allow setup clickhouse-operator logger behavior"
@@ -5653,6 +5763,11 @@ spec:
           type: integer
           description: Backup duration (seconds)
           jsonPath: .status.durationSeconds
+        - name: taskID
+          type: string
+          description: Current task id
+          priority: 1
+          jsonPath: .status.taskID
         - name: age
           type: date
           jsonPath: .metadata.creationTimestamp
@@ -5662,9 +5777,9 @@ spec:
         openAPIV3Schema:
           description: |
             EXPERIMENTAL. ClickHouseBackup defines a one-off backup of a ClickHouseInstallation.
-            The operator runs one Job per backup-enabled cluster it targets, each driving the
+            The operator runs the backup on every backup-enabled cluster it targets, driving the
             clickhouse-backup sidecar it injects into the cluster (see ClickHouseInstallation
-            spec.backup), creating and uploading a backup under one name. The API may change
+            spec.backup) through SQL, creating and uploading a backup under one name. The API may change
             in a future release.
           type: object
           required:
@@ -5688,9 +5803,23 @@ spec:
                   message: "a backup that runs a schedule takes its options from it: replicaSelection, tables, partitions and activeDeadlineSeconds are not set with scheduleRef"
                 - rule: "!has(self.scheduleRef) || (has(self.backupName) ? self.backupName : '') == ''"
                   message: "a backup that runs a schedule is named with the schedule's backupNamePrefix: backupName is not set with scheduleRef"
-                - rule: "!has(self.backupName) || !self.backupName.matches('-[0-9]{8}-[0-9]{6}$')"
-                  message: "backupName must not end like the backups of a schedule, -YYYYMMDD-HHMMSS, which the retention of a schedule of that prefix would prune"
+                - rule: "!has(self.scheduleRef) || !has(self.configOverrides)"
+                  message: "a backup that runs a schedule takes no configOverrides: they are not set with scheduleRef"
+                - rule: "!has(self.backupName) || !self.backupName.matches('-[0-9]{14}$')"
+                  message: "backupName must not end like the backups of a schedule, -YYYYMMDDHHMMSS, which the retention of a schedule of that prefix would prune"
               properties:
+                configOverrides:
+                  type: array
+                  nullable: true
+                  maxItems: 16
+                  x-kubernetes-list-type: set
+                  description: |
+                    clickhouse-backup settings the backup is made with in place of those of the sidecar, KEY=VALUE of the env
+                    var of the setting, e.g. S3_STORAGE_CLASS=STANDARD_IA; a leading --env= is stripped. Not the settings the
+                    operator sets, those of where the backups are, of the API or of secrets. Not with scheduleRef
+                  items:
+                    type: string
+                    pattern: '^(--env=)?[A-Z][A-Z0-9_]{0,63}=[A-Za-z0-9_.,:/@+=-]{1,256}$'
                 clickHouseInstallation:
                   type: string
                   minLength: 1
@@ -5714,14 +5843,14 @@ spec:
                       description: "Name of the ClickHouseBackupSchedule"
                 cluster:
                   type: string
-                  description: "Optional cluster of the ClickHouseInstallation to back up. Empty backs up every backup-enabled cluster, each in a Job of its own, under one backup name; with scheduleRef, every cluster the schedule backs up. Immutable"
+                  description: "Optional cluster of the ClickHouseInstallation to back up. Empty backs up every backup-enabled cluster, each in a run of its own, under one backup name; with scheduleRef, every cluster the schedule backs up. Immutable"
                   # Mirrors the ClickHouseInstallation cluster name constraint
                   maxLength: 15
                   pattern: "^[a-zA-Z0-9-]{0,15}$"
                 backupName: &TypeBackupName
                   type: string
                   description: |
-                    Optional explicit backup name, which must not end like the backups of a schedule (-YYYYMMDD-HHMMSS).
+                    Optional explicit backup name, which must not end like the backups of a schedule (-YYYYMMDDHHMMSS).
                     Generated from the resource name and the time the backup is due when empty. Not set with scheduleRef,
                     whose backup is named with the schedule's backupNamePrefix
                   maxLength: 128
@@ -5738,36 +5867,59 @@ spec:
                   minimum: 0
                   maximum: 2147483647
                   description: |
-                    How late, counted from the time the backup is due, it may start on a cluster: a cluster whose Job is not
+                    How late, counted from the time the backup is due, it may start on a cluster: a cluster whose run is not
                     created by then fails, as does the backup when it is not validated by then. Unset waits as long as it takes
                 diffFromRemote:
                   <<: *TypeBackupName
                   description: "Existing backup to take this backup incrementally against (clickhouse-backup --diff-from-remote). The base backup must stay in the backup storage while this backup is kept"
-                verify: &TypeStringBool
-                  description: "Run a verification Job after the backup that downloads it and checks it is restorable, without touching cluster data"
+                schemaOnly: &TypeStringBool
+                  description: "Back up table/database definitions only (no data)"
                   # StringBool is polymorphic — accepts native YAML bool (true/false),
                   # integer (0/1), or string from the recognized vocabulary.
                   # See pkg/apis/common/types/string_bool.go (UnmarshalJSON + IsValid).
                   # Structural-schema rules don't natively support bool|int|string
                   # union, so we use x-kubernetes-preserve-unknown-fields: true.
                   x-kubernetes-preserve-unknown-fields: true
-                schemaOnly:
-                  <<: *TypeStringBool
-                  description: "Back up table/database definitions only (no data)"
                 replicaSelection:
                   type: string
                   description: |
                     Which replicas to back up.
                     FirstPerShard (default) backs up one replica per shard, which is enough for Replicated* tables.
                     AllReplicas backs up every replica; use it when the cluster holds non-replicated tables.
+                    A shard counts as backed up once any of its replicas made the backup, AllReplicas included.
+                    AllReplicas needs a storage path and an object disk path of its own on every replica, as {replica}
+                    gives them: the replicas of a shard make a backup of one name at once, and the operator aborts a
+                    backup or a schedule whose paths, expanded with the macros of every host, they share
+                    (StoragePathConflict).
                   enum:
                     - FirstPerShard
                     - AllReplicas
                 tables:
-                  type: string
-                  description: "Optional clickhouse-backup --tables pattern, e.g. db.table or db.*, comma-separated. Empty backs up every table"
-                  maxLength: 1024
-                  pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
+                  type: array
+                  description: "Optional clickhouse-backup --tables patterns, one per item, e.g. db.table or db.*, joined by commas (at most 1024 characters). Empty backs up every table"
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    maxLength: 1024
+                    pattern: "^[A-Za-z0-9_.*?][A-Za-z0-9_.*?-]*$"
+                skipTables:
+                  type: array
+                  description: "Optional clickhouse-backup table patterns, one per item, e.g. db.tmp* or logs.*, of the tables the backup leaves out, on top of the system databases (CLICKHOUSE_SKIP_TABLES), joined by commas (at most 1024 characters)"
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    maxLength: 1024
+                    pattern: "^[A-Za-z0-9_.*?][A-Za-z0-9_.*?-]*$"
+                skipTableEngines:
+                  type: array
+                  description: "Optional table engines, e.g. Kafka, whose tables the backup leaves out (CLICKHOUSE_SKIP_TABLE_ENGINES)"
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    pattern: "^[A-Za-z][A-Za-z0-9_]{0,127}$"
                 partitions:
                   type: array
                   description: "Optional partition ids to back up (clickhouse-backup --partitions)"
@@ -5779,7 +5931,42 @@ spec:
                   type: integer
                   format: int64
                   minimum: 1
-                  description: "How long the Job may run before it is stopped and the operation fails. Defaults to 24 hours"
+                  maximum: 2147483647
+                  description: "How long the run may run before it is stopped and the operation fails. Defaults to 24 hours"
+                timeouts:
+                  type: object
+                  description: |
+                    How the operator waits for the commands of the backup on the clickhouse-backup sidecars. Every field is optional:
+                    one left unset is that of the schedule a backup runs (scheduleRef), else that of backup.timeouts of the
+                    operator configuration, else the built-in default
+                  properties:
+                    actionTimeout:
+                      type: string
+                      format: duration
+                      description: "How long the operator waits for one command on one host, a Go duration, e.g. 12h or 90m. Default 12h. At most 720h"
+                    unreachableTimeout:
+                      type: string
+                      format: duration
+                      description: "How long a host whose ClickHouse does not answer, or whose sidecar answers the URL engine with an error, is retried from the first error in a row before the host fails, a Go duration. Default 10m. At most 168h"
+                    errorResponsesMax:
+                      type: integer
+                      format: int32
+                      minimum: 1
+                      maximum: 1000
+                      description: "How many polls in a row may find no row of a submitted command before the operator takes it as lost, as after a restart of the sidecar. Default 5"
+                    httpReceiveTimeout:
+                      type: string
+                      format: duration
+                      description: "http_receive_timeout and http_send_timeout of every insert into system.backup_actions, a Go duration: a synchronous delete local or delete remote answers once it is done. Default 4h. At most 168h"
+                taskID:
+                  type: string
+                  description: |
+                    Reruns a backup that finished when it changes to a value status.taskID, taskIDsStarted and
+                    taskIDsCompleted do not record. A completed backup makes a new backup, named anew at the time of the
+                    rerun, and keeps the one it made in the storage (status.previousBackupNames); a completed backup named
+                    by backupName needs another backupName with the taskID. A backup that failed or was aborted makes its
+                    backup again under its name on the clusters it did not complete on, replacing the copies of it its
+                    runs there left. A value set while the backup runs reruns nothing
             status:
               type: object
               properties:
@@ -5791,6 +5978,7 @@ spec:
                     - Running
                     - Completed
                     - Failed
+                    - Aborted
                 backupName:
                   type: string
                   description: "Resolved backup name, the same on every cluster"
@@ -5816,6 +6004,96 @@ spec:
                     backupNamePrefix:
                       type: string
                       description: "The schedule's backupNamePrefix, which names the backup"
+                    schedules:
+                      type: array
+                      description: "The schedule's entries, which make the backup incremental and the retention after it, as after a scheduled run"
+                      items:
+                        type: object
+                        properties:
+                          period:
+                            type: string
+                          time:
+                            type: string
+                          day:
+                            type: integer
+                            format: int32
+                          keep:
+                            type: integer
+                            format: int32
+                          incremental:
+                            type: string
+                          configOverrides:
+                            type: array
+                            nullable: true
+                            items:
+                              type: string
+                    timeZone:
+                      type: string
+                      description: "The schedule's timeZone"
+                    keepBackups:
+                      type: array
+                      nullable: true
+                      description: "The schedule's retention.keepBackups, which the retention after the backup keeps beyond the entries"
+                      items:
+                        type: object
+                        required:
+                          - name
+                        properties:
+                          name:
+                            type: string
+                            description: "The name of the backup pinned"
+                          until:
+                            type: string
+                            format: date-time
+                            description: "When the pin ends, RFC 3339"
+                    previousSchedules:
+                      type: array
+                      nullable: true
+                      description: "The schedule's status.retention.previous, whose backups the retention after the backup holds"
+                      items:
+                        type: object
+                        required:
+                          - changeID
+                        properties:
+                          changeID:
+                            type: string
+                            description: "When the change was made, RFC 3339 in UTC, which identifies it"
+                          schedules:
+                            type: array
+                            nullable: true
+                            description: "The entries before the change"
+                            items:
+                              type: object
+                              properties:
+                                period:
+                                  type: string
+                                time:
+                                  type: string
+                                day:
+                                  type: integer
+                                  format: int32
+                                keep:
+                                  type: integer
+                                  format: int32
+                                incremental:
+                                  type: string
+                                configOverrides:
+                                  type: array
+                                  nullable: true
+                                  items:
+                                    type: string
+                          timeZone:
+                            type: string
+                            description: "The time zone before the change"
+                          keepAll:
+                            type: boolean
+                            description: "Holds every backup made before the change, whatever the entries, until expires: the oldest changes merged into one"
+                          expires:
+                            type: string
+                            description: |
+                              When every backup the change holds has expired, RFC 3339: a backup made before the change expires
+                              at the latest keep periods of the entry that lasts longest after the change; of a merge, the
+                              later of those of the changes merged
                     schemaOnly:
                       type: string
                       description: "The schedule's schemaOnly"
@@ -5823,8 +6101,23 @@ spec:
                       type: string
                       description: "The schedule's replicaSelection"
                     tables:
-                      type: string
+                      type: array
+                      nullable: true
                       description: "The schedule's tables"
+                      items:
+                        type: string
+                    skipTables:
+                      type: array
+                      nullable: true
+                      description: "The schedule's skipTables"
+                      items:
+                        type: string
+                    skipTableEngines:
+                      type: array
+                      nullable: true
+                      description: "The schedule's skipTableEngines"
+                      items:
+                        type: string
                     partitions:
                       type: array
                       nullable: true
@@ -5835,10 +6128,31 @@ spec:
                       type: integer
                       format: int64
                       description: "The schedule's activeDeadlineSeconds"
+                    timeouts:
+                      type: object
+                      description: |
+                        The schedule's timeouts, which those of the backup override field by field
+                      properties:
+                        actionTimeout:
+                          type: string
+                          format: duration
+                          description: "How long the operator waits for one command on one host, a Go duration, e.g. 12h or 90m. Default 12h. At most 720h"
+                        unreachableTimeout:
+                          type: string
+                          format: duration
+                          description: "How long a host whose ClickHouse does not answer, or whose sidecar answers the URL engine with an error, is retried from the first error in a row before the host fails, a Go duration. Default 10m. At most 168h"
+                        errorResponsesMax:
+                          type: integer
+                          format: int32
+                          description: "How many polls in a row may find no row of a submitted command before the operator takes it as lost, as after a restart of the sidecar. Default 5"
+                        httpReceiveTimeout:
+                          type: string
+                          format: duration
+                          description: "http_receive_timeout and http_send_timeout of every insert into system.backup_actions, a Go duration: a synchronous delete local or delete remote answers once it is done. Default 4h. At most 168h"
                 clusters:
                   type: array
                   description: |
-                    The clusters the backup targets, resolved once it is validated, each run by a Job of its own,
+                    The clusters the backup targets, resolved once it is validated, each run by a run of its own,
                     and the state of the backup on each
                   x-kubernetes-list-type: map
                   x-kubernetes-list-map-keys:
@@ -5859,18 +6173,16 @@ spec:
                           - Running
                           - Completed
                           - Failed
-                      jobName:
-                        type: string
-                        description: "Job that drives the backup on the cluster"
+                          - Aborted
                       hosts:
                         type: array
                         nullable: true
-                        description: "Hosts of the cluster the Job drives"
+                        description: "Hosts of the cluster the run drives"
                         items:
                           type: string
                       configSecret:
                         type: string
-                        description: "Secret of the clickhouse-backup configuration of the cluster the Job keeps the backup by, or reads it by, as the Job was built: the storage the backup lies in"
+                        description: "Secret of the clickhouse-backup configuration of the cluster the run keeps the backup by, or reads it by, as the run was built: the storage the backup lies in"
                       startTime:
                         type: string
                         format: date-time
@@ -5885,6 +6197,52 @@ spec:
                       message:
                         type: string
                         description: "Why the cluster waits, or how the backup went on it"
+                      run:
+                        type: object
+                        nullable: true
+                        description: "State of the run of the operation on the cluster, which the operator resumes after a restart"
+                        properties:
+                          operation:
+                            type: string
+                          step:
+                            type: string
+                          mutated:
+                            type: boolean
+                          hosts:
+                            type: array
+                            nullable: true
+                            items:
+                              type: object
+                              properties:
+                                host:
+                                  type: string
+                                backup:
+                                  type: string
+                                base:
+                                  type: string
+                          actions:
+                            type: array
+                            nullable: true
+                            description: "Commands the run inserted into system.backup_actions"
+                            items:
+                              type: object
+                              properties:
+                                step:
+                                  type: string
+                                host:
+                                  type: string
+                                command:
+                                  type: string
+                                timeFrom:
+                                  type: string
+                                status:
+                                  type: string
+                                error:
+                                  type: string
+                          plan:
+                            type: object
+                            nullable: true
+                            x-kubernetes-preserve-unknown-fields: true
                 startTime:
                   type: string
                   format: date-time
@@ -5896,6 +6254,78 @@ spec:
                 durationSeconds:
                   type: integer
                   format: int64
+                rerunTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  description: "When spec.taskID last reran the backup: the backup is due then, which names a new backup and starts its starting deadline"
+                previousBackupNames:
+                  type: array
+                  nullable: true
+                  description: "The backups the backup made before spec.taskID reran it once it completed, newest first, 10 at most: they stay in the storage, which retention or a delete by hand removes"
+                  items:
+                    type: string
+                previousRuns:
+                  type: array
+                  nullable: true
+                  description: |
+                    What the runs of the backup did on the clusters spec.taskID reran it on, under the same name: the rerun
+                    replaces the copies of the backup they left (creates of the backup)
+                  items:
+                    type: object
+                    required:
+                      - cluster
+                    properties:
+                      cluster:
+                        type: string
+                        description: "Name of the cluster"
+                      hosts:
+                        type: array
+                        nullable: true
+                        description: "Hosts the runs worked on, with the name of the backup on each"
+                        items:
+                          type: object
+                          properties:
+                            host:
+                              type: string
+                            backup:
+                              type: string
+                            base:
+                              type: string
+                      actions:
+                        type: array
+                        nullable: true
+                        description: "Commands of the runs that changed what the hosts keep"
+                        items:
+                          type: object
+                          properties:
+                            step:
+                              type: string
+                            host:
+                              type: string
+                            command:
+                              type: string
+                            timeFrom:
+                              type: string
+                            status:
+                              type: string
+                            error:
+                              type: string
+                taskID:
+                  type: string
+                  description: "The spec.taskID the resource acts on"
+                taskIDsStarted:
+                  type: array
+                  description: "The task ids the resource started acting on, newest first, 10 at most"
+                  nullable: true
+                  items:
+                    type: string
+                taskIDsCompleted:
+                  type: array
+                  description: "The task ids the resource is done with, newest first, 10 at most: the run each started finished, or the id came while a run was in progress and reran nothing"
+                  nullable: true
+                  items:
+                    type: string
                 conditions:
                   type: array
                   nullable: true
@@ -5950,10 +6380,10 @@ spec:
           description: Target cluster, empty means every backup-enabled cluster
           jsonPath: .spec.cluster
           priority: 1
-        - name: schedule
+        - name: phase
           type: string
-          description: Cron schedule
-          jsonPath: .spec.schedule
+          description: Schedule phase - Active, Suspended or Aborted
+          jsonPath: .status.phase
         - name: suspend
           type: string
           description: Whether the schedule is suspended by its spec
@@ -5964,7 +6394,7 @@ spec:
           jsonPath: .status.conditions[?(@.type=="Ready")].reason
         - name: last-schedule
           type: date
-          description: Last time a backup Job was scheduled
+          description: Last time a backup run was scheduled
           jsonPath: .status.lastScheduleTime
         - name: last-success
           type: date
@@ -5979,6 +6409,11 @@ spec:
           type: date
           description: Last time a scheduled backup failed
           jsonPath: .status.lastFailureTime
+        - name: taskID
+          type: string
+          description: Current task id
+          priority: 1
+          jsonPath: .status.taskID
         - name: age
           type: date
           jsonPath: .metadata.creationTimestamp
@@ -5988,9 +6423,10 @@ spec:
         openAPIV3Schema:
           description: |
             EXPERIMENTAL. ClickHouseBackupSchedule defines a recurring backup of a ClickHouseInstallation.
-            The operator runs one CronJob per backup-enabled cluster it targets, each driving the
-            clickhouse-backup sidecar it injects into the cluster (see ClickHouseInstallation spec.backup)
-            and, optionally, pruning old backups of this schedule there. The API may change in a future
+            The operator runs the schedule itself on every backup-enabled cluster it targets, at the slots of the
+            finest of its entries, driving clickhouse-backup on the cluster through SQL (see ClickHouseInstallation
+            spec.backup); a run lives in status.active and status.recentRuns, no resource is created for it; a run whose time matches coarser entries counts for them too. After a successful run
+            the backups of the schedule's series that no entry keeps are deleted. The API may change in a future
             release.
           type: object
           required:
@@ -6006,7 +6442,7 @@ spec:
               type: object
               required:
                 - clickHouseInstallation
-                - schedule
+                - schedules
               x-kubernetes-validations:
                 - rule: "self.clickHouseInstallation == oldSelf.clickHouseInstallation && (has(self.cluster) ? self.cluster : '') == (has(oldSelf.cluster) ? oldSelf.cluster : '')"
                   message: "clickHouseInstallation and cluster are immutable; create a new resource"
@@ -6020,57 +6456,109 @@ spec:
                   description: "Name of the target ClickHouseInstallation in the same namespace. Immutable"
                 cluster:
                   type: string
-                  description: "Optional cluster of the ClickHouseInstallation to back up. Empty backs up every backup-enabled cluster, each by a CronJob of its own. Immutable"
+                  description: "Optional cluster of the ClickHouseInstallation to back up. Empty backs up every backup-enabled cluster, each by a schedule of its own. Immutable"
                   # Mirrors the ClickHouseInstallation cluster name constraint
                   maxLength: 15
                   pattern: "^[a-zA-Z0-9-]{0,15}$"
-                schedule:
-                  type: string
-                  minLength: 1
-                  description: "Cron schedule in standard Kubernetes CronJob format, e.g. \"0 2 * * *\""
+                schedules:
+                  type: array
+                  minItems: 1
+                  description: |
+                    The periods the schedule backs up at, at most one entry per period. Every entry that sets a time sets the
+                    same, which an hour or 6hours entry that sets none takes, so every slot of a coarser entry is a slot of the
+                    finest one, whose slots the runs run at. A run matches its time against the entries: one backup
+                    is made, for the entry of the longest period it matches, and it counts for each of them. A weekly and a
+                    monthly entry need a daily or finer one beside them
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys:
+                    - period
+                  items:
+                    type: object
+                    required:
+                      - period
+                      - keep
+                    properties:
+                      period:
+                        type: string
+                        description: "How often the entry is due; a minute entry is due every minute, whatever its time"
+                        enum:
+                          - minute
+                          - hour
+                          - 6hours
+                          - daily
+                          - weekly
+                          - monthly
+                      time:
+                        type: string
+                        description: |
+                          HH:MM the entry is due at, in timeZone. Required for daily, weekly and monthly. For hour only its
+                          minute is used, for 6hours its hour modulo 6 and its minute; empty takes the time the other entries
+                          set, 00:00 when none does
+                        pattern: "^(([01][0-9]|2[0-3]):[0-5][0-9])?$"
+                      day:
+                        type: integer
+                        format: int32
+                        minimum: 0
+                        maximum: 31
+                        description: |
+                          Day the entry is due on: for weekly 0..6, 0 being Sunday; for monthly 1..31, a day past the end
+                          of a shorter month meaning its last day. Required for weekly and monthly, not set otherwise
+                      keep:
+                        type: integer
+                        format: int32
+                        minimum: 1
+                        description: "How many of the newest backups made at the slots of the entry are kept, at least 1"
+                      incremental:
+                        # A StringBool, polymorphic as suspend below
+                        x-kubernetes-preserve-unknown-fields: true
+                        description: |
+                          Make the runs of the entry incremental backups on the newest backup of the series while the chain
+                          of incremental backups is shorter than keep; the run after makes a full backup again. At most one
+                          entry
+                      configOverrides:
+                        type: array
+                        nullable: true
+                        maxItems: 16
+                        x-kubernetes-list-type: set
+                        description: |
+                          clickhouse-backup settings the runs of the entry make their backups with in place of those of the
+                          sidecar, KEY=VALUE of the env var of the setting, e.g. S3_STORAGE_CLASS=GLACIER_IR; a leading --env= is
+                          stripped. Those of the heaviest entry of a slot apply. Not the settings the operator sets, those of
+                          where the backups are, of the API or of secrets
+                        items:
+                          type: string
+                          pattern: '^(--env=)?[A-Z][A-Z0-9_]{0,63}=[A-Za-z0-9_.,:/@+=-]{1,256}$'
                 timeZone:
                   type: string
                   maxLength: 64
                   description: |
-                    IANA time zone the schedule is read in, e.g. Europe/Berlin, as the CronJob's timeZone. Empty reads it in
-                    the time zone of the Kubernetes controller manager, UTC as a rule. Backup names carry UTC times either way
+                    IANA time zone the schedules are read in, e.g. Europe/Berlin, . Empty reads them in UTC
                 suspend: &TypeStringBool
-                  description: "Pause creation of new backup Jobs. Jobs already running are not affected"
+                  description: "Pause new runs. A run in progress goes on"
                   # StringBool is polymorphic — accepts native YAML bool (true/false),
                   # integer (0/1), or string from the recognized vocabulary.
                   # See pkg/apis/common/types/string_bool.go (UnmarshalJSON + IsValid).
                   # Structural-schema rules don't natively support bool|int|string
                   # union, so we use x-kubernetes-preserve-unknown-fields: true.
                   x-kubernetes-preserve-unknown-fields: true
-                concurrencyPolicy:
-                  type: string
-                  description: |
-                    How to treat a run that is due while the previous one is still running.
-                    Forbid (default) starts the new run only once the running one has finished, and not at all past
-                    startingDeadlineSeconds; Allow runs both; Replace stops the running one.
-                  enum:
-                    - Allow
-                    - Forbid
-                    - Replace
                 startingDeadlineSeconds:
                   type: integer
                   format: int64
                   minimum: 0
+                  maximum: 2147483647
                   description: "Deadline in seconds for starting a run that missed its scheduled time"
-                successfulJobsHistoryLimit:
+                successfulRunsHistoryLimit:
                   type: integer
                   format: int32
                   minimum: 1
                   description: |
-                    How many successful finished Jobs to keep, at least 1: the operator learns from the Job of a run
-                    the backup it made, whether that backup holds data and the hosts it backed up. Defaults to 3
-                failedJobsHistoryLimit:
+                    How many successful finished runs status.recentRuns keeps, at least 1. Defaults to 3
+                failedRunsHistoryLimit:
                   type: integer
                   format: int32
                   minimum: 1
                   description: |
-                    How many failed finished Jobs to keep, at least 1: the operator learns from the Job of a run why
-                    it failed and the hosts it backed up. Defaults to 1
+                    How many failed finished runs status.recentRuns keeps, at least 1. Defaults to 1
                 schemaOnly:
                   <<: *TypeStringBool
                   description: "Back up table/database definitions only (no data)"
@@ -6080,14 +6568,40 @@ spec:
                     Which replicas to back up.
                     FirstPerShard (default) backs up one replica per shard, which is enough for Replicated* tables.
                     AllReplicas backs up every replica; use it when the cluster holds non-replicated tables.
+                    A shard counts as backed up once any of its replicas made the backup, AllReplicas included.
+                    AllReplicas needs a storage path and an object disk path of its own on every replica, as {replica}
+                    gives them: the replicas of a shard make a backup of one name at once, and the operator aborts a
+                    backup or a schedule whose paths, expanded with the macros of every host, they share
+                    (StoragePathConflict).
                   enum:
                     - FirstPerShard
                     - AllReplicas
                 tables:
-                  type: string
-                  description: "Optional clickhouse-backup --tables pattern, e.g. db.table or db.*, comma-separated. Empty backs up every table"
-                  maxLength: 1024
-                  pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
+                  type: array
+                  description: "Optional clickhouse-backup --tables patterns, one per item, e.g. db.table or db.*, joined by commas (at most 1024 characters). Empty backs up every table"
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    maxLength: 1024
+                    pattern: "^[A-Za-z0-9_.*?][A-Za-z0-9_.*?-]*$"
+                skipTables:
+                  type: array
+                  description: "Optional clickhouse-backup table patterns, one per item, e.g. db.tmp* or logs.*, of the tables the backup leaves out, on top of the system databases (CLICKHOUSE_SKIP_TABLES), joined by commas (at most 1024 characters)"
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    maxLength: 1024
+                    pattern: "^[A-Za-z0-9_.*?][A-Za-z0-9_.*?-]*$"
+                skipTableEngines:
+                  type: array
+                  description: "Optional table engines, e.g. Kafka, whose tables the backup leaves out (CLICKHOUSE_SKIP_TABLE_ENGINES)"
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    pattern: "^[A-Za-z][A-Za-z0-9_]{0,127}$"
                 partitions:
                   type: array
                   description: "Optional partition ids to back up (clickhouse-backup --partitions)"
@@ -6099,14 +6613,40 @@ spec:
                   type: integer
                   format: int64
                   minimum: 1
-                  description: "How long each backup Job may run before it is stopped and the run fails. Defaults to 24 hours"
+                  maximum: 2147483647
+                  description: "How long each backup run may run before it is stopped and the run fails. Defaults to 24 hours"
+                timeouts:
+                  type: object
+                  description: |
+                    How the operator waits for the commands of every run of the schedule, and of a ClickHouseBackup that runs it
+                    (scheduleRef) and sets none of its own, on the clickhouse-backup sidecars. Every field is optional: one left
+                    unset is that of backup.timeouts of the operator configuration, else the built-in default
+                  properties:
+                    actionTimeout:
+                      type: string
+                      format: duration
+                      description: "How long the operator waits for one command on one host, a Go duration, e.g. 12h or 90m. Default 12h. At most 720h"
+                    unreachableTimeout:
+                      type: string
+                      format: duration
+                      description: "How long a host whose ClickHouse does not answer, or whose sidecar answers the URL engine with an error, is retried from the first error in a row before the host fails, a Go duration. Default 10m. At most 168h"
+                    errorResponsesMax:
+                      type: integer
+                      format: int32
+                      minimum: 1
+                      maximum: 1000
+                      description: "How many polls in a row may find no row of a submitted command before the operator takes it as lost, as after a restart of the sidecar. Default 5"
+                    httpReceiveTimeout:
+                      type: string
+                      format: duration
+                      description: "http_receive_timeout and http_send_timeout of every insert into system.backup_actions, a Go duration: a synchronous delete local or delete remote answers once it is done. Default 4h. At most 168h"
                 backupNamePrefix:
                   type: string
                   description: |
-                    Prefix of the backup names; each run appends the UTC time it was due. Retention only
-                    ever prunes backups named with this prefix and such a time. Defaults to
+                    Prefix of the backup names; each run appends the time it was due, -YYYYMMDDHHMMSS.
+                    Retention only ever prunes backups named with this prefix and such a time. Defaults to
                     "<namespace>-<installation>-<schedule>", shortened with a hash when longer. At most
-                    112 characters, so the name with its "-YYYYMMDD-HHMMSS" suffix stays within 128.
+                    112 characters, so the name with its suffix stays within 128.
                     Can be set once and is immutable after, as a changed prefix would leave the backups of the
                     former series unpruned. Set later, it replaces the default prefix the same way: meant for a
                     schedule that has not run yet, such as one held for a recovery
@@ -6115,24 +6655,107 @@ spec:
                 retention:
                   type: object
                   description: |
-                    Which backups of the schedule are deleted: a rule of the series of backups named with its backupNamePrefix
-                    and the time of a run, not of any one backup. Backups of other names, one-off backups and those that run
-                    the schedule once among them, are never deleted by it
+                    What retention keeps beyond the entries: backups pinned by name, and the backups the schedule kept
+                    before a change of its entries or time zone, held until they expire as that schedule would have deleted
+                    them, or until released
                   properties:
-                    keepLast:
-                      type: integer
-                      format: int32
-                      minimum: 0
+                    onScheduleChange:
+                      type: string
                       description: |
-                        After each successful run keep the N most recent backups of the series that hold data, and apart from
-                        them the N most recent that hold none, and delete older ones. 0 (default) keeps every backup
+                        What retention does with the backups the entries kept before a change of the entries or of the
+                        time zone: Hold (default) keeps each until it expires as the entries before the change would have
+                        deleted it, or until releaseHeld releases the change, and lists in status.clusters[].heldBackups those
+                        the schedule as it is would delete, with when each expires; Prune applies the change at once
+                      enum:
+                        - ""
+                        - Hold
+                        - Prune
+                    keepBackups:
+                      type: array
+                      nullable: true
+                      maxItems: 512
+                      description: |
+                        Backups retention keeps beyond the entries, as the Altinity usual backup workflow keeps the backups its
+                        dialog of a schedule change pins and those made by hand, each until its until, or without one: a backup
+                        the schedule kept before a change of it until it expires as that schedule would have deleted it, any
+                        other as long as it is listed
+                      items:
+                        type: object
+                        required:
+                          - name
+                        properties:
+                          name:
+                            type: string
+                            maxLength: 128
+                            pattern: '^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$'
+                            description: |
+                              The name of the backup, or with a naming template the name of the backup of any shard, or the
+                              time alone when the template holds no {prefix}
+                          until:
+                            type: string
+                            format: date-time
+                            description: |
+                              When the pin ends, RFC 3339 such as 2026-12-31T00:00:00Z: retention keeps the backup until then,
+                              and treats it as any other backup after
+                    releaseHeld:
+                      type: string
+                      description: |
+                        The changeID of status.retention.previous whose held backups, and those of every earlier change, are
+                        released: the next run deletes those neither the entries nor keepBackups keep. A later change is never
+                        released by it
+                taskID:
+                  type: string
+                  description: |
+                    Resets a schedule that is aborted when it changes to a value status.taskID, taskIDsStarted and
+                    taskIDsCompleted do not record: the schedule is validated again at once and its phase told anew. It
+                    runs no slot by itself
             status:
               type: object
               properties:
+                phase:
+                  type: string
+                  description: "Phase of the schedule"
+                  enum:
+                    - Active
+                    - Suspended
+                    - Aborted
+                reason:
+                  type: string
+                  description: "Why the schedule is in its phase, in one word"
+                message:
+                  type: string
+                  description: "Why the schedule is in its phase, in a sentence"
+                nextScheduleTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  description: "Next time a run of the runs matches an entry of the schedule"
+                entries:
+                  type: array
+                  description: "State of the runs of each entry of the schedule"
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys:
+                    - period
+                  items:
+                    type: object
+                    required:
+                      - period
+                    properties:
+                      period:
+                        type: string
+                        description: "Period of the entry"
+                      lastScheduleTime:
+                        type: string
+                        format: date-time
+                        nullable: true
+                        description: "Last time a run matching the entry was scheduled, made for it or for a coarser entry that matched as well"
+                      lastBackupName:
+                        type: string
+                        description: "Backup the last successful run matching the entry made"
                 clusters:
                   type: array
                   description: |
-                    The clusters the schedule backs up, each by a CronJob of its own, and a cluster it no longer backs up
+                    The clusters the schedule backs up, and a cluster it no longer backs up
                     while retention leaves backups of it unpruned, with the state of the runs on each
                   x-kubernetes-list-type: map
                   x-kubernetes-list-map-keys:
@@ -6145,22 +6768,19 @@ spec:
                       name:
                         type: string
                         description: "Name of the cluster"
-                      cronJobName:
-                        type: string
-                        description: "Name of the CronJob that runs the schedule on the cluster"
                       configSecret:
                         type: string
-                        description: "Secret of the clickhouse-backup configuration the runs of the cluster keep their backups by, as its CronJob was last built: for a cluster that lost its CronJob, the storage its unpruned backups lie in"
+                        description: "Secret of the clickhouse-backup configuration the runs of the cluster keep their backups by, as its schedule was last built: for a cluster that lost its schedule, the storage its unpruned backups lie in"
                       lastScheduleTime:
                         type: string
                         format: date-time
                         nullable: true
-                        description: "Last time a backup Job was scheduled on the cluster"
+                        description: "Last time a backup run was scheduled on the cluster"
                       lastSuccessfulTime:
                         type: string
                         format: date-time
                         nullable: true
-                        description: "Last time a scheduled backup Job of the cluster completed successfully"
+                        description: "Last time a scheduled backup run of the cluster completed successfully"
                       lastBackupName:
                         type: string
                         description: "Backup the last successful scheduled run of the cluster made"
@@ -6168,10 +6788,10 @@ spec:
                         type: string
                         format: date-time
                         nullable: true
-                        description: "Last time a scheduled backup Job of the cluster failed"
+                        description: "Last time a scheduled backup run of the cluster failed"
                       lastFailureMessage:
                         type: string
-                        description: "Why the last failed scheduled backup Job of the cluster failed"
+                        description: "Why the last failed scheduled backup run of the cluster failed"
                       retentionHosts:
                         type: array
                         nullable: true
@@ -6189,11 +6809,30 @@ spec:
                           rejoins retentionHosts is dropped from it.
                         items:
                           type: string
+                      heldBackups:
+                        type: array
+                        nullable: true
+                        description: |
+                          Backups the last successful scheduled run of the cluster found held for a change of the schedule,
+                          status.retention.previous, which the schedule as it is would delete, with when each expires: add
+                          those to keep longer to spec.retention.keepBackups with an until, or release the change at once with
+                          spec.retention.releaseHeld
+                        items:
+                          type: object
+                          required:
+                            - name
+                          properties:
+                            name:
+                              type: string
+                              description: "The name of the backup, with a naming template that of the backup of the first shard"
+                            expires:
+                              type: string
+                              description: "When the hold ends, RFC 3339, as the schedule before the change would have deleted the backup; empty for never"
                 lastScheduleTime:
                   type: string
                   format: date-time
                   nullable: true
-                  description: "Last time a backup Job was scheduled on any cluster"
+                  description: "Last time a backup run was scheduled on any cluster"
                 lastSuccessfulTime:
                   type: string
                   format: date-time
@@ -6206,10 +6845,306 @@ spec:
                   type: string
                   format: date-time
                   nullable: true
-                  description: "Last time a scheduled backup Job failed on any cluster"
+                  description: "Last time a scheduled backup run failed on any cluster"
                 lastFailureMessage:
                   type: string
-                  description: "Why the last failed scheduled backup Job failed"
+                  description: "Why the last failed scheduled backup run failed"
+                retention:
+                  type: object
+                  description: "The entries and time zone the runs apply, and the changes of them whose backups retention holds"
+                  properties:
+                    appliedSchedules:
+                      type: array
+                      nullable: true
+                      description: "The entries the runs apply"
+                      items:
+                        type: object
+                        properties:
+                          period:
+                            type: string
+                          time:
+                            type: string
+                          day:
+                            type: integer
+                            format: int32
+                          keep:
+                            type: integer
+                            format: int32
+                          incremental:
+                            type: string
+                          configOverrides:
+                            type: array
+                            nullable: true
+                            items:
+                              type: string
+                    appliedTimeZone:
+                      type: string
+                      description: "The time zone the runs apply"
+                    previous:
+                      type: array
+                      nullable: true
+                      description: "The entries and time zones before each change not released yet, oldest first: retention keeps every backup they kept when the change was made, until it expires; a change is dropped once all of them have, at its expires"
+                      items:
+                        type: object
+                        required:
+                          - changeID
+                        properties:
+                          changeID:
+                            type: string
+                            description: "When the change was made, RFC 3339 in UTC, which identifies it"
+                          schedules:
+                            type: array
+                            nullable: true
+                            description: "The entries before the change"
+                            items:
+                              type: object
+                              properties:
+                                period:
+                                  type: string
+                                time:
+                                  type: string
+                                day:
+                                  type: integer
+                                  format: int32
+                                keep:
+                                  type: integer
+                                  format: int32
+                                incremental:
+                                  type: string
+                                configOverrides:
+                                  type: array
+                                  nullable: true
+                                  items:
+                                    type: string
+                          timeZone:
+                            type: string
+                            description: "The time zone before the change"
+                          keepAll:
+                            type: boolean
+                            description: "Holds every backup made before the change, whatever the entries, until expires: the oldest changes merged into one"
+                          expires:
+                            type: string
+                            description: |
+                              When every backup the change holds has expired, RFC 3339: a backup made before the change expires
+                              at the latest keep periods of the entry that lasts longest after the change; of a merge, the
+                              later of those of the changes merged
+                    changeID:
+                      type: string
+                      description: "The changeID of the newest change of previous, which spec.retention.releaseHeld releases with every earlier one"
+                active:
+                  type: array
+                  nullable: true
+                  description: "Runs in progress, one per cluster at most, which the operator resumes after a restart"
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys:
+                    - name
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - slot
+                    properties:
+                      slot:
+                        type: string
+                        format: date-time
+                        description: "Time the run was due"
+                      backupName:
+                        type: string
+                        description: "Backup the run makes, with a naming template the backup of the first shard"
+                      name:
+                        type: string
+                        description: "Name of the cluster"
+                      phase:
+                        type: string
+                        description: "Lifecycle phase of the run on the cluster"
+                        enum:
+                          - Pending
+                          - Running
+                          - Completed
+                          - Failed
+                          - Aborted
+                      hosts:
+                        type: array
+                        nullable: true
+                        description: "Hosts of the cluster the run drives"
+                        items:
+                          type: string
+                      configSecret:
+                        type: string
+                        description: "Secret of the clickhouse-backup configuration of the cluster the run keeps the backup by, or reads it by, as the run was built: the storage the backup lies in"
+                      startTime:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      completionTime:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      reason:
+                        type: string
+                        description: "Why the cluster waits, or how the run went on it, in one word"
+                      message:
+                        type: string
+                        description: "Why the cluster waits, or how the run went on it"
+                      run:
+                        type: object
+                        nullable: true
+                        description: "State of the run of the operation on the cluster, which the operator resumes after a restart"
+                        properties:
+                          operation:
+                            type: string
+                          step:
+                            type: string
+                          mutated:
+                            type: boolean
+                          hosts:
+                            type: array
+                            nullable: true
+                            items:
+                              type: object
+                              properties:
+                                host:
+                                  type: string
+                                backup:
+                                  type: string
+                                base:
+                                  type: string
+                          actions:
+                            type: array
+                            nullable: true
+                            description: "Commands the run inserted into system.backup_actions"
+                            items:
+                              type: object
+                              properties:
+                                step:
+                                  type: string
+                                host:
+                                  type: string
+                                command:
+                                  type: string
+                                timeFrom:
+                                  type: string
+                                status:
+                                  type: string
+                                error:
+                                  type: string
+                          plan:
+                            type: object
+                            nullable: true
+                            x-kubernetes-preserve-unknown-fields: true
+                recentRuns:
+                  type: array
+                  nullable: true
+                  description: "Newest finished runs, newest first, as many as successfulRunsHistoryLimit and failedRunsHistoryLimit keep"
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - slot
+                    properties:
+                      slot:
+                        type: string
+                        format: date-time
+                        description: "Time the run was due"
+                      backupName:
+                        type: string
+                        description: "Backup the run makes, with a naming template the backup of the first shard"
+                      name:
+                        type: string
+                        description: "Name of the cluster"
+                      phase:
+                        type: string
+                        description: "Lifecycle phase of the run on the cluster"
+                        enum:
+                          - Pending
+                          - Running
+                          - Completed
+                          - Failed
+                          - Aborted
+                      hosts:
+                        type: array
+                        nullable: true
+                        description: "Hosts of the cluster the run drives"
+                        items:
+                          type: string
+                      configSecret:
+                        type: string
+                        description: "Secret of the clickhouse-backup configuration of the cluster the run keeps the backup by, or reads it by, as the run was built: the storage the backup lies in"
+                      startTime:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      completionTime:
+                        type: string
+                        format: date-time
+                        nullable: true
+                      reason:
+                        type: string
+                        description: "Why the cluster waits, or how the run went on it, in one word"
+                      message:
+                        type: string
+                        description: "Why the cluster waits, or how the run went on it"
+                      run:
+                        type: object
+                        nullable: true
+                        description: "State of the run of the operation on the cluster, which the operator resumes after a restart"
+                        properties:
+                          operation:
+                            type: string
+                          step:
+                            type: string
+                          mutated:
+                            type: boolean
+                          hosts:
+                            type: array
+                            nullable: true
+                            items:
+                              type: object
+                              properties:
+                                host:
+                                  type: string
+                                backup:
+                                  type: string
+                                base:
+                                  type: string
+                          actions:
+                            type: array
+                            nullable: true
+                            description: "Commands the run inserted into system.backup_actions"
+                            items:
+                              type: object
+                              properties:
+                                step:
+                                  type: string
+                                host:
+                                  type: string
+                                command:
+                                  type: string
+                                timeFrom:
+                                  type: string
+                                status:
+                                  type: string
+                                error:
+                                  type: string
+                          plan:
+                            type: object
+                            nullable: true
+                            x-kubernetes-preserve-unknown-fields: true
+                taskID:
+                  type: string
+                  description: "The spec.taskID the resource acts on"
+                taskIDsStarted:
+                  type: array
+                  description: "The task ids the resource started acting on, newest first, 10 at most"
+                  nullable: true
+                  items:
+                    type: string
+                taskIDsCompleted:
+                  type: array
+                  description: "The task ids the resource is done with, newest first, 10 at most: the run each started finished, or the id came while a run was in progress and reran nothing"
+                  nullable: true
+                  items:
+                    type: string
                 conditions:
                   type: array
                   nullable: true
@@ -6266,7 +7201,7 @@ spec:
           priority: 1
         - name: backup
           type: string
-          description: Backup the restore Job restores
+          description: Backup the restore run restores
           jsonPath: .status.backupName
         - name: phase
           type: string
@@ -6276,6 +7211,11 @@ spec:
           type: integer
           description: Restore duration (seconds)
           jsonPath: .status.durationSeconds
+        - name: taskID
+          type: string
+          description: Current task id
+          priority: 1
+          jsonPath: .status.taskID
         - name: age
           type: date
           jsonPath: .metadata.creationTimestamp
@@ -6285,7 +7225,7 @@ spec:
         openAPIV3Schema:
           description: |
             EXPERIMENTAL. ClickHouseRestore defines a one-off restore of a backup into a
-            ClickHouseInstallation. The operator runs one Job per backup-enabled cluster it targets,
+            ClickHouseInstallation. The operator runs one run per backup-enabled cluster it targets,
             each driving the clickhouse-backup sidecar it injects into the cluster (see
             ClickHouseInstallation spec.backup). Restoring into a fresh, empty installation is
             recommended. The API may change in a future release.
@@ -6317,7 +7257,7 @@ spec:
                   description: "Name of the target ClickHouseInstallation in the same namespace (a fresh, empty installation is recommended). Immutable"
                 cluster:
                   type: string
-                  description: "Optional cluster of the ClickHouseInstallation to restore into. Empty restores every backup-enabled cluster, each in a Job of its own. Immutable"
+                  description: "Optional cluster of the ClickHouseInstallation to restore into. Empty restores every backup-enabled cluster, each in a run of its own. Immutable"
                   # Mirrors the ClickHouseInstallation cluster name constraint
                   maxLength: 15
                   pattern: "^[a-zA-Z0-9-]{0,15}$"
@@ -6350,25 +7290,112 @@ spec:
                   x-kubernetes-preserve-unknown-fields: true
                 overwrite:
                   <<: *TypeStringBool
-                  description: "Allow restoring over existing tables, which are dropped first. When false (default) the restore is refused if any target host already holds user tables"
+                  description: "Without tables, recreate the databases of the backup whole (clickhouse-backup restore --rm), dropping their tables the backup does not hold. With tables, or when false (default), only the tables of the backup are recreated - clickhouse-backup drops those that exist anyway - and every other table is left alone"
                 validateTopology:
                   <<: *TypeStringBool
                   description: "When true (default) the restore is refused unless every target shard holds the backup, so a backup taken from a different layout is not half-applied"
                 tables:
-                  type: string
-                  description: "Optional clickhouse-backup --tables pattern, e.g. db.table or db.*, comma-separated, restricting the schema and the data restored. Empty restores every table"
-                  maxLength: 1024
-                  pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
+                  type: array
+                  description: "Optional clickhouse-backup --tables patterns, one per item, e.g. db.table or db.*, joined by commas (at most 1024 characters), restricting the schema and the data restored. Empty restores every table"
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    maxLength: 1024
+                    pattern: "^[A-Za-z0-9_.*?][A-Za-z0-9_.*?-]*$"
+                partitions:
+                  type: array
+                  description: "Optional partition ids the restore is restricted to (clickhouse-backup --partitions): their data is downloaded and attached into the existing tables, replacing those partitions, and the schema is not restored, as the Altinity usual backup workflow restores partitions. Not with schemaOnly or rbac"
+                  nullable: true
+                  items:
+                    type: string
+                    pattern: "^[A-Za-z0-9_-]{1,128}$"
+                skipTables:
+                  type: array
+                  description: "Optional clickhouse-backup table patterns, one per item, e.g. db.tmp* or logs.*, of the tables the restore leaves out, on top of the system databases (CLICKHOUSE_SKIP_TABLES), joined by commas (at most 1024 characters)"
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    maxLength: 1024
+                    pattern: "^[A-Za-z0-9_.*?][A-Za-z0-9_.*?-]*$"
+                skipTableEngines:
+                  type: array
+                  description: "Optional table engines, e.g. Kafka, whose tables the restore leaves out (CLICKHOUSE_SKIP_TABLE_ENGINES)"
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    pattern: "^[A-Za-z][A-Za-z0-9_]{0,127}$"
+                databaseMapping:
+                  type: object
+                  description: |
+                    Optional mapping of the databases of the backup, the keys, to the databases the restore restores their tables into,
+                    the values (clickhouse-backup --restore-database-mapping)
+                  additionalProperties:
+                    type: string
+                    pattern: "^[A-Za-z0-9_][A-Za-z0-9_-]{0,127}$"
                 rbac:
                   <<: *TypeStringBool
                   description: |
                     Also restore the users, roles, grants and other access entities the backup holds. They belong to the
                     whole installation, so only a restore with an empty cluster may set it. Needs ClickHouse 23.3 or later
+                replicatedCopyToDetached:
+                  <<: *TypeStringBool
+                  description: |
+                    When true (default), every replica of a shard downloads the data: the replicas but the first one copy
+                    it into the detached directories of their Replicated*MergeTree tables (clickhouse-backup restore --data
+                    --replicated-copy-to-detached), all at once, then the first replica attaches it, and the other replicas
+                    take the parts replication tells them of from their own detached directories instead of fetching them
+                    over the network. A first replica that does not answer leaves the data to the next replica of its shard.
+                    When false, the replicas but the first one download the schema alone (clickhouse-backup download
+                    --schema), and fetch the data the first replica attaches by replication: less disk and download, more
+                    replication traffic
+                resumeDownload:
+                  <<: *TypeStringBool
+                  description: |
+                    When true (default), a rerun of the restore by spec.taskID resumes the downloads its earlier runs left on
+                    each host (clickhouse-backup download --hardlink-exists-files), from another installation too, where the
+                    preflight checks the local copy an earlier run downloaded instead of downloading the schema over it.
+                    When false, a rerun deletes the local copies of the backup its earlier runs downloaded (clickhouse-backup
+                    delete local) and downloads the backup again. The first run of the restore is the same either way
                 activeDeadlineSeconds:
                   type: integer
                   format: int64
                   minimum: 1
-                  description: "How long the restore Job may run before it is stopped and the restore fails. Defaults to 24 hours"
+                  maximum: 2147483647
+                  description: "How long the restore run may run before it is stopped and the restore fails. Defaults to 24 hours"
+                timeouts:
+                  type: object
+                  description: |
+                    How the operator waits for the commands of the restore on the clickhouse-backup sidecars. Every field is
+                    optional: one left unset is that of backup.timeouts of the operator configuration, else the built-in default
+                  properties:
+                    actionTimeout:
+                      type: string
+                      format: duration
+                      description: "How long the operator waits for one command on one host, a Go duration, e.g. 12h or 90m. Default 12h. At most 720h"
+                    unreachableTimeout:
+                      type: string
+                      format: duration
+                      description: "How long a host whose ClickHouse does not answer, or whose sidecar answers the URL engine with an error, is retried from the first error in a row before the host fails, a Go duration. Default 10m. At most 168h"
+                    errorResponsesMax:
+                      type: integer
+                      format: int32
+                      minimum: 1
+                      maximum: 1000
+                      description: "How many polls in a row may find no row of a submitted command before the operator takes it as lost, as after a restart of the sidecar. Default 5"
+                    httpReceiveTimeout:
+                      type: string
+                      format: duration
+                      description: "http_receive_timeout and http_send_timeout of every insert into system.backup_actions, a Go duration: a synchronous delete local or delete remote answers once it is done. Default 4h. At most 168h"
+                taskID:
+                  type: string
+                  description: |
+                    Reruns a restore that failed or was aborted when it changes to a value status.taskID, taskIDsStarted
+                    and taskIDsCompleted do not record: the restore runs again on the clusters it did not complete on,
+                    resuming the downloads its runs there made (status.previousRuns). A completed restore, or one that
+                    runs, is not rerun
             status:
               type: object
               properties:
@@ -6380,16 +7407,17 @@ spec:
                     - Running
                     - Completed
                     - Failed
+                    - Aborted
                 backupName:
                   type: string
-                  description: "Backup the restore Jobs restore, as it was when the first Job was created"
+                  description: "Backup the restore runs restore, as it was when the first run was created"
                 cluster:
                   type: string
                   description: "Cluster spec.cluster named when the restore was validated, empty for every backup-enabled cluster: what the restore holds and whether it restores access entities follow it"
                 clusters:
                   type: array
                   description: |
-                    The clusters the restore targets, resolved once it is validated, each run by a Job of its own,
+                    The clusters the restore targets, resolved once it is validated, each run by a run of its own,
                     and the state of the restore on each
                   x-kubernetes-list-type: map
                   x-kubernetes-list-map-keys:
@@ -6410,18 +7438,16 @@ spec:
                           - Running
                           - Completed
                           - Failed
-                      jobName:
-                        type: string
-                        description: "Job that drives the restore on the cluster"
+                          - Aborted
                       hosts:
                         type: array
                         nullable: true
-                        description: "Hosts of the cluster the Job drives"
+                        description: "Hosts of the cluster the run drives"
                         items:
                           type: string
                       configSecret:
                         type: string
-                        description: "Secret of the clickhouse-backup configuration of the cluster the Job keeps the backup by, or reads it by, as the Job was built: the storage the backup lies in"
+                        description: "Secret of the clickhouse-backup configuration of the cluster the run keeps the backup by, or reads it by, as the run was built: the storage the backup lies in"
                       startTime:
                         type: string
                         format: date-time
@@ -6436,6 +7462,52 @@ spec:
                       message:
                         type: string
                         description: "Why the cluster waits, or how the restore went on it"
+                      run:
+                        type: object
+                        nullable: true
+                        description: "State of the run of the operation on the cluster, which the operator resumes after a restart"
+                        properties:
+                          operation:
+                            type: string
+                          step:
+                            type: string
+                          mutated:
+                            type: boolean
+                          hosts:
+                            type: array
+                            nullable: true
+                            items:
+                              type: object
+                              properties:
+                                host:
+                                  type: string
+                                backup:
+                                  type: string
+                                base:
+                                  type: string
+                          actions:
+                            type: array
+                            nullable: true
+                            description: "Commands the run inserted into system.backup_actions"
+                            items:
+                              type: object
+                              properties:
+                                step:
+                                  type: string
+                                host:
+                                  type: string
+                                command:
+                                  type: string
+                                timeFrom:
+                                  type: string
+                                status:
+                                  type: string
+                                error:
+                                  type: string
+                          plan:
+                            type: object
+                            nullable: true
+                            x-kubernetes-preserve-unknown-fields: true
                 startTime:
                   type: string
                   format: date-time
@@ -6447,6 +7519,68 @@ spec:
                 durationSeconds:
                   type: integer
                   format: int64
+                previousRuns:
+                  type: array
+                  nullable: true
+                  description: |
+                    What the runs of the restore did on the clusters spec.taskID reran it on: the rerun resumes the downloads
+                    they made, which a restore from another installation would otherwise refuse as local copies it did not
+                    download
+                  items:
+                    type: object
+                    required:
+                      - cluster
+                    properties:
+                      cluster:
+                        type: string
+                        description: "Name of the cluster"
+                      hosts:
+                        type: array
+                        nullable: true
+                        description: "Hosts the runs worked on, with the name of the backup on each"
+                        items:
+                          type: object
+                          properties:
+                            host:
+                              type: string
+                            backup:
+                              type: string
+                            base:
+                              type: string
+                      actions:
+                        type: array
+                        nullable: true
+                        description: "Commands of the runs that changed what the hosts keep"
+                        items:
+                          type: object
+                          properties:
+                            step:
+                              type: string
+                            host:
+                              type: string
+                            command:
+                              type: string
+                            timeFrom:
+                              type: string
+                            status:
+                              type: string
+                            error:
+                              type: string
+                taskID:
+                  type: string
+                  description: "The spec.taskID the resource acts on"
+                taskIDsStarted:
+                  type: array
+                  description: "The task ids the resource started acting on, newest first, 10 at most"
+                  nullable: true
+                  items:
+                    type: string
+                taskIDsCompleted:
+                  type: array
+                  description: "The task ids the resource is done with, newest first, 10 at most: the run each started finished, or the id came while a run was in progress and reran nothing"
+                  nullable: true
+                  items:
+                    type: string
                 conditions:
                   type: array
                   nullable: true
@@ -6568,6 +7702,16 @@ rules:
       - update
       - watch
       - delete
+  # The backup controllers are leader-elected by a Lease in the namespace of the operator, which a Role of that
+  # namespace grants: a ClusterRole would grant it in every namespace
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - create
+      - get
+      - update
   - apiGroups:
       - ""
     resources:
@@ -6643,35 +7787,6 @@ rules:
       - get
       - list
       - watch
-
-  #
-  # batch.* resources - backup/restore Jobs and CronJobs
-  # They are owned by their backup resource and garbage-collected with it. The operator never deletes
-  # a Job; a schedule deletes the CronJob of a cluster it no longer backs up.
-  #
-
-  - apiGroups:
-      - batch
-    resources:
-      - jobs
-    verbs:
-      - get
-      - list
-      - patch
-      - watch
-      - create
-  - apiGroups:
-      - batch
-    resources:
-      - cronjobs
-    verbs:
-      - get
-      - list
-      - patch
-      - update
-      - watch
-      - create
-      - delete
 
   #
   # apiextensions
@@ -6761,6 +7876,7 @@ rules:
       - delete
 
   # clickhouse backup - related resources
+  # The operator sets and removes its finalizers on the backups, schedules and restores
   - apiGroups:
       - clickhouse.altinity.com
     resources:
@@ -6770,6 +7886,8 @@ rules:
       - get
       - list
       - watch
+      - update
+      - patch
   # The operator creates a restore itself to recover an installation from a backup
   - apiGroups:
       - clickhouse.altinity.com
@@ -6780,16 +7898,8 @@ rules:
       - list
       - watch
       - create
-  # Jobs and CronJobs carry a blocking owner reference to their backup resource, which requires
-  # update on the owner's finalizers where OwnerReferencesPermissionEnforcement is enabled (OpenShift)
-  - apiGroups:
-      - clickhouse.altinity.com
-    resources:
-      - clickhousebackups/finalizers
-      - clickhousebackupschedules/finalizers
-      - clickhouserestores/finalizers
-    verbs:
       - update
+      - patch
   - apiGroups:
       - clickhouse.altinity.com
     resources:
@@ -7534,6 +8644,20 @@ data:
       # See docs/backup.md#storage-paths.
       storagePath: "backup/{namespace}/{installation}/{cluster}/{shard}"
       storageObjectDiskPath: "object_disks/{namespace}/{installation}/{cluster}/{shard}"
+      # How the operator waits for the commands it runs on the clickhouse-backup sidecars: the defaults
+      # of spec.timeouts of every ClickHouseBackup, ClickHouseRestore and ClickHouseBackupSchedule, which
+      # a resource overrides field by field. See docs/backup.md#timeouts.
+      timeouts:
+        # How long the operator waits for one command on one host. A Go duration, e.g. 12h, 90m.
+        actionTimeout: "12h"
+        # How long a host whose ClickHouse does not answer is retried, from the first error in a row,
+        # before the host fails. A Go duration.
+        unreachableTimeout: "10m"
+        # How many polls in a row may find no row of a submitted command before it is taken as lost.
+        errorResponsesMax: 5
+        # http_receive_timeout and http_send_timeout of every insert into system.backup_actions:
+        # a synchronous delete local|remote answers once it is done. A Go duration.
+        httpReceiveTimeout: "4h"
     
     ################################################
     ##

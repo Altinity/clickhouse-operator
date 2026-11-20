@@ -98,8 +98,12 @@ var ClickHouseSidecarContainerNames = []string{
 
 const (
 	// DefaultClickHouseBackupDockerImage specifies the clickhouse-backup image of a sidecar whose base container names
-	// none, or that has no base container as backup.podTemplate is empty
-	DefaultClickHouseBackupDockerImage = "altinity/clickhouse-backup:2.8.1"
+	// none, or that has no base container as backup.podTemplate is empty. The stable tag moves with the releases of
+	// clickhouse-backup, so the containers that run it pull it Always unless their base container sets a pull policy.
+	DefaultClickHouseBackupDockerImage = "altinity/clickhouse-backup:stable"
+	// DefaultClickHouseBackupImagePullPolicy is the pull policy of a clickhouse-backup container whose base container
+	// sets none
+	DefaultClickHouseBackupImagePullPolicy = "Always"
 
 	// ClickHouseBackupAPIPortName specifies name of the clickhouse-backup REST API port of the sidecar
 	ClickHouseBackupAPIPortName = "backup-api"
@@ -120,7 +124,7 @@ const (
 	DirPathClickHouseBackupConfig = "/etc/clickhouse-backup"
 
 	// Keys of the operator-generated backup Secret. They are named after the clickhouse-backup
-	// environment variables they stand for: the backup Jobs take the REST API credentials from them as env vars,
+	// environment variables they stand for: the integration tables call the REST API with the credentials,
 	// and the generated configuration file of the sidecar takes all of them. The operator generates the REST API
 	// credentials only: the ClickHouse ones are set by the user, or not at all, leaving clickhouse-backup with its
 	// own defaults.
@@ -143,14 +147,26 @@ const (
 	ClickHouseBackupEnvClickHouseRestartCommand = "CLICKHOUSE_RESTART_COMMAND"
 	ClickHouseBackupEnvRestoreSchemaOnCluster   = "RESTORE_SCHEMA_ON_CLUSTER"
 	ClickHouseBackupEnvBackupsToKeepLocal       = "BACKUPS_TO_KEEP_LOCAL"
+	// ClickHouseBackupEnvBackupsToKeepRemote, ClickHouseBackupEnvRebaseDuringDelete and
+	// ClickHouseBackupEnvRebaseBeforeRemoveOldRemote are pinned: retention is the schedules' alone, and a
+	// deleted backup that another one is incremental to is rebased first
+	ClickHouseBackupEnvBackupsToKeepRemote         = "BACKUPS_TO_KEEP_REMOTE"
+	ClickHouseBackupEnvRebaseDuringDelete          = "REBASE_DURING_DELETE"
+	ClickHouseBackupEnvRebaseBeforeRemoveOldRemote = "REBASE_BEFORE_REMOVE_OLD_REMOTE"
 	// ClickHouseBackupEnvAPIAllowParallel is kept off, as by default, also where the storage Secret or the
 	// sidecar's base container turns it on: clickhouse-backup sets the env vars an operation overrides for the whole
-	// process, which an operation running alongside would see, and the operations of two Jobs on one host would run
+	// process, which an operation running alongside would see, and the operations of two runs on one host would run
 	// at once.
 	ClickHouseBackupEnvAPIAllowParallel = "API_ALLOW_PARALLEL"
+	// ClickHouseBackupEnvTZ is pinned to UTC: clickhouse-backup tells start and finish of a row of
+	// system.backup_actions in the local time of its container, without a zone, and the operator compares them with
+	// now('UTC') of ClickHouse.
+	ClickHouseBackupEnvTZ = "TZ"
+	// ClickHouseBackupTZ is the time zone of the sidecar
+	ClickHouseBackupTZ = "UTC"
 	// ClickHouseBackupEnvRestoreDatabaseMapping and ClickHouseBackupEnvRestoreTableMapping are kept empty: a mapping
-	// makes clickhouse-backup restore into, and drop, other databases and tables than the backup names, which the
-	// overwrite guard of a restore Job, comparing the names the backup holds, does not see.
+	// makes clickhouse-backup restore into, and drop, other databases and tables than the backup names: a restore maps
+	// databases by its databaseMapping only.
 	ClickHouseBackupEnvRestoreDatabaseMapping = "RESTORE_DATABASE_MAPPING"
 	ClickHouseBackupEnvRestoreTableMapping    = "RESTORE_TABLE_MAPPING"
 	// ClickHouseBackupEnvConfig names the configuration file clickhouse-backup reads instead of the one in
@@ -159,16 +175,25 @@ const (
 	// ClickHouseBackupEnvAllowEmptyBackups lets a backup of a cluster without tables succeed. Without it every
 	// scheduled backup of a freshly created cluster fails with "no tables for backup".
 	ClickHouseBackupEnvAllowEmptyBackups = "ALLOW_EMPTY_BACKUPS"
+	// ClickHouseBackupEnvAPICreateIntegrationTables and ClickHouseBackupEnvAPIIntegrationTablesHost are pinned on: the
+	// operator drives clickhouse-backup through SQL, by the integration tables system.backup_actions and
+	// system.backup_list the server creates in ClickHouse over the URL engine at the host of its API in the pod,
+	// ClickHouseBackupIntegrationTablesHost.
+	ClickHouseBackupEnvAPICreateIntegrationTables = "API_CREATE_INTEGRATION_TABLES"
+	ClickHouseBackupEnvAPIIntegrationTablesHost   = "API_INTEGRATION_TABLES_HOST"
+	// ClickHouseBackupIntegrationTablesHost is the host ClickHouse reaches the API of the sidecar of its pod at.
+	ClickHouseBackupIntegrationTablesHost = "127.0.0.1"
 
 	// ClickHouseBackupBackupsToKeepLocalDeleteAfterUpload makes clickhouse-backup delete the local copy of a
 	// backup once it is uploaded. Its default keeps every local copy, and these fill up the data disk.
 	ClickHouseBackupBackupsToKeepLocalDeleteAfterUpload = "-1"
 
-	// ClickHouseBackupRestartCommandReloadUsers is what clickhouse-backup runs once it has restored access
-	// objects, so that ClickHouse loads them. Its default restarts the server through systemctl, which a sidecar
-	// does not have: the command fails, clickhouse-backup ignores the failure, and the restored users, roles and
-	// grants stay unloaded. Reloading them needs ClickHouse 23.3 or later, and no restart.
-	ClickHouseBackupRestartCommandReloadUsers = "sql:SYSTEM RELOAD USERS"
+	// ClickHouseBackupRestartCommandReload is what clickhouse-backup runs, one command after the other, once it has
+	// restored access objects or configuration files, so that ClickHouse loads them, as the Altinity usual backup workflow
+	// has it. Its default restarts the server through systemctl, which a sidecar does not have: the command fails,
+	// clickhouse-backup ignores the failure, and the restored users, roles and grants stay unloaded. Reloading them
+	// needs ClickHouse 23.3 or later, and no restart.
+	ClickHouseBackupRestartCommandReload = "sql:SYSTEM RELOAD USERS; sql:SYSTEM RELOAD CONFIG"
 
 	// ClickHouseBackupClickHouseHost is where the sidecar reaches ClickHouse - both share the pod's network namespace
 	ClickHouseBackupClickHouseHost = "localhost"

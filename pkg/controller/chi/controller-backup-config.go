@@ -33,6 +33,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/backupconfig"
@@ -59,11 +60,21 @@ var backupConfigSyncInstallationTimeout = 15 * time.Second
 var (
 	// errBackupStorageSecretNotFound: the storage Secret of the cluster does not exist
 	errBackupStorageSecretNotFound = errors.New("does not exist")
-	// errBackupStorageConfigNotFound: the storage Secret of the cluster holds no configuration file
-	errBackupStorageConfigNotFound = fmt.Errorf("has no key %s", backupconfig.FileName)
-	// errBackupStorageConfigEmpty: the storage Secret of the cluster holds an empty configuration file
-	errBackupStorageConfigEmpty = fmt.Errorf("has an empty key %s", backupconfig.FileName)
+	// errBackupStorageConfigNotFound: the storage Secret of the cluster holds no configuration file in its key. It is
+	// wrapped with the key, see getBackupStorageConfig.
+	errBackupStorageConfigNotFound = errors.New("has no key")
+	// errBackupStorageConfigEmpty: the storage Secret of the cluster holds an empty configuration file in its key. It
+	// is wrapped with the key, see getBackupStorageConfig.
+	errBackupStorageConfigEmpty = errors.New("has an empty key")
+	// errBackupStorageSecretUnreadable: the storage Secret of the cluster cannot be read for any reason but its
+	// absence
+	errBackupStorageSecretUnreadable = errors.New("cannot be read")
 )
+
+// errBackupConfigSecretForeign: the Secret of the name the configuration file goes to exists, and is not the
+// operator's for this installation and cluster. Names of installations and clusters join with "-", so that
+// installation "a-b" with cluster "c" and installation "a" with cluster "b-c" name the same Secret.
+var errBackupConfigSecretForeign = errors.New("exists and is not the backup configuration of this cluster")
 
 // backupConfigOutcome is how the configuration file Secret of a cluster has been reconciled
 type backupConfigOutcome struct {
@@ -72,13 +83,16 @@ type backupConfigOutcome struct {
 	secret *core.Secret
 	// storageSecret is the name of the storage Secret of the cluster, "" for none
 	storageSecret string
+	// storageKey is the key of the storage Secret the configuration file is in, "" for none
+	storageKey string
 	// noStorage tells why the storage Secret of the cluster gives no storage settings: errBackupStorageSecretNotFound,
 	// errBackupStorageConfigNotFound or errBackupStorageConfigEmpty, nil when it does
 	noStorage error
 	// keptStorage tells that, the storage Secret giving none, the configuration file kept the storage settings it had
 	keptStorage bool
 	// err is why the Secret was not reconciled: backupconfig.ErrInvalidStorageConfig for storage settings that
-	// cannot be read, or a failure to read or write a Secret
+	// cannot be read, errBackupConfigSecretForeign for a Secret of the name that is not the operator's for the
+	// cluster, or a failure to read or write a Secret
 	err error
 }
 
@@ -134,8 +148,11 @@ func (c *Controller) reconcileBackupConfigSecret(
 	credentials backupconfig.Credentials,
 	keepClickHouseCredentials bool,
 ) backupConfigOutcome {
-	outcome := backupConfigOutcome{storageSecret: cluster.GetBackup().GetConfigSecretName()}
-	storage, err := c.getBackupStorageConfig(ctx, cr.GetNamespace(), outcome.storageSecret)
+	outcome := backupConfigOutcome{
+		storageSecret: cluster.GetBackup().GetStorageConfigSecretName(),
+		storageKey:    cluster.GetBackup().GetStorageConfigSecretKey(),
+	}
+	storage, err := c.getBackupStorageConfig(ctx, cr.GetNamespace(), outcome.storageSecret, outcome.storageKey)
 	if err != nil {
 		outcome.err = err
 		return outcome
@@ -144,6 +161,11 @@ func (c *Controller) reconcileBackupConfigSecret(
 	current, err := c.getBackupConfigSecret(ctx, cr.GetNamespace(), c.namer.Name(interfaces.NameBackupConfigSecret, cr, cluster.GetName()))
 	if err != nil {
 		outcome.err = err
+		return outcome
+	}
+	if (current != nil) && !isBackupConfigSecretOwned(cr, current) {
+		// Neither read nor written, nor registered: it is not ours
+		outcome.err = fmt.Errorf("Secret %s %w", util.NamespaceNameString(current), errBackupConfigSecretForeign)
 		return outcome
 	}
 	if current != nil {
@@ -191,9 +213,9 @@ type backupStorageConfig struct {
 	missing error
 }
 
-// getBackupStorageConfig returns the storage settings the storage Secret holds, none for no Secret
-func (c *Controller) getBackupStorageConfig(ctx context.Context, namespace, name string) (backupStorageConfig, error) {
-	if name == "" {
+// getBackupStorageConfig returns the storage settings the key of the storage Secret holds, none for no Secret
+func (c *Controller) getBackupStorageConfig(ctx context.Context, namespace, name, key string) (backupStorageConfig, error) {
+	if (name == "") || (key == "") {
 		return backupStorageConfig{}, nil
 	}
 	secret, err := c.kube.Secret().Get(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Namespace: namespace, Name: name}})
@@ -201,14 +223,14 @@ func (c *Controller) getBackupStorageConfig(ctx context.Context, namespace, name
 	case apiErrors.IsNotFound(err):
 		return backupStorageConfig{missing: errBackupStorageSecretNotFound}, nil
 	case err != nil:
-		return backupStorageConfig{}, err
+		return backupStorageConfig{}, fmt.Errorf("%w: %w", errBackupStorageSecretUnreadable, err)
 	}
-	storageConfig, ok := secret.Data[backupconfig.FileName]
+	storageConfig, ok := secret.Data[key]
 	switch {
 	case !ok:
-		return backupStorageConfig{missing: errBackupStorageConfigNotFound}, nil
+		return backupStorageConfig{missing: fmt.Errorf("%w %s", errBackupStorageConfigNotFound, key)}, nil
 	case len(bytes.TrimSpace(storageConfig)) == 0:
-		return backupStorageConfig{missing: errBackupStorageConfigEmpty}, nil
+		return backupStorageConfig{missing: fmt.Errorf("%w %s", errBackupStorageConfigEmpty, key)}, nil
 	}
 	return backupStorageConfig{config: storageConfig}, nil
 }
@@ -263,6 +285,17 @@ func (c *Controller) getBackupConfigSecret(ctx context.Context, namespace, name 
 	return secret, err
 }
 
+// isBackupConfigSecretOwned tells whether the Secret carries the labels the operator gives its Secrets of the
+// installation, which a Secret of the same name that another installation, or a user, made does not
+func isBackupConfigSecretOwned(cr *api.ClickHouseInstallation, secret *core.Secret) bool {
+	for key, value := range getLabeler(cr).Selector(interfaces.SelectorCRScope) {
+		if secret.GetLabels()[key] != value {
+			return false
+		}
+	}
+	return true
+}
+
 // applyBackupConfigSecret creates the Secret when there is none, current being nil, or updates the data of the one
 // there when it differs. The metadata of an existing Secret stays as it is: a pass that does not reconcile the
 // installation must not take labels or owners from another state of it than its reconcile does.
@@ -292,7 +325,7 @@ type backupConfigProblems struct {
 // which may well be gone by the next pass and is logged instead
 func backupConfigProblem(outcome backupConfigOutcome) string {
 	switch {
-	case errors.Is(outcome.err, backupconfig.ErrInvalidStorageConfig):
+	case errors.Is(outcome.err, backupconfig.ErrInvalidStorageConfig), errors.Is(outcome.err, errBackupConfigSecretForeign):
 		return outcome.err.Error()
 	case outcome.err != nil:
 		return ""
@@ -376,6 +409,10 @@ func (c *Controller) syncBackupConfigs(ctx context.Context, announcer a.Announce
 		if !chop.Config().IsNamespaceWatched(item.GetNamespace()) || !item.GetDeletionTimestamp().IsZero() || item.Spec.Suspend.Value() {
 			continue
 		}
+		if isAbortedOnInvalidBackupConfig(item) {
+			c.retryAbortedOnInvalidBackupConfig(ctx, item)
+			continue
+		}
 		c.syncBackupConfig(ctx, announcer, item.GetNamespace(), item.GetName())
 	}
 }
@@ -408,4 +445,53 @@ func (c *Controller) syncBackupConfig(ctx context.Context, announcer a.Announcer
 			log.V(1).M(cr).F().Warning("Unable to sync backup configuration Secret of cluster %s err: %v", cluster, outcome.err)
 		}
 	}
+}
+
+// isAbortedOnInvalidBackupConfig reports whether the last reconcile of the installation was aborted as its backup
+// could not be configured, see abortOnInvalidBackupConfig
+func isAbortedOnInvalidBackupConfig(cr *api.ClickHouseInstallation) bool {
+	status := cr.EnsureStatus()
+	errs := status.GetErrors()
+	return (status.GetStatus() == api.StatusAborted) && (len(errs) > 0) &&
+		strings.HasPrefix(errs[0], "["+api.StatusReasonBackupConfigInvalid+"]")
+}
+
+// retryAbortedOnInvalidBackupConfig reconciles anew an installation whose reconcile was aborted as its backup could
+// not be configured, once the storage Secret of every backup-enabled cluster can be used: the operator does not
+// watch those Secrets, and fixing one changes nothing on the installation that would reconcile it
+func (c *Controller) retryAbortedOnInvalidBackupConfig(ctx context.Context, cr *api.ClickHouseInstallation) {
+	ctx, cancel := context.WithTimeout(ctx, backupConfigSyncInstallationTimeout)
+	defer cancel()
+	if !c.backupStorageUsable(ctx, cr) {
+		return
+	}
+	log.V(1).M(cr).F().Info("Storage Secrets of the backup can be used now - reconcile the installation aborted on them")
+	c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileAdd, nil, cr))
+}
+
+// backupStorageUsable reports whether the storage Secret of every backup-enabled cluster of the installation, as its
+// spec stands, holds a configuration file the operator can build the one of clickhouse-backup from
+func (c *Controller) backupStorageUsable(ctx context.Context, cr *api.ClickHouseInstallation) bool {
+	if len(backupSpecProblems(cr)) > 0 {
+		return false
+	}
+	for _, cluster := range cr.GetSpecT().GetConfiguration().GetClusters() {
+		backup := cluster.GetBackup().DeepCopy().MergeFrom(cr.GetSpecT().GetBackup(), api.MergeTypeFillEmptyValues)
+		if !backup.IsEnabled() {
+			continue
+		}
+		current, err := c.getBackupConfigSecret(ctx, cr.GetNamespace(), c.namer.Name(interfaces.NameBackupConfigSecret, cr, cluster.GetName()))
+		if (err != nil) || ((current != nil) && !isBackupConfigSecretOwned(cr, current)) {
+			return false
+		}
+		storage, err := c.getBackupStorageConfig(ctx, cr.GetNamespace(), backup.GetStorageConfigSecretName(), backup.GetStorageConfigSecretKey())
+		if (err != nil) || (storage.missing != nil) {
+			return false
+		}
+		probe := backupconfig.Credentials{APIUsername: "probe", APIPassword: "probe"}
+		if _, err := backupconfig.Build(storage.config, probe, backupconfig.Defaults{}); err != nil {
+			return false
+		}
+	}
+	return true
 }

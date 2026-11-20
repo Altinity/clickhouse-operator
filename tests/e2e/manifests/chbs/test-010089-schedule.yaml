@@ -1,0 +1,17 @@
+# test_010089
+# Every minute, keeping the five newest backups: the scenario lowers keep to 1, a change retention holds, so the
+# backups the schedule kept before expire five minutes after each was made.
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseBackupSchedule"
+metadata:
+  name: keep-backups
+spec:
+  clickHouseInstallation: test-089-backup
+  schedules:
+    - period: minute
+      keep: 5
+  retention:
+    onScheduleChange: Hold
+  successfulRunsHistoryLimit: 2
+  failedRunsHistoryLimit: 1
+  backupNamePrefix: e2e-089-sched

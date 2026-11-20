@@ -76,22 +76,27 @@ func normalizeBackupCR(t *testing.T, cr *chi.ClickHouseInstallation, secretGet s
 // backupStorageSecret is the storage Secret enabledBackup names, without which backup stays off
 const backupStorageSecret = "s3-credentials"
 
-// configSecretRef references the configuration Secret of the given name
-func configSecretRef(secret string) *core.LocalObjectReference {
-	return &core.LocalObjectReference{Name: secret}
+// storageConfig takes the configuration from key config.yml of the Secret of the given name
+func storageConfig(secret string) *chi.StorageConfig {
+	return chi.NewStorageConfig(secret, "config.yml")
 }
 
 // enabledBackup enables backup with a storage Secret
 func enabledBackup() *chi.ClusterBackup {
 	return &chi.ClusterBackup{
-		Enabled:         types.NewStringBool(true),
-		ConfigSecretRef: configSecretRef(backupStorageSecret),
+		Enabled:       types.NewStringBool(true),
+		StorageConfig: storageConfig(backupStorageSecret),
 	}
 }
 
-// enabledOn enables backup with the sidecar built on the clickhouse-backup container of the pod template named
+// enabledOn enables backup with a storage Secret and the sidecar built on the clickhouse-backup container of the
+// pod template named
 func enabledOn(podTemplate string) *chi.ClusterBackup {
-	return &chi.ClusterBackup{Enabled: types.NewStringBool(true), PodTemplate: types.NewString(podTemplate)}
+	return &chi.ClusterBackup{
+		Enabled:       types.NewStringBool(true),
+		PodTemplate:   types.NewString(podTemplate),
+		StorageConfig: storageConfig(backupStorageSecret),
+	}
 }
 
 func backupCluster(name string, backup *chi.ClusterBackup) *chi.Cluster {
@@ -148,8 +153,8 @@ func requireNoBackupEnvVar(t *testing.T, cr *chi.ClickHouseInstallation) {
 func TestBackupClusterInheritance(t *testing.T) {
 	cr := &chi.ClickHouseInstallation{}
 	cr.Spec.Backup = &chi.ClusterBackup{
-		Enabled:         types.NewStringBool(true),
-		ConfigSecretRef: configSecretRef(backupStorageSecret),
+		Enabled:       types.NewStringBool(true),
+		StorageConfig: storageConfig(backupStorageSecret),
 	}
 	cr.Spec.Configuration = &chi.Configuration{Clusters: []*chi.Cluster{
 		backupCluster("inherits", nil),
@@ -161,19 +166,19 @@ func TestBackupClusterInheritance(t *testing.T) {
 
 	inherits := findCluster(t, got, "inherits").GetBackup()
 	require.True(t, inherits.IsEnabled())
-	require.Equal(t, backupStorageSecret, inherits.GetConfigSecretName())
+	require.Equal(t, backupStorageSecret, inherits.GetStorageConfigSecretName())
 
 	optsOut := findCluster(t, got, "opts-out").GetBackup()
 	require.False(t, optsOut.IsEnabled(), "a cluster-level `enabled: no` wins over the installation-level `yes`")
-	require.Equal(t, backupStorageSecret, optsOut.GetConfigSecretName())
+	require.Equal(t, backupStorageSecret, optsOut.GetStorageConfigSecretName())
 }
 
 // .spec.backup is part of the spec, so a template can switch backup on for every installation using it.
 func TestBackupFromTemplate(t *testing.T) {
 	tpl := newCHIT("chit-backup", "")
 	tpl.Spec.Backup = &chi.ClusterBackup{
-		Enabled:         types.NewStringBool(true),
-		ConfigSecretRef: configSecretRef(backupStorageSecret),
+		Enabled:       types.NewStringBool(true),
+		StorageConfig: storageConfig(backupStorageSecret),
 	}
 	registerCHIT(t, tpl)
 
@@ -186,7 +191,7 @@ func TestBackupFromTemplate(t *testing.T) {
 	got := normalizeBackupCR(t, cr, backupSecretGetter(t))
 	backup := findCluster(t, got, "c").GetBackup()
 	require.True(t, backup.IsEnabled())
-	require.Equal(t, backupStorageSecret, backup.GetConfigSecretName())
+	require.Equal(t, backupStorageSecret, backup.GetStorageConfigSecretName())
 	requireBackupUserFromSecret(t, got)
 }
 
@@ -195,13 +200,13 @@ func TestBackupFromTemplate(t *testing.T) {
 func TestBackupConfigSecretInheritance(t *testing.T) {
 	cr := &chi.ClickHouseInstallation{}
 	cr.Spec.Backup = &chi.ClusterBackup{
-		Enabled:         types.NewStringBool(true),
-		ConfigSecretRef: configSecretRef(backupStorageSecret),
+		Enabled:       types.NewStringBool(true),
+		StorageConfig: storageConfig(backupStorageSecret),
 	}
 	cr.Spec.Configuration = &chi.Configuration{Clusters: []*chi.Cluster{
 		backupCluster("inherits", nil),
-		backupCluster("own", &chi.ClusterBackup{ConfigSecretRef: configSecretRef("s3-cold")}),
-		backupCluster("opts-out", &chi.ClusterBackup{ConfigSecretRef: configSecretRef("")}),
+		backupCluster("own", &chi.ClusterBackup{StorageConfig: storageConfig("s3-cold")}),
+		backupCluster("opts-out", &chi.ClusterBackup{StorageConfig: storageConfig("")}),
 	}}
 
 	got := normalizeBackupCR(t, cr, backupSecretGetter(t))
@@ -211,9 +216,9 @@ func TestBackupConfigSecretInheritance(t *testing.T) {
 		"own":      "s3-cold",
 		"opts-out": "",
 	} {
-		require.Equal(t, want, findCluster(t, got, cluster).GetBackup().GetConfigSecretName(), cluster)
+		require.Equal(t, want, findCluster(t, got, cluster).GetBackup().GetStorageConfigSecretName(), cluster)
 	}
-	require.Equal(t, backupStorageSecret, got.Spec.Backup.GetConfigSecretName(), "the installation keeps its own Secret")
+	require.Equal(t, backupStorageSecret, got.Spec.Backup.GetStorageConfigSecretName(), "the installation keeps its own Secret")
 }
 
 // An installation's own configuration Secret wins over the one of a template it uses: the template applies to many
@@ -221,8 +226,8 @@ func TestBackupConfigSecretInheritance(t *testing.T) {
 func TestBackupConfigSecretOverATemplate(t *testing.T) {
 	tpl := newCHIT("chit-storage", "")
 	tpl.Spec.Backup = &chi.ClusterBackup{
-		Enabled:         types.NewStringBool(true),
-		ConfigSecretRef: configSecretRef("s3-shared"),
+		Enabled:       types.NewStringBool(true),
+		StorageConfig: storageConfig("s3-shared"),
 	}
 	registerCHIT(t, tpl)
 
@@ -232,7 +237,7 @@ func TestBackupConfigSecretOverATemplate(t *testing.T) {
 	}{
 		"an installation of no Secret": {secret: "s3-shared"},
 		"an installation of a Secret of its own": {
-			backup: &chi.ClusterBackup{ConfigSecretRef: configSecretRef("s3-own")},
+			backup: &chi.ClusterBackup{StorageConfig: storageConfig("s3-own")},
 			secret: "s3-own",
 		},
 	} {
@@ -244,8 +249,8 @@ func TestBackupConfigSecretOverATemplate(t *testing.T) {
 
 			got := normalizeBackupCR(t, cr, backupSecretGetter(t))
 			requireNotAborted(t, got)
-			require.Equal(t, tc.secret, findCluster(t, got, "c").GetBackup().GetConfigSecretName())
-			require.Equal(t, "s3-shared", tpl.Spec.Backup.GetConfigSecretName(), "the template keeps its Secret")
+			require.Equal(t, tc.secret, findCluster(t, got, "c").GetBackup().GetStorageConfigSecretName())
+			require.Equal(t, "s3-shared", tpl.Spec.Backup.GetStorageConfigSecretName(), "the template keeps its Secret")
 		})
 	}
 }
@@ -377,6 +382,14 @@ func TestBackupUserInjected(t *testing.T) {
 	users := got.Spec.Configuration.Users
 	require.Equal(t, chop.Config().ClickHouse.Config.User.Default.Profile, users.Get(backupUser(userFieldProfile)).String())
 	require.Equal(t, chop.Config().ClickHouse.Config.User.Default.Quota, users.Get(backupUser(userFieldQuota)).String())
+}
+
+// Sidecars connect over loopback only: no host regexp.
+func TestBackupUserOfSidecarModeHasNoHostRegexp(t *testing.T) {
+	cr := &chi.ClickHouseInstallation{}
+	cr.Spec.Configuration = &chi.Configuration{Clusters: []*chi.Cluster{backupCluster("sidecars", enabledBackup())}}
+	got := normalizeBackupCR(t, cr, backupSecretGetter(t))
+	require.False(t, got.Spec.Configuration.Users.Has(backupUser(userFieldNetworksHostRegexp)))
 }
 
 // The operator manages a backup user only when the backup Secret sets both its username and its password, which are
@@ -775,12 +788,13 @@ func TestBackupPodTemplate(t *testing.T) {
 	t.Run("a cluster's empty podTemplate over the installation's - the operator's own sidecar", func(t *testing.T) {
 		cr := newCR(&chi.ClusterBackup{PodTemplate: types.NewString("")}, podTemplate(backupTemplate, sidecar))
 		cr.Spec.Backup = enabledOn(backupTemplate)
-		cr.Spec.Backup.ConfigSecretRef = configSecretRef(backupStorageSecret)
+		cr.Spec.Backup.StorageConfig = storageConfig(backupStorageSecret)
 		requireSidecars(t, normalizeBackupCR(t, cr, backupSecretGetter(t)), config.DefaultClickHouseBackupDockerImage, "")
 	})
 	t.Run("a cluster's empty podTemplate over the installation's, without a storage - no sidecar", func(t *testing.T) {
 		cr := newCR(&chi.ClusterBackup{PodTemplate: types.NewString("")}, podTemplate(backupTemplate, sidecar))
 		cr.Spec.Backup = enabledOn(backupTemplate)
+		cr.Spec.Backup.StorageConfig = nil
 		got := normalizeBackupCR(t, cr, backupSecretGetter(t))
 		requireNotAborted(t, got)
 		require.True(t, findCluster(t, got, "c").GetBackup().LacksStorage())
@@ -926,13 +940,13 @@ func TestIsBackupEnabled(t *testing.T) {
 		"cluster opts out of the CR": {spec: enabledBackup(), cluster: &chi.ClusterBackup{Enabled: types.NewStringBool(false)}, want: false},
 		"enabled without storage":    {spec: &chi.ClusterBackup{Enabled: types.NewStringBool(true)}, want: false},
 		"storage of the CR, enabled for the cluster": {
-			spec:    &chi.ClusterBackup{ConfigSecretRef: configSecretRef(backupStorageSecret)},
+			spec:    &chi.ClusterBackup{StorageConfig: storageConfig(backupStorageSecret)},
 			cluster: &chi.ClusterBackup{Enabled: types.NewStringBool(true)},
 			want:    true,
 		},
 		"cluster drops the storage of the CR": {
 			spec:    enabledBackup(),
-			cluster: &chi.ClusterBackup{ConfigSecretRef: configSecretRef("")},
+			cluster: &chi.ClusterBackup{StorageConfig: storageConfig("")},
 			want:    false,
 		},
 	} {
@@ -980,6 +994,7 @@ func TestBackupContainerValidation(t *testing.T) {
 		clusterBackup := &chi.ClusterBackup{Enabled: types.NewStringBool(backup)}
 		if backup {
 			clusterBackup.PodTemplate = types.NewString(sharedPodTemplate)
+			clusterBackup.StorageConfig = storageConfig(backupStorageSecret)
 		}
 		cr.Spec.Configuration = &chi.Configuration{Clusters: []*chi.Cluster{backupCluster("c", clusterBackup)}}
 		return cr

@@ -695,6 +695,20 @@ backup:
   # See docs/backup.md#storage-paths.
   storagePath: "backup/{namespace}/{installation}/{cluster}/{shard}"
   storageObjectDiskPath: "object_disks/{namespace}/{installation}/{cluster}/{shard}"
+  # How the operator waits for the commands it runs on the clickhouse-backup sidecars: the defaults
+  # of spec.timeouts of every ClickHouseBackup, ClickHouseRestore and ClickHouseBackupSchedule, which
+  # a resource overrides field by field. See docs/backup.md#timeouts.
+  timeouts:
+    # How long the operator waits for one command on one host. A Go duration, e.g. 12h, 90m.
+    actionTimeout: "12h"
+    # How long a host whose ClickHouse does not answer is retried, from the first error in a row,
+    # before the host fails. A Go duration.
+    unreachableTimeout: "10m"
+    # How many polls in a row may find no row of a submitted command before it is taken as lost.
+    errorResponsesMax: 5
+    # http_receive_timeout and http_send_timeout of every insert into system.backup_actions:
+    # a synchronous delete local|remote answers once it is done. A Go duration.
+    httpReceiveTimeout: "4h"
 
 ################################################
 ##

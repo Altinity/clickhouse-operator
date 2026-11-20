@@ -173,8 +173,8 @@ neither changes it nor lets backup resources target the cluster. With
 [operator-managed backup](backup.md) enabled, name this pod template in
 `spec.backup.podTemplate`, as the CHI is aborted while a pod template it does
 not name holds a `clickhouse-backup` container. The container then becomes the
-base of the operator's sidecar, whose REST API the backup Jobs call over plain
-HTTP. Drop `API_SECURE` with its certificate settings, the `command`/`args`,
+base of the operator's sidecar, whose REST API the integration tables call over
+plain HTTP. Drop `API_SECURE` with its certificate settings, the `command`/`args`,
 the API port and any API or ClickHouse credentials, which the operator
 provides; a value of `API_SECURE` that turns TLS on aborts the CHI. See
 [Customizing the sidecar](backup.md#customizing-the-sidecar).

@@ -70,8 +70,8 @@ func newBackupSecretOwner(name string, completedWithBackup, reconciledWithBackup
 	normalized := func(backup bool) *api.ClickHouseInstallation {
 		cr := &api.ClickHouseInstallation{}
 		cr.Spec.Backup = &api.ClusterBackup{
-			Enabled:         commonTypes.NewStringBool(backup),
-			ConfigSecretRef: &core.LocalObjectReference{Name: testStorageSecret},
+			Enabled:       commonTypes.NewStringBool(backup),
+			StorageConfig: api.NewStorageConfig(testStorageSecret, "config.yml"),
 		}
 		cr.Spec.Configuration = &api.Configuration{Clusters: []*api.Cluster{{Name: "c"}}}
 		return cr

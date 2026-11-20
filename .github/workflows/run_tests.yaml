@@ -78,7 +78,7 @@ jobs:
           test "$(docker info -f '{{.DockerRootDir}}')" = "/mnt/docker"
           df -h /mnt /
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         id: setup-python
         with:
           python-version: '3.12'

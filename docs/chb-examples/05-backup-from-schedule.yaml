@@ -4,17 +4,18 @@
 # (docs/chb-examples/04-backup-schedule.yaml) makes every night: before an upgrade, say. The two
 # resources are tied by spec.scheduleRef.name alone, neither owns the other:
 #
-# - The schedule makes its own backups without any ClickHouseBackup: the CronJob of each cluster
-#   starts a Job per run, the runs report in the schedule's status, and their backups make up the
+# - The schedule makes its own backups without any ClickHouseBackup: the operator runs it on each cluster at its
+#   slots, the runs report in the schedule's status, and their backups make up the
 #   series its retention deletes from. It knows nothing of this backup, which its status never
 #   shows.
 #
 # - This backup is a ClickHouseBackup as docs/chb-examples/02-backup-once.yaml is, with a status and
-#   Jobs of its own, but takes from the schedule what a one-off backup sets itself:
+#   runs of its own, but takes from the schedule what a one-off backup sets itself:
 #     - the installation,
 #     - the clusters, which spec.cluster may narrow to one,
 #     - every backup option of the schedule, namely:
 #         spec.schemaOnly, spec.replicaSelection, spec.tables,
+#         spec.skipTables, spec.skipTableEngines,
 #         spec.partitions, spec.activeDeadlineSeconds,
 #       none of which it may set itself.
 #   Until it is validated it reads the schedule anew on every reconcile,
@@ -62,29 +63,21 @@ spec:
   # scheduledTime: "2026-10-20T02:00:00+02:00"
 
   # How many seconds after it is due (its creation, or spec.scheduledTime) the backup may still
-  # start. It starts on a cluster when the operator creates the cluster's Job, which waits, for
+  # start. It starts on a cluster when the operator creates the cluster's run, which waits, for
   # instance, until the installation has completed its reconcile and no other backup or restore runs
   # on the cluster. Past the deadline, a backup still not validated (an invalid spec, say) fails, as
-  # does each cluster whose Job is not created yet, with the reason StartingDeadlineExceeded and
+  # does each cluster whose run is not created yet, with the reason StartingDeadlineExceeded and
   # what it waited for; clusters already running finish. Unset, the backup waits as long as it
   # takes. The operator checks a second after the backup is due, so keep it a minute or more. How
-  # long a Job may run once started is spec.activeDeadlineSeconds: the backup's own, or with
+  # long a run may take once started is spec.activeDeadlineSeconds: the backup's own, or with
   # spec.scheduleRef the schedule's.
   # startingDeadlineSeconds: 3600
 
   # Make this an incremental backup on top of the existing backup of this name: only the data parts
   # not in that base yet are uploaded, which takes less storage and less time. The base must be in
-  # the storage of every host the backup runs on, or the Job fails before changing anything. A
+  # the storage of every host the backup runs on, or the run fails before changing anything. A
   # restore of this backup needs its whole chain of bases in the storage. The retention of a
   # schedule never deletes a base that a backup it keeps still needs, but deleting a base any other
   # way (BACKUPS_TO_KEEP_REMOTE, a bucket lifecycle rule, by hand) breaks every backup built on it.
   # The runs of a schedule always make full backups, which can serve as bases.
   # diffFromRemote: demo-base
-
-  # Check that the backup can be read back. Once it has completed on every cluster, a second Job
-  # per cluster downloads it from the storage on the first replica of each shard, checks that
-  # clickhouse-backup lists the download as complete, and deletes it again, touching no table.
-  # The data disk needs room for one copy of the backup meanwhile, and with AllReplicas the copies
-  # of the other replicas are not downloaded. The outcome is the Verified condition, Verified or
-  # VerificationFailed; a backup that failed on any cluster is not verified. Off by default.
-  verify: true

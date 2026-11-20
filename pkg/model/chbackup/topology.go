@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package chbackup builds the Kubernetes Job/CronJob resources that drive the operator-managed
-// clickhouse-backup sidecars for the ClickHouseBackup, ClickHouseBackupSchedule and
-// ClickHouseRestore custom resources.
+// Package chbackup holds the model of the operator-managed backup: the topology, names, schedules, retention and
+// storage path check the operator drives the clickhouse-backup sidecars by for the ClickHouseBackup,
+// ClickHouseBackupSchedule and ClickHouseRestore custom resources.
 package chbackup
 
 import (
@@ -26,18 +26,13 @@ import (
 	"strings"
 
 	core "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
-)
-
-// settingMaxTableSizeToDrop is the server setting that bounds the size of a table ClickHouse drops, and
-// clickHouseDefaultMaxTableSizeToDrop its default, in bytes.
-const (
-	settingMaxTableSizeToDrop                  = "max_table_size_to_drop"
-	clickHouseDefaultMaxTableSizeToDrop uint64 = 50_000_000_000
 )
 
 var (
@@ -57,6 +52,9 @@ type topologyShard struct {
 	// name is the value of the {shard} macro on the hosts of the shard
 	name  string
 	hosts []string
+	// macros are, of every host, the macros the operator gives it that differ between the replicas of the shard, see
+	// PathHost
+	macros []map[string]string
 }
 
 // topologyCluster is one backup-enabled cluster of an installation.
@@ -64,35 +62,30 @@ type topologyCluster struct {
 	name string
 	// configSecret is the Secret of the clickhouse-backup configuration the sidecars of the cluster keep backups by
 	configSecret string
-	// pod holds what a Job inherits from the cluster's first host: its sidecar and its pod template.
-	pod    podSettings
-	shards []topologyShard
+	shards       []topologyShard
 	// sidecar tells how the sidecars of the cluster take the settings that tell where they keep their
-	// backups, which every host of the cluster has to take alike for a Job to know them
+	// backups, which every host of the cluster has to take alike for the operator to know them
 	sidecar sidecarSettings
-	// replicated tells whether the hosts of the cluster have ZooKeeper, which ON CLUSTER DDL needs
-	replicated bool
-	// maxTableSizeToDrop is the smallest max_table_size_to_drop of the hosts of the cluster, 0 when none
-	// of them limits the size of a table it drops
-	maxTableSizeToDrop uint64
+	// preferredReplica is the index of the replica of each shard a backup of one replica per shard runs on
+	preferredReplica int
+	// naming is the naming template of the backups of the cluster, "" for the default naming
+	naming string
+	// endpoints are how the operator reaches the ClickHouse of every host of the cluster, by host, without the address
+	endpoints map[string]HostEndpoint
 }
 
-// podSettings are the settings a Job inherits from a host it drives: the image of its clickhouse-backup
-// sidecar, as it pulls it, and the identity, security context and registry access admission already
-// accepts for the installation's own pods in that namespace.
-type podSettings struct {
-	// image and imagePullPolicy are the sidecar's: the Job needs bash 4.4 or newer and curl from the image
-	image           string
-	imagePullPolicy core.PullPolicy
-	securityContext *core.PodSecurityContext
-	// containerSecurityContext is the sidecar's security context, whose identity the Job takes where
-	// the pod level leaves it open
-	containerSecurityContext *core.SecurityContext
-	imagePullSecrets         []core.LocalObjectReference
-	serviceAccountName       string
+// HostEndpoint is how the operator reaches the ClickHouse of a host, as it does for schema propagation.
+type HostEndpoint struct {
+	// Address is the name of the host in the DNS domain of the namespace of the installation
+	Address string
+	// HTTPPort and HTTPSPort are the ports ClickHouse serves HTTP and HTTPS on, 0 for none
+	HTTPPort  int
+	HTTPSPort int
+	// TLS is the TLS configuration of the cluster for connections to ClickHouse
+	TLS *api.ClusterSecurityClickHouseTLS
 }
 
-// Topology is the set of backup-enabled clusters, and their hosts, an operation targets. Every Job
+// Topology is the set of backup-enabled clusters, and their hosts, an operation targets. Every run
 // targets one of them; it also knows every other backup-enabled cluster of the installation, whose
 // storage paths its own must not collide with.
 type Topology struct {
@@ -100,6 +93,9 @@ type Topology struct {
 	installation string
 	// namespace is the value of the {namespace} macro on every host
 	namespace string
+	// domain is the DNS domain of the namespace of the installation, which the host names resolve in from any
+	// namespace, as the operator reaches them
+	domain string
 	// clusters are the clusters the operation targets, in spec order
 	clusters []topologyCluster
 	// enabled are all backup-enabled clusters of the installation, in spec order
@@ -130,7 +126,7 @@ func NewTopology(normalized *api.ClickHouseInstallation, cluster string) (*Topol
 	namer := managers.NewNameManager(managers.NameManagerTypeClickHouse)
 	containers := managers.NewContainerManager(managers.ContainerManagerTypeClickHouse)
 
-	topology := &Topology{installation: chi.GetName(), namespace: chi.GetNamespace()}
+	topology := &Topology{installation: chi.GetName(), namespace: chi.GetNamespace(), domain: namespaceDomain(chi)}
 	for _, c := range chi.GetSpecT().Configuration.GetClusters() {
 		if c.GetBackup().LacksStorage() {
 			topology.withoutStorage = append(topology.withoutStorage, c.GetName())
@@ -140,7 +136,7 @@ func NewTopology(normalized *api.ClickHouseInstallation, cluster string) (*Topol
 			topology.disabled = append(topology.disabled, c.GetName())
 			continue
 		}
-		topology.enabled = append(topology.enabled, newTopologyCluster(c, chi.GetSpecT().GetConfiguration().GetSettings(), namer, containers))
+		topology.enabled = append(topology.enabled, newTopologyCluster(c, namer, containers))
 	}
 	return topology.restrict(cluster)
 }
@@ -175,6 +171,7 @@ func (t *Topology) restrict(cluster string) (*Topology, error) {
 	restricted := &Topology{
 		installation:   t.installation,
 		namespace:      t.namespace,
+		domain:         t.domain,
 		enabled:        t.enabled,
 		disabled:       t.disabled,
 		withoutStorage: t.withoutStorage,
@@ -305,14 +302,15 @@ func indexTemplates[T any, PT interface {
 // the server settings at the installation level, are given.
 func newTopologyCluster(
 	c *api.Cluster,
-	installationSettings *api.Settings,
 	namer interfaces.INameManager,
 	containers interfaces.IContainerManager,
 ) topologyCluster {
 	cluster := topologyCluster{
-		name:         c.GetName(),
-		configSecret: c.GetBackup().GetConfigSecretName(),
-		replicated:   !c.GetZookeeper().IsEmpty(),
+		name:             c.GetName(),
+		configSecret:     c.GetBackup().GetStorageConfigSecretName(),
+		preferredReplica: c.GetBackup().GetPreferredReplica(),
+		naming:           c.GetBackup().GetNaming(),
+		endpoints:        map[string]HostEndpoint{},
 	}
 	if c.GetLayout() == nil {
 		return cluster
@@ -323,7 +321,18 @@ func newTopologyCluster(
 		for _, host := range s.Hosts {
 			service := namer.Name(interfaces.NameStatefulSetService, host)
 			shard.hosts = append(shard.hosts, service)
-			cluster.maxTableSizeToDrop = smallerLimit(cluster.maxTableSizeToDrop, hostMaxTableSizeToDrop(installationSettings, host))
+			shard.macros = append(shard.macros, map[string]string{
+				MacroReplica:         namer.Name(interfaces.NamePodHostname, host),
+				MacroAllShardedShard: strconv.Itoa(host.Runtime.Address.CHIScopeIndex),
+			})
+			endpoint := HostEndpoint{TLS: c.GetSecurity().GetClickHouse().GetTLS()}
+			if host.HTTPPort.HasValue() {
+				endpoint.HTTPPort = host.HTTPPort.IntValue()
+			}
+			if host.HTTPSPort.HasValue() {
+				endpoint.HTTPSPort = host.HTTPSPort.IntValue()
+			}
+			cluster.endpoints[service] = endpoint
 			sidecar := newSidecarSettings(host, containers)
 			switch {
 			case first == "":
@@ -341,69 +350,13 @@ func newTopologyCluster(
 		if len(shard.hosts) == 0 {
 			continue
 		}
-		if len(cluster.shards) == 0 {
-			cluster.pod = newPodSettings(s.Hosts[0], containers)
-		}
 		cluster.shards = append(cluster.shards, shard)
 	}
 	return cluster
 }
 
-// hostMaxTableSizeToDrop returns the max_table_size_to_drop a host runs with, 0 for no limit. The
-// installation-level settings and the host's own ones go to configuration files ClickHouse merges in an
-// order of their own, so a host set at both levels is taken by the smaller limit, which refuses no less
-// than either. A value that is no number of bytes counts as ClickHouse's default.
-func hostMaxTableSizeToDrop(installationSettings *api.Settings, host *api.Host) uint64 {
-	set := false
-	limit := uint64(0)
-	for _, settings := range []*api.Settings{installationSettings, host.Settings} {
-		setting := settings.Get(settingMaxTableSizeToDrop)
-		if !setting.HasValue() {
-			continue
-		}
-		value, err := strconv.ParseUint(strings.TrimSpace(setting.String()), 10, 64)
-		if err != nil {
-			value = clickHouseDefaultMaxTableSizeToDrop
-		}
-		if !set {
-			set, limit = true, value
-			continue
-		}
-		limit = smallerLimit(limit, value)
-	}
-	if !set {
-		return clickHouseDefaultMaxTableSizeToDrop
-	}
-	return limit
-}
-
-// smallerLimit returns the smaller of two limits, 0 standing for none.
-func smallerLimit(x, y uint64) uint64 {
-	if (x == 0) || ((y > 0) && (y < x)) {
-		return y
-	}
-	return x
-}
-
-// newPodSettings returns what a Job inherits from a host: the image, its pull policy and the identity of the
-// host's clickhouse-backup sidecar, and what its pod template sets at the pod level
-func newPodSettings(host *api.Host, containers interfaces.IContainerManager) podSettings {
-	sidecar, _ := containers.NewBackupContainer(host)
-	settings := podSettings{
-		image:                    sidecar.Image,
-		imagePullPolicy:          sidecar.ImagePullPolicy,
-		containerSecurityContext: sidecar.SecurityContext,
-	}
-	if template, ok := host.GetPodTemplate(); ok {
-		settings.securityContext = template.Spec.SecurityContext
-		settings.imagePullSecrets = template.Spec.ImagePullSecrets
-		settings.serviceAccountName = template.Spec.ServiceAccountName
-	}
-	return settings
-}
-
-// cluster returns the name of the cluster a Job built from the topology targets: the first one, as a
-// Job targets one.
+// cluster returns the name of the cluster an operation built from the topology targets: the first one, as a
+// an operation targets one.
 func (t *Topology) cluster() string {
 	if (t == nil) || (len(t.clusters) == 0) {
 		return ""
@@ -411,7 +364,7 @@ func (t *Topology) cluster() string {
 	return t.clusters[0].name
 }
 
-// configSecret returns the configuration Secret of the cluster a Job built from the topology targets.
+// configSecret returns the configuration Secret of the cluster an operation built from the topology targets.
 func (t *Topology) configSecret() string {
 	if (t == nil) || (len(t.clusters) == 0) {
 		return ""
@@ -432,6 +385,34 @@ func (t *Topology) firstPerShard() []string {
 		}
 	}
 	return hosts
+}
+
+// preferredPerShard returns the preferred replica of every shard, backup.preferredReplica, or its first one when the
+// shard has fewer replicas: the replicas a backup of one replica per shard runs on.
+func (t *Topology) preferredPerShard() []string {
+	if t == nil {
+		return nil
+	}
+	var hosts []string
+	for _, cluster := range t.clusters {
+		for _, shard := range cluster.shards {
+			if cluster.preferredReplica < len(shard.hosts) {
+				hosts = append(hosts, shard.hosts[cluster.preferredReplica])
+			} else {
+				hosts = append(hosts, shard.hosts[0])
+			}
+		}
+	}
+	return hosts
+}
+
+// backupHosts returns the hosts a backup with the given replica selection makes its parts on: every replica, or the
+// preferred replica of every shard, see preferredPerShard.
+func (t *Topology) backupHosts(selection api.ReplicaSelection) []string {
+	if selection == api.ReplicaSelectionAllReplicas {
+		return t.allReplicas()
+	}
+	return t.preferredPerShard()
 }
 
 // allReplicas returns every host of every shard.
@@ -456,26 +437,187 @@ func (t *Topology) hosts(selection api.ReplicaSelection) []string {
 	return t.firstPerShard()
 }
 
-// pod returns what the operation Job inherits from a pod template, taken from the first target
-// cluster: a Job targets one.
-func (t *Topology) pod() podSettings {
+// Naming returns the naming template of the backups of the cluster an operation built from the topology targets, "" for the
+// default naming.
+func (t *Topology) Naming() string {
 	if (t == nil) || (len(t.clusters) == 0) {
-		return podSettings{}
+		return ""
 	}
-	return t.clusters[0].pod
+	return t.clusters[0].naming
 }
 
-// replicated reports whether the cluster an operation Job targets has ZooKeeper, which ON CLUSTER DDL
-// needs.
-func (t *Topology) replicated() bool {
-	return (t != nil) && (len(t.clusters) > 0) && t.clusters[0].replicated
+// ClusterNamings returns the naming template of every cluster the topology targets, by cluster, "" for the default
+// naming.
+func (t *Topology) ClusterNamings() map[string]string {
+	namings := map[string]string{}
+	if t == nil {
+		return namings
+	}
+	for _, cluster := range t.clusters {
+		namings[cluster.name] = cluster.naming
+	}
+	return namings
 }
 
-// maxTableSizeToDrop returns the max_table_size_to_drop of the cluster an operation Job targets, 0 for no
-// limit.
-func (t *Topology) maxTableSizeToDrop() uint64 {
-	if (t == nil) || (len(t.clusters) == 0) {
-		return 0
+// Installation returns the name of the installation of the topology, the value of {chi} in a naming template.
+func (t *Topology) Installation() string {
+	if t == nil {
+		return ""
 	}
-	return t.clusters[0].maxTableSizeToDrop
+	return t.installation
+}
+
+// Namespace returns the namespace of the installation of the topology, the value of {namespace} in a naming template.
+func (t *Topology) Namespace() string {
+	if t == nil {
+		return ""
+	}
+	return t.namespace
+}
+
+// Cluster returns the name of the cluster an operation built from the topology targets.
+func (t *Topology) Cluster() string {
+	return t.cluster()
+}
+
+// namespaceDomainDefault is the DNS domain of a namespace, as the operator reaches the hosts of an installation that
+// sets no namespaceDomainPattern: absolute, which spares the search suffixes of the resolver.
+const namespaceDomainDefault = "%s.svc.cluster.local."
+
+// namespaceDomain returns the DNS domain of the namespace of the installation, as the operator names the hosts of it
+// it connects to: by its namespaceDomainPattern when it sets one.
+func namespaceDomain(chi *api.ClickHouseInstallation) string {
+	pattern := namespaceDomainDefault
+	if p := chi.GetSpecT().GetNamespaceDomainPattern(); p.HasValue() {
+		pattern = p.Value()
+	}
+	return fmt.Sprintf(pattern, chi.GetNamespace())
+}
+
+// Address returns the name the operator reaches the host by from its own namespace: the host name in the DNS domain of
+// the namespace of the installation.
+func (t *Topology) Address(host string) string {
+	if (t == nil) || (t.domain == "") {
+		return host
+	}
+	return host + "." + t.domain
+}
+
+// ShardOf returns the shard of the host, as <cluster>/<shard>, "" for a host of no backup-enabled cluster of the
+// installation: a backup is made on a shard once it is made on any replica of it.
+func (t *Topology) ShardOf(host string) string {
+	if t == nil {
+		return ""
+	}
+	for _, c := range t.enabled {
+		for _, shard := range c.shards {
+			if slices.Contains(shard.hosts, host) {
+				return c.name + "/" + shard.name
+			}
+		}
+	}
+	return ""
+}
+
+// Endpoint returns how the operator reaches the ClickHouse of the host, a backup-enabled host of the installation.
+func (t *Topology) Endpoint(host string) HostEndpoint {
+	endpoint := HostEndpoint{}
+	if t != nil {
+		for _, c := range t.enabled {
+			if found, ok := c.endpoints[host]; ok {
+				endpoint = found
+				break
+			}
+		}
+	}
+	endpoint.Address = t.Address(host)
+	return endpoint
+}
+
+// ConfigSecret returns the configuration Secret of the cluster an operation built from the topology targets.
+func (t *Topology) ConfigSecret() string {
+	return t.configSecret()
+}
+
+// FirstPerShard returns the first host of every shard.
+func (t *Topology) FirstPerShard() []string {
+	return t.firstPerShard()
+}
+
+// AllReplicas returns every host of every shard.
+func (t *Topology) AllReplicas() []string {
+	return t.allReplicas()
+}
+
+// BackupHosts returns the hosts a backup with the given replica selection makes its parts on, see backupHosts.
+func (t *Topology) BackupHosts(selection api.ReplicaSelection) []string {
+	return t.backupHosts(selection)
+}
+
+// Hosts returns the hosts a backup with the given replica selection targets.
+func (t *Topology) Hosts(selection api.ReplicaSelection) []string {
+	return t.hosts(selection)
+}
+
+// RunNaming returns how the backups of the cluster an operation built from the topology targets are named on its
+// hosts.
+func (t *Topology) RunNaming() Naming {
+	naming := Naming{Template: t.Naming(), Cluster: t.cluster(), Installation: t.installation, Namespace: t.namespace,
+		ShardOf: map[string]int{}}
+	if (t == nil) || (len(t.clusters) == 0) {
+		return naming
+	}
+	// The shards of system.clusters are those of the layout, in its order, numbered from 1
+	for i, shard := range t.clusters[0].shards {
+		naming.Shards = append(naming.Shards, shard.name)
+		for _, host := range shard.hosts {
+			naming.ShardOf[host] = i
+		}
+	}
+	return naming
+}
+
+// SettingResolver resolves an env var of the sidecar of a cluster as kubelet does for the sidecar: its value, or the
+// key of the Secret or the ConfigMap it refers to, false for an optional source that lacks it.
+type SettingResolver func(source core.EnvVar) (string, bool, error)
+
+// PathCheck returns what the storage path check reads of every backup-enabled cluster of the installation, the
+// settings of their sidecars resolved, for an operation on the cluster the topology targets.
+func (t *Topology) PathCheck(operation string, selection api.ReplicaSelection, resolve SettingResolver) (*PathCheck, error) {
+	check := &PathCheck{
+		Installation:          t.installation,
+		Namespace:             t.namespace,
+		Operation:             operation,
+		ReplicaSelection:      selection,
+		DefaultPath:           ptr.To(chop.Config().Backup.StoragePath),
+		DefaultObjectDiskPath: ptr.To(chop.Config().Backup.StorageObjectDiskPath),
+		NamingTemplate:        t.Naming(),
+	}
+	for index, cluster := range t.enabled {
+		if cluster.name == t.cluster() {
+			check.Self = index
+		}
+		pathCluster := PathCluster{Name: cluster.name, Unverifiable: cluster.sidecar.unverifiable, Settings: map[string]*string{}}
+		for i, shard := range cluster.shards {
+			pathCluster.Shards = append(pathCluster.Shards, shard.name)
+			for j, host := range shard.hosts {
+				pathCluster.Hosts = append(pathCluster.Hosts, PathHost{Name: host, Shard: i, Macros: shard.macros[j]})
+			}
+		}
+		if pathCluster.Unverifiable == "" {
+			for _, key := range PathCheckKeys {
+				for _, source := range cluster.sidecar.sources[key] {
+					value, set, err := resolve(source)
+					if err != nil {
+						return nil, err
+					}
+					if set {
+						pathCluster.Settings[key] = ptr.To(value)
+					}
+				}
+			}
+		}
+		check.Clusters = append(check.Clusters, pathCluster)
+	}
+	return check, nil
 }

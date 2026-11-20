@@ -454,10 +454,14 @@ Another example with selectively described replicas. Note - `replicasCount` spec
   backup:
     enabled: "yes"
     podTemplate: backup-sidecar  # its clickhouse-backup container is the sidecar's base
-    configSecretRef:         # the Secret of the clickhouse-backup configuration of the sidecar
-      name: clickhouse-backup-config
+    storageConfig:           # where the clickhouse-backup configuration is, required
+      valueFrom:
+        secretKeyRef:
+          name: clickhouse-backup-config
+          key: config.yml
+    # mode: sidecar          # or pod: no sidecar, a backup Pod per shard while a backup or restore runs
     recovery:                # a new installation only
-      backupName: default-prod-nightly-20261003-020000
+      backupName: default-prod-nightly-20261003023000
   configuration:
     clusters:
       - name: scratch
@@ -468,18 +472,28 @@ Another example with selectively described replicas. Note - `replicasCount` spec
 for every cluster of the installation; `.spec.configuration.clusters[].backup` overrides it for one cluster.
 A cluster inherits every field it leaves empty from `.spec.backup`, so `enabled: "no"` on a cluster opts it out. For every enabled cluster the operator injects a `clickhouse-backup`
 sidecar into each Pod - enabling or disabling it rolls the cluster's Pods - and the cluster can then be targeted by
-`ClickHouseBackup`, `ClickHouseBackupSchedule` and `ClickHouseRestore` resources, which run one Job per cluster.
+`ClickHouseBackup`, `ClickHouseBackupSchedule` and `ClickHouseRestore` resources, which the operator runs itself, one
+run per cluster, through SQL on the integration tables of the sidecars (see
+[backup.md](backup.md#how-the-operator-runs-an-operation)).
   - `enabled` - turn operator-managed backup on (`"yes"`) or off (`"no"`, the default)
-  - `podTemplate` - the pod template whose container named `clickhouse-backup` the sidecar is built on, its `image`, `env`,
-    `resources`, `securityContext` and more; only that container is taken, and the Jobs run its image under its identity.
-    Left empty, the operator builds the sidecar on its own (see [backup.md](backup.md#customizing-the-sidecar))
-  - `configSecretRef` - the `name` of a Secret in the installation's namespace whose key `config.yml` holds the
-    clickhouse-backup configuration of the sidecar, a YAML mapping of its sections, e.g. `general.remote_storage`,
+  - `podTemplate` - the pod template whose container named `clickhouse-backup` the sidecar is built on, its `image`
+    (default `altinity/clickhouse-backup:stable`, pulled `Always`), `env`, `resources`, `securityContext` and more;
+    only that container is taken.
+    It customizes the container only and names no storage. Left empty, the operator builds the sidecar on its own (see
+    [backup.md](backup.md#customizing-the-sidecar))
+  - `storageConfig` - `valueFrom.secretKeyRef` names a Secret in the installation's namespace, by its `name`, and the
+    `key` of it that holds the clickhouse-backup configuration of the sidecar, a YAML mapping of its sections, e.g. `general.remote_storage`,
     `s3.bucket`, `s3.path`, `s3.access_key`, `s3.secret_key`; the operator generates the sidecar's configuration file
     from it. A cluster takes the installation's unless it names its own, and the installation a template's;
-    `name: ""` on a cluster leaves it without one. Without it, the container `podTemplate` names configures the
-    storage. Backup takes effect only where `configSecretRef` or `podTemplate` is set. Pods start without the Secret,
-    but backups and restores fail until it exists.
+    `secretKeyRef.name: ""` on a cluster leaves it without one. It is required wherever backup is enabled, with
+    both the `name` and the `key`: without it, with a Secret that does not exist or holds no readable configuration in
+    its `key`, or with an invalid backup block (a `secretKeyRef` without a `key`, `hotReload` or `optional`), the reconcile of the
+    installation is aborted (status `Aborted`, reason `BackupConfigInvalid`, warning event
+    `BackupStorageConfigInvalid`) until it is fixed. The operator forces `general.backups_to_keep_remote: 0` and turns
+    `rebase_during_delete` and `rebase_before_remove_old_remote` on: only the schedules' retention deletes backups.
+    A schedule's `spec.retention.keepBackups` pins backups by `name`, each until an optional `until` (RFC 3339); a
+    change of its entries holds the backups they kept until each expires as the schedule before would have deleted it
+    (see [backup.md](backup.md#schedule-changes)).
     The sidecars follow the Secret: once it is created or changed, the operator regenerates their configuration file,
     which they read anew for every operation, within minutes and without a restart (see
     [backup.md](backup.md#secret-changes)). The storage path defaults
@@ -488,6 +502,9 @@ sidecar into each Pod - enabling or disabling it rolls the cluster's Pods - and 
     sidecar configuration in this Secret and the sidecar container's `env`, as backups and restores refuse to run on
     paths they cannot check, such as those of an `envFrom` or of a configuration file the sidecar's command names (see
     [backup.md](backup.md#storage-paths))
+  - `preferredReplica` - index, from 0, of the replica of each shard a backup works on (default 0, the first replica):
+    a backup of one replica per shard runs on that replica's sidecar, or on the first replica's when the shard has
+    fewer replicas or the preferred one does not answer (see [backup.md](backup.md#which-hosts-are-involved))
   - `recovery.backupName` - for a new installation: the backup it starts from. Once its first reconcile completes,
     the operator restores every backup-enabled cluster from it, once, provided the installation holds no tables yet;
     a cluster may name another backup, or `""` for none. Taken from the installation only, never from a template;
@@ -495,10 +512,24 @@ sidecar into each Pod - enabling or disabling it rolls the cluster's Pods - and 
   - `recovery.sourceInstallation`, `recovery.sourceNamespace` - the installation, and its namespace, that made the
     backup, when not this one: the backup is read from the storage paths the `{installation}` and `{namespace}`
     macros give there (see [backup.md](backup.md#storage-paths))
+  - a recovery restores the whole backup: the filters of a `ClickHouseRestore` - `tables`, `partitions`, `skipTables`,
+    `skipTableEngines`, `databaseMapping` - are for a restore created by hand (see
+    [backup.md](backup.md#restore-filters))
+  - a recovery, as a `ClickHouseRestore` by default (`replicatedCopyToDetached: true`), downloads the backup on every
+    replica: the replicas of a shard but the first copy its data into the `detached` directories of their
+    `Replicated*` tables before the first one restores it, so replication attaches it from there instead of fetching
+    it over the network; `replicatedCopyToDetached: false` on a `ClickHouseRestore` downloads the schema alone on them
+    (see [backup.md](backup.md#clickhouserestore))
 
 The sidecar works on ClickHouse's data volume, so give backup-enabled clusters a `dataVolumeClaimTemplate`.
 Without a volume mounted at `/var/lib/clickhouse`, the operator shares an `emptyDir` there between the two containers,
 which is lost whenever the Pod is deleted.
+
+`ClickHouseBackup`, `ClickHouseRestore` and `ClickHouseBackupSchedule` take a `spec.taskID` as the installation does:
+a new value reruns a backup that finished, under a new name once it completed, a restore that failed, and resets a
+schedule that is aborted (see [backup.md](backup.md#rerunning-with-spectaskid)). A rerun restore resumes the downloads
+its earlier runs left, from another installation too; `resumeDownload: false` on the `ClickHouseRestore` has it delete
+them and download the backup again.
 
 See [backup.md](./backup.md) for details.
 

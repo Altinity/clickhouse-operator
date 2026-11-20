@@ -43,8 +43,7 @@ func retainRequestedClusters(namespace, chiName string, chi *api.ClickHouseInsta
 }
 
 // reportBackupOutcome sets the last-outcome gauges of the clusters of an installation from the status
-// of one of its backups, of those reported tells. A backup is made on a cluster once it completed there,
-// verified or not.
+// of one of its backups, of those reported tells. A backup is made on a cluster once it completed there.
 func reportBackupOutcome(chb *api.ClickHouseBackup, reported func(cluster string) bool) {
 	for _, cluster := range chb.Status.Clusters {
 		switch {
@@ -52,7 +51,7 @@ func reportBackupOutcome(chb *api.ClickHouseBackup, reported func(cluster string
 		case cluster.CompletionTime == nil:
 		case cluster.Phase == api.OperationPhaseCompleted:
 			reportSuccess(context.Background(), chb.GetNamespace(), chb.TargetInstallation(), cluster.Name, cluster.CompletionTime.Time)
-		case cluster.Phase == api.OperationPhaseFailed:
+		case failedPhase(cluster.Phase):
 			reportFailure(context.Background(), chb.GetNamespace(), chb.TargetInstallation(), cluster.Name, cluster.CompletionTime.Time)
 		}
 	}
@@ -95,7 +94,7 @@ func (r *reconciler) reportFinishedBackup(ctx context.Context, chb *api.ClickHou
 // hosts retention left unpruned, is left out: its series went when it left.
 func reportScheduleOutcome(chbs *api.ClickHouseBackupSchedule) {
 	for _, cluster := range chbs.Status.Clusters {
-		if cluster.CronJobName == "" {
+		if (len(cluster.RetentionHosts) == 0) && (len(cluster.UnprunedHosts) > 0) {
 			continue
 		}
 		if succeeded := cluster.LastSuccessfulTime; succeeded != nil {

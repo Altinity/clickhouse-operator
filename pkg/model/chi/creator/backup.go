@@ -61,19 +61,26 @@ func stripScriptComments(script string) string {
 	return strings.Join(kept, "\n") + "\n"
 }
 
-// backupPinnedEnvVarNames are the env vars of the sidecar the backup Jobs rely on. The operator sets them over what
-// the base container sets, and they take precedence over the configuration file: the Jobs call the REST API over
-// plain HTTP on its port, a restore that ran ON CLUSTER on every replica would rewrite Distributed tables, restored
+// backupPinnedEnvVarNames are the env vars of the sidecar the operator relies on. The operator sets them over what
+// the base container sets, and they take precedence over the configuration file: ClickHouse calls the REST API
+// through the integration tables, which the operator drives the sidecar by, over plain HTTP on its port, the operator
+// reads the times of the commands there in UTC, a restore that ran ON CLUSTER on every replica would rewrite Distributed tables, restored
 // access entities left unloaded would be missing, operations running alongside in one sidecar would see each other's
-// settings, and a restore mapped to other databases or tables would drop what the guard of its Job never checked.
+// settings, and a restore mapped to other databases or tables would drop other databases or tables than the restore names.
 var backupPinnedEnvVarNames = []string{
 	config.ClickHouseBackupEnvAPIListen,
 	config.ClickHouseBackupEnvAPISecure,
 	config.ClickHouseBackupEnvAPIAllowParallel,
+	config.ClickHouseBackupEnvAPICreateIntegrationTables,
+	config.ClickHouseBackupEnvAPIIntegrationTablesHost,
 	config.ClickHouseBackupEnvRestoreSchemaOnCluster,
 	config.ClickHouseBackupEnvClickHouseRestartCommand,
 	config.ClickHouseBackupEnvRestoreDatabaseMapping,
 	config.ClickHouseBackupEnvRestoreTableMapping,
+	config.ClickHouseBackupEnvBackupsToKeepRemote,
+	config.ClickHouseBackupEnvRebaseDuringDelete,
+	config.ClickHouseBackupEnvRebaseBeforeRemoveOldRemote,
+	config.ClickHouseBackupEnvTZ,
 }
 
 // backupConfigFileEnvVarNames are the env vars the base container must not set: the credentials, which the
@@ -101,7 +108,7 @@ func newBackupSidecarCommand() []string {
 		config.ClickHouseBackupCommand, config.ClickHouseBackupCommandServer))
 }
 
-// newBackupScriptCommand runs the script with bash, which the backup image has for the backup Jobs as well. The
+// newBackupScriptCommand runs the script with bash, which the clickhouse-backup image has. The
 // arguments become the script's positional parameters, with the container name as its $0.
 func newBackupScriptCommand(script string, args ...string) []string {
 	return append([]string{"bash", "-c", script, config.ClickHouseBackupContainerName}, args...)
@@ -113,9 +120,8 @@ func (cm *ContainerManager) getContainerClickHouseBackup(statefulSet *apps.State
 }
 
 // NewBackupContainer builds the clickhouse-backup sidecar of a host of a backup-enabled cluster - as its pod runs it,
-// as the backup Jobs take their image and identity from it, and as the storage path check reads it. The container of
-// that name of the pod template the cluster's backup names is the base: what it sets is kept and only what it
-// lacks is filled in, the settings the Jobs rely on last. Hosts of other clusters get none, whatever their pod
+// and as the storage path check reads it. The container of that name of the pod template the cluster's backup names is the base: what it sets is kept and only what it
+// lacks is filled in, the settings the operator relies on last. Hosts of other clusters get none, whatever their pod
 // template holds.
 //
 // The sidecar reads its configuration file, which holds the credentials and the storage settings, from the Secret
@@ -123,6 +129,12 @@ func (cm *ContainerManager) getContainerClickHouseBackup(statefulSet *apps.State
 // waits for the file, so a sidecar started before the Secret exists serves nothing until then. Any other command
 // might serve the REST API to everybody without the file, so it gets the Secret as mandatory.
 func (cm *ContainerManager) NewBackupContainer(host *chi.Host) (core.Container, bool) {
+	return cm.NewBackupServerContainer(host)
+}
+
+// NewBackupServerContainer builds the clickhouse-backup sidecar of a host of a backup-enabled cluster, see
+// NewBackupContainer.
+func (cm *ContainerManager) NewBackupServerContainer(host *chi.Host) (core.Container, bool) {
 	backup := host.GetCluster().GetBackup()
 	if !backup.IsEnabled() {
 		return core.Container{}, false
@@ -141,6 +153,9 @@ func (cm *ContainerManager) NewBackupContainer(host *chi.Host) (core.Container, 
 
 	if container.Image == "" {
 		container.Image = config.DefaultClickHouseBackupDockerImage
+	}
+	if container.ImagePullPolicy == "" {
+		container.ImagePullPolicy = core.PullPolicy(config.DefaultClickHouseBackupImagePullPolicy)
 	}
 	if (len(container.Command) == 0) && (len(container.Args) == 0) {
 		container.Command = newBackupSidecarCommand()
@@ -202,7 +217,7 @@ func (cm *ContainerManager) ensureContainerSpecifiedClickHouseBackup(statefulSet
 // statefulSetEnsureBackupConfigVolume gives the pod the volume of the configuration file Secret of the host's
 // cluster, in place of a volume of that name the pod template has. Only the file and the fingerprint of the
 // credentials of the REST API are projected: the Secret holds the settings the storage path check reads as well,
-// which the backup Jobs take as env vars.
+// which the operator reads from the Secret itself.
 func (cm *ContainerManager) statefulSetEnsureBackupConfigVolume(statefulSet *apps.StatefulSet, host *chi.Host, optional bool) {
 	volume := core.Volume{
 		Name: config.ClickHouseBackupConfigVolumeName,
@@ -228,7 +243,7 @@ func (cm *ContainerManager) statefulSetEnsureBackupConfigVolume(statefulSet *app
 // ensureContainerVolumeMountsClickHouseBackup mounts every volume of the ClickHouse container into the
 // clickhouse-backup sidecar as well, as the sidecar works on all disks of the server directly
 func (cm *ContainerManager) ensureContainerVolumeMountsClickHouseBackup(statefulSet *apps.StatefulSet, host *chi.Host) {
-	if !host.GetCluster().GetBackup().IsEnabled() {
+	if backup := host.GetCluster().GetBackup(); !backup.IsEnabled() {
 		return
 	}
 	backup, ok := cm.getContainerClickHouseBackup(statefulSet)
@@ -296,10 +311,19 @@ func newBackupEnvVars(host *chi.Host) []core.EnvVar {
 			Name:  config.ClickHouseBackupEnvAPIListen,
 			Value: net.JoinHostPort(config.ClickHouseBackupAPIListenHost, strconv.Itoa(config.ClickHouseBackupAPIPortNumber)),
 		},
-		// The backup Jobs call the REST API over plain HTTP, see backupPinnedEnvVarNames
+		// ClickHouse calls the REST API over plain HTTP, see backupPinnedEnvVarNames
 		{
 			Name:  config.ClickHouseBackupEnvAPISecure,
 			Value: strconv.FormatBool(false),
+		},
+		// The operator drives the sidecar through the integration tables, see backupPinnedEnvVarNames
+		{
+			Name:  config.ClickHouseBackupEnvAPICreateIntegrationTables,
+			Value: strconv.FormatBool(true),
+		},
+		{
+			Name:  config.ClickHouseBackupEnvAPIIntegrationTablesHost,
+			Value: config.ClickHouseBackupIntegrationTablesHost,
 		},
 		{
 			Name:  config.ClickHouseBackupEnvAPIAllowParallel,
@@ -311,7 +335,7 @@ func newBackupEnvVars(host *chi.Host) []core.EnvVar {
 		},
 		// Set, and empty, so that nothing else sets it, see backupPinnedEnvVarNames: a schema restore ON CLUSTER
 		// rewrites every Distributed table over a literal cluster other than the restored one - all-sharded,
-		// another cluster of the installation - to the restored cluster. The backup Jobs restore the schema on
+		// another cluster of the installation - to the restored cluster. The operator restores the schema on
 		// every replica instead, and run ON CLUSTER only where they ask for it themselves.
 		{
 			Name:  config.ClickHouseBackupEnvRestoreSchemaOnCluster,
@@ -319,7 +343,7 @@ func newBackupEnvVars(host *chi.Host) []core.EnvVar {
 		},
 		{
 			Name:  config.ClickHouseBackupEnvClickHouseRestartCommand,
-			Value: config.ClickHouseBackupRestartCommandReloadUsers,
+			Value: config.ClickHouseBackupRestartCommandReload,
 		},
 		// Set, and empty, so that nothing else sets them, see backupPinnedEnvVarNames
 		{
@@ -334,9 +358,27 @@ func newBackupEnvVars(host *chi.Host) []core.EnvVar {
 			Name:  config.ClickHouseBackupEnvBackupsToKeepLocal,
 			Value: config.ClickHouseBackupBackupsToKeepLocalDeleteAfterUpload,
 		},
+		// Retention is the schedules' alone, see backupPinnedEnvVarNames: the configuration file forces the same
+		{
+			Name:  config.ClickHouseBackupEnvBackupsToKeepRemote,
+			Value: "0",
+		},
+		{
+			Name:  config.ClickHouseBackupEnvRebaseDuringDelete,
+			Value: strconv.FormatBool(true),
+		},
+		{
+			Name:  config.ClickHouseBackupEnvRebaseBeforeRemoveOldRemote,
+			Value: strconv.FormatBool(true),
+		},
 		{
 			Name:  config.ClickHouseBackupEnvAllowEmptyBackups,
 			Value: strconv.FormatBool(true),
+		},
+		// The operator reads the start and finish of the commands in UTC, see backupPinnedEnvVarNames
+		{
+			Name:  config.ClickHouseBackupEnvTZ,
+			Value: config.ClickHouseBackupTZ,
 		},
 	}
 
@@ -366,8 +408,14 @@ func newBackupEnvVars(host *chi.Host) []core.EnvVar {
 	return envVars
 }
 
-// ServiceHasBackupPort reports whether the host Service publishes the clickhouse-backup REST API the backup
-// Jobs call, nil-safe
+// HostServesBackupAPI reports whether the pod of the host serves the clickhouse-backup REST API, which its Service
+// then publishes: the pods of a backup-enabled cluster do
+func HostServesBackupAPI(host *chi.Host) bool {
+	backup := host.GetCluster().GetBackup()
+	return backup.IsEnabled()
+}
+
+// ServiceHasBackupPort reports whether the host Service publishes the clickhouse-backup REST API, nil-safe
 func ServiceHasBackupPort(svc *core.Service) bool {
 	if svc == nil {
 		return false
@@ -388,7 +436,7 @@ func serviceSpecHasBackupPort(spec *core.ServiceSpec) bool {
 	})
 }
 
-// serviceSpecEnsureBackupPort exposes the clickhouse-backup REST API of the host, which the backup Jobs call.
+// serviceSpecEnsureBackupPort exposes the clickhouse-backup REST API of the host, for tools that call it; the operator reaches the sidecar through the integration tables.
 // The API is plain HTTP behind basic auth, so a Service reachable from outside the cluster does not get it.
 func serviceSpecEnsureBackupPort(spec *core.ServiceSpec) {
 	if !serviceSpecIsClusterInternal(spec) || serviceSpecHasBackupPort(spec) {
