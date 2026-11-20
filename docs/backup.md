@@ -1233,7 +1233,9 @@ next slot once the CHI has completed its reconcile; a cluster that leaves runs n
 **Missed slots.** As a `CronJob` does, a schedule runs only the latest slot it missed - while the
 operator was down, or a run, a restore or a held state kept it waiting - and runs it late, unless
 `startingDeadlineSeconds` passed since that slot, which skips it with a `ScheduledRunSkipped` warning.
-The slots before it never run, so a long outage makes one backup, not one for each slot. As
+The slots before it never run, so a long outage makes one backup, not one for each slot; the
+`ScheduledRunSkipped` warning tells how many slots of the cluster were missed since its last one, from
+which, and which slot runs instead (counted up to 10000). As
 [retention](#retention) counts the backups that exist, never the slots, a missed slot deletes nothing
 earlier: it only leaves the older backups longer, until newer ones push them out.
 
@@ -1326,7 +1328,7 @@ makes the schedule `Active` and `Ready` again. A run whose backup
 `Ready` stays `True` with the reason `LastBackupWithoutData` until a run backs up data again.
 
 **Events** on the schedule: `ScheduledBackupStarted` when a run starts on a cluster, and the warning
-`ScheduledRunSkipped` for a slot missed past `startingDeadlineSeconds`; `ScheduleActive`, `ScheduleSuspended` and `ScheduleAborted` (a warning, with
+`ScheduledRunSkipped` for a slot missed past `startingDeadlineSeconds`, and for the slots missed before the latest one, which do not run; `ScheduleActive`, `ScheduleSuspended` and `ScheduleAborted` (a warning, with
 the reason) on every change of the phase; `ScheduledBackupSucceeded` for every completed run, naming
 its backup, and the warning `ScheduledBackupFailed` for every failed one, with the end of the error;
 every run adds the events of its steps (see

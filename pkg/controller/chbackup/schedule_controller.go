@@ -337,6 +337,68 @@ func dueSlot(chbs *api.ClickHouseBackupSchedule, now time.Time) time.Time {
 	return latest
 }
 
+// missedSlotsMax bounds how many slots missedSlots counts, so that a minute entry of a schedule stopped for long is
+// not walked slot by slot.
+const missedSlotsMax = 10000
+
+// missedSlots returns how many slots of the schedule lie after after and before slot and at or after the creation of
+// the schedule, with the first of them: those no run started for, as the operator did not run then, or a run of the
+// cluster was in progress or held. The count stops at missedSlotsMax.
+func missedSlots(chbs *api.ClickHouseBackupSchedule, after, slot time.Time) (int, time.Time) {
+	location, err := chbs.Spec.GetLocation()
+	if err != nil {
+		return 0, time.Time{}
+	}
+	entries := api.ResolveScheduleTimes(chbs.Spec.Schedules)
+	if created := chbs.GetCreationTimestamp().Time; after.Before(created) {
+		after = created.Add(-time.Nanosecond)
+	}
+	count, first := 0, time.Time{}
+	for count < missedSlotsMax {
+		var next time.Time
+		for _, entry := range entries {
+			if candidate := model.NextSlot(entry, location, after); !candidate.IsZero() && (next.IsZero() || candidate.Before(next)) {
+				next = candidate
+			}
+		}
+		if next.IsZero() || !next.Before(slot) {
+			break
+		}
+		if count == 0 {
+			first = next
+		}
+		count++
+		after = next
+	}
+	return count, first
+}
+
+// warnMissedSlots posts a ScheduledRunSkipped warning when slots of the cluster passed between the last slot it ran
+// or skipped and slot, as only the latest due slot runs.
+func (c *ScheduleController) warnMissedSlots(
+	chbs *api.ClickHouseBackupSchedule,
+	cluster *api.ScheduleClusterStatus,
+	name string,
+	slot time.Time,
+	out *announcements,
+) {
+	if cluster.LastScheduleTime == nil {
+		return
+	}
+	count, first := missedSlots(chbs, cluster.LastScheduleTime.Time, slot)
+	if count == 0 {
+		return
+	}
+	more := ""
+	if count >= missedSlotsMax {
+		more = " or more"
+	}
+	out.add(c.warning(chbs, a.EventActionReconcile, reasonScheduledRunSkipped,
+		"%d%s slot(s) of cluster %s from %s were missed, as the operator did not run or a run of the cluster was in "+
+			"progress or held: only the latest due slot %s runs, the missed ones are not made up",
+		count, more, name, first.UTC().Format(time.RFC3339), slot.UTC().Format(time.RFC3339)))
+}
+
 // runDueSlot starts the run of the latest slot of the schedule on every cluster that has not run it, is not held and
 // runs nothing: a run that waited for one in progress, or for a restore, runs late, unless startingDeadlineSeconds
 // passed since its slot, which skips it. A slot before the schedule was created never runs. It returns when to look
@@ -365,6 +427,7 @@ func (c *ScheduleController) runDueSlot(
 		case holds[name] != nil:
 			continue
 		}
+		c.warnMissedSlots(chbs, cluster, name, slot, out)
 		if deadline := chbs.Spec.StartingDeadlineSeconds; (deadline != nil) && (now.Sub(slot) > time.Duration(*deadline)*time.Second) {
 			cluster.LastScheduleTime = &meta.Time{Time: slot.UTC()}
 			out.add(c.warning(chbs, a.EventActionReconcile, reasonScheduledRunSkipped,

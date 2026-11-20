@@ -284,6 +284,52 @@ func TestScheduleHoldsForARestoreAndSkipsLateSlots(t *testing.T) {
 	require.Empty(t, sc.commands())
 }
 
+// The slots missed since the last slot of a cluster, as the operator did not run, are told by a ScheduledRunSkipped
+// warning when the latest due slot runs; a run of the next slot tells none.
+func TestScheduleWarnsOfMissedSlots(t *testing.T) {
+	sc := newFakeSidecars()
+	sc.any = true
+	withSidecars(t, sc)
+	chi := installation(t, api.StatusCompleted, backupCluster("main", 1, true))
+	chbs := newScheduleCR("nightly")
+	chbs.CreationTimestamp = meta.NewTime(time.Date(2026, time.November, 1, 0, 0, 0, 0, time.UTC))
+	chbs.Status.Clusters = []api.ScheduleClusterStatus{{
+		Name:             "main",
+		LastScheduleTime: &meta.Time{Time: time.Date(2026, time.November, 9, 3, 0, 0, 0, time.UTC)},
+	}}
+	c := newClient(t, nil, chbs)
+	controller := NewScheduleController(c, c, newScheme(t), newFakeCR(chi))
+	controller.clock = clocktesting.NewFakePassiveClock(time.Date(2026, time.November, 12, 3, 0, 5, 0, time.UTC))
+	_, err := controller.Reconcile(context.Background(), request("nightly"))
+	require.NoError(t, err)
+
+	messages := eventMessages(t, c, reasonScheduledRunSkipped)
+	require.Len(t, messages, 1)
+	require.Contains(t, messages[0], "2 slot(s) of cluster main from 2026-11-10T03:00:00Z were missed")
+	require.Contains(t, messages[0], "only the latest due slot 2026-11-12T03:00:00Z runs")
+	require.Equal(t, time.Date(2026, time.November, 12, 3, 0, 0, 0, time.UTC),
+		getSchedule(t, c, "nightly").Status.Clusters[0].LastScheduleTime.Time.UTC())
+}
+
+func TestMissedSlots(t *testing.T) {
+	chbs := newScheduleCR("nightly")
+	chbs.CreationTimestamp = meta.NewTime(time.Date(2026, time.November, 10, 12, 0, 0, 0, time.UTC))
+	slot := time.Date(2026, time.November, 14, 3, 0, 0, 0, time.UTC)
+
+	count, first := missedSlots(chbs, time.Date(2026, time.November, 13, 3, 0, 0, 0, time.UTC), slot)
+	require.Zero(t, count, "the slot right after the last one misses none")
+	require.True(t, first.IsZero())
+
+	count, first = missedSlots(chbs, time.Date(2026, time.November, 1, 3, 0, 0, 0, time.UTC), slot)
+	require.Equal(t, 3, count, "slots before the schedule was created are not missed")
+	require.Equal(t, time.Date(2026, time.November, 11, 3, 0, 0, 0, time.UTC), first)
+
+	chbs.Spec.Schedules = []api.BackupScheduleEntry{{Period: api.BackupPeriodMinute, Keep: 1}}
+	chbs.CreationTimestamp = meta.NewTime(time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC))
+	count, _ = missedSlots(chbs, time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC), slot)
+	require.Equal(t, missedSlotsMax, count, "the count stops at its bound")
+}
+
 func ptrInt64(v int64) *int64 {
 	return &v
 }
