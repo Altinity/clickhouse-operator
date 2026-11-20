@@ -19,6 +19,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/stretchr/testify/require"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -205,6 +206,48 @@ func TestScheduleRunsAtItsSlots(t *testing.T) {
 	require.True(t, strings.HasSuffix(sc.commands()[1], "create_remote --rbac nightly-20261113030000"))
 	recent := getSchedule(t, c, "nightly").Status.RecentRuns
 	require.Equal(t, "nightly-20261113030000", recent[0].BackupName, "newest first")
+}
+
+// The night the clocks go back, an hourly schedule of a zone that repeats a wall-clock hour runs the slots of that hour
+// once, the first occurrence: the second would make a backup of the name of the first, which the preflight refuses.
+func TestScheduleRunsTheRepeatedWallClockHourOnce(t *testing.T) {
+	sc := newFakeSidecars()
+	sc.any = true
+	withSidecars(t, sc)
+	chi := installation(t, api.StatusCompleted, backupCluster("main", 1, true))
+	chbs := newScheduleCR("nightly")
+	chbs.Spec.BackupNamePrefix = "nightly"
+	chbs.Spec.TimeZone = "Europe/Berlin"
+	chbs.Spec.Schedules = []api.BackupScheduleEntry{{Period: api.BackupPeriodHour, Time: "00:00", Keep: 5}}
+	chbs.CreationTimestamp = meta.NewTime(time.Date(2026, time.October, 24, 20, 0, 0, 0, time.UTC))
+	c := newClient(t, nil, chbs)
+	controller := NewScheduleController(c, c, newScheme(t), newFakeCR(chi))
+	clock := clocktesting.NewFakePassiveClock(time.Date(2026, time.October, 25, 0, 0, 5, 0, time.UTC))
+	controller.clock = clock
+	reconcile := func() (ctrl.Result, error) { return controller.Reconcile(context.Background(), request("nightly")) }
+
+	// 00:00Z is 02:00 CEST, 01:00Z is 02:00 CET again, 02:00Z is 03:00 CET
+	reconcileUntil(t, reconcile, func() bool { return len(getSchedule(t, c, "nightly").Status.RecentRuns) == 1 })
+	require.Equal(t, []string{"chi-demo-main-0-0: create_remote --rbac nightly-20261025020000"}, sc.commands())
+
+	clock.SetTime(time.Date(2026, time.October, 25, 1, 0, 5, 0, time.UTC))
+	for i := 0; i < 5; i++ {
+		_, err := reconcile()
+		require.NoError(t, err)
+		time.Sleep(time.Millisecond)
+	}
+	got := getSchedule(t, c, "nightly")
+	require.Empty(t, got.Status.Active, "the second 02:00 starts no run")
+	require.Len(t, got.Status.RecentRuns, 1)
+	require.Len(t, sc.commands(), 1)
+	require.Equal(t, time.Date(2026, time.October, 25, 2, 0, 0, 0, time.UTC), got.Status.NextScheduleTime.Time.UTC(), "the next slot is 03:00")
+
+	clock.SetTime(time.Date(2026, time.October, 25, 2, 0, 5, 0, time.UTC))
+	reconcileUntil(t, reconcile, func() bool { return len(getSchedule(t, c, "nightly").Status.RecentRuns) == 2 })
+	require.Equal(t, "chi-demo-main-0-0: create_remote --rbac nightly-20261025030000", sc.commands()[1])
+	for _, run := range getSchedule(t, c, "nightly").Status.RecentRuns {
+		require.Equal(t, api.OperationPhaseCompleted, run.Phase, run.Message)
+	}
 }
 
 // A schedule held by a restore of its cluster runs no slot; a slot missed by more than startingDeadlineSeconds is

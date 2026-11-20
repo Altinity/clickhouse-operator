@@ -23,6 +23,7 @@ import (
 
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	apiMachineryRuntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	clientGoScheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -290,11 +291,61 @@ func setupBackupControllers(manager ctrlRuntime.Manager, cr interfaces.IKubeCR) 
 		Complete(controller.NewRecoveryController(c, apiReader, scheme, cr))
 }
 
-func runBackup(ctx context.Context) error {
+// backupRestartBackoff paces the manager of the backup controllers that is built again, and elected again, after its
+// lease was lost: the waits grow as the leadership keeps being lost, up to the cap.
+var backupRestartBackoff = wait.Backoff{
+	Duration: time.Second,
+	Factor:   2.0,
+	Jitter:   0.1,
+	Cap:      time.Minute,
+	// Steps only bounds the doubling, as of initRetryBackoff
+	Steps: 7,
+}
+
+// runBackup runs the manager of the backup controllers built by initBackup until ctx is done, and builds a new one, and
+// enters the leader election again, each time it stops as a manager does when it loses the Lease: it returns from Start,
+// and a manager is never started twice. The operator is not terminated, as the controllers of ClickHouse go on, and the
+// leader that wins the Lease next, this operator or another, resumes the runs in flight from their status, as after a
+// restart of the operator.
+func runBackup(ctx context.Context, rebuild func(context.Context) error) error {
+	return serveBackup(ctx, startBackupManager, rebuild, backupRestartBackoff)
+}
+
+// startBackupManager runs the manager that initBackup built, until it stops.
+func startBackupManager(ctx context.Context) error {
 	if err := backupManager.Start(ctx); err != nil {
 		backupLogger.Error(err, "run backup - unable to backupManager.Start")
 		return err
 	}
 	// Run successful
 	return nil
+}
+
+// serveBackup starts a manager by start until ctx is done, then, as long as it is not, builds the next one by rebuild,
+// which is retried until it succeeds, or fails for a reason no retry clears, and starts it. The wait between two
+// managers that stopped one after another is the longer, as backoff tells; a manager that ran, as leader or not, longer
+// than the cap of the backoff starts the backoff over, as the leadership it lost was held for a while. It returns nil
+// once ctx is done, else the error that stops the controllers for good.
+func serveBackup(ctx context.Context, start, rebuild func(context.Context) error, backoff wait.Backoff) error {
+	for {
+		started := time.Now()
+		err := start(ctx)
+		if util.IsContextDone(ctx) {
+			return nil
+		}
+		log.Warning("backup controllers stopped, the leader election is entered again, err: %v", err)
+
+		if time.Since(started) > backoff.Cap {
+			backoff.Steps, backoff.Duration = backupRestartBackoff.Steps, backupRestartBackoff.Duration
+		}
+		if util.WaitContextDoneOrTimeout(ctx, backoff.Step()) {
+			return nil
+		}
+		if err := initWithRetry(ctx, backupComponent, rebuild); err != nil {
+			if util.IsContextDone(ctx) {
+				return nil
+			}
+			return err
+		}
+	}
 }

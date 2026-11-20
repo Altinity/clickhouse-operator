@@ -389,6 +389,10 @@ func (o *orchestrator) submit(ctx context.Context, step, host, command string, m
 	}
 	if (row != nil) && o.adoptable(row) {
 		action := api.BackupRunAction{Step: step, Host: host, Command: command, TimeFrom: row.Start, Status: row.Status, Error: row.Error}
+		// The command the run inserted before a restart lost its record changed something as much as one it inserts now
+		o.update(func(status *api.BackupRunStatus) {
+			status.Mutated = status.Mutated || mutates
+		})
 		o.record(action)
 		o.logf("%s: %s already started at %s", host, command, row.Start)
 		return &action, nil

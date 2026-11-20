@@ -36,10 +36,16 @@ type SlotEntry struct {
 	Incremental bool
 	// ConfigOverrides are the config overrides of the runs of the entry
 	ConfigOverrides []string
+	// Zone is the time zone of the schedule, nil for UTC: a daily, weekly or monthly slot whose time does not exist in it
+	// on the day of a clock change that sets the clock forward, as 02:30 in Europe/Berlin on the last Sunday of March, is
+	// the time Go normalizes it to, 03:30, which the backup of the slot is named after
+	Zone *time.Location
 }
 
-// SlotEntries returns the entries of a schedule as the slots of the backups are matched against them.
-func SlotEntries(entries []api.BackupScheduleEntry) []SlotEntry {
+// SlotEntries returns the entries of a schedule as the slots of the backups are matched against them, in its time zone
+// ("" for UTC, as for a zone that is unknown).
+func SlotEntries(entries []api.BackupScheduleEntry, zone string) []SlotEntry {
+	location := loadZone(zone)
 	var resolved []SlotEntry
 	for _, entry := range api.ResolveScheduleTimes(entries) {
 		hour, minute, _ := entry.ParseTime()
@@ -48,14 +54,15 @@ func SlotEntries(entries []api.BackupScheduleEntry) []SlotEntry {
 		}
 		resolved = append(resolved, SlotEntry{
 			Period: entry.Period, Hour: hour, Minute: minute, Day: entry.GetDay(), Keep: int(entry.Keep),
-			Incremental: entry.IsIncremental(), ConfigOverrides: api.ConfigOverrides(entry.ConfigOverrides),
+			Incremental: entry.IsIncremental(), ConfigOverrides: api.ConfigOverrides(entry.ConfigOverrides), Zone: location,
 		})
 	}
 	return resolved
 }
 
 // SlotMatches reports whether the wall time tag, YYYYMMDDHHMMSS, is a slot of the entry, to the minute, or no more
-// than tolerance seconds after one.
+// than tolerance seconds after one. A slot whose time does not exist in the zone of the entry that day is the time the
+// zone moves it to, see inGapSlot.
 func SlotMatches(entry SlotEntry, tag string, tolerance int) bool {
 	if entry.Period == api.BackupPeriodMinute {
 		return true
@@ -63,6 +70,9 @@ func SlotMatches(entry SlotEntry, tag string, tolerance int) bool {
 	t, err := time.Parse(tagLayout, tag)
 	if err != nil {
 		return false
+	}
+	if inGapSlot(entry.Period, entry.Hour, entry.Minute, entry.Day, entry.Zone, t, tolerance) {
+		return true
 	}
 	if tolerance > 0 {
 		back := ((t.Minute()-entry.Minute+60)%60)*60 + t.Second()
@@ -132,6 +142,18 @@ func SlotTag(t time.Time, zone string) string {
 		}
 	}
 	return t.In(location).Format(tagLayout)
+}
+
+// loadZone returns the time zone of the name, nil for UTC and for a zone that is unknown.
+func loadZone(zone string) *time.Location {
+	if (zone == "") || (zone == "UTC") {
+		return nil
+	}
+	location, err := time.LoadLocation(zone)
+	if err != nil {
+		return nil
+	}
+	return location
 }
 
 // BackupSets classifies the keys of the backups the hosts of a series list.
@@ -395,7 +417,7 @@ func (r Retention) heldExpiries(ordered []keyed) (held, byEntry map[string]time.
 				location = time.UTC
 			}
 		}
-		entries := SlotEntries(change.Schedules)
+		entries := SlotEntries(change.Schedules, change.TimeZone)
 		longest := longestEntry(entries)
 		keys := map[string]string{}
 		for _, b := range before {

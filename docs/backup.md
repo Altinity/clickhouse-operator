@@ -1206,6 +1206,21 @@ backup name on every cluster. A cluster that joins - added to the CHI, backup en
 next slot once the CHI has completed its reconcile; a cluster that leaves runs no more (see
 [Hosts that leave a schedule](#hosts-that-leave-a-schedule)).
 
+**Daylight saving time.** A backup is named after the wall-clock time of its slot in `timeZone`, so
+the two nights a year the clocks change are handled by that name:
+
+* **Clocks go forward** (02:00 to 03:00 in `Europe/Berlin`, the last Sunday of March): a `daily`,
+  `weekly` or `monthly` slot whose time does not exist that day - `02:30` - is the time the zone
+  moves it to, `03:30`, and the backup is named after it, `...-20260329033000`. The slot is still the
+  slot of its entries: the run is the weekly one on the Sunday, with that entry's `configOverrides`
+  and its `incremental`, and [retention](#retention) keeps the backup as that of the entry's slot,
+  never as the backup of no slot, which it would prune.
+* **Clocks go back** (03:00 to 02:00, the last Sunday of October): a wall-clock time that happens
+  twice is a slot once, its first occurrence. An `hour` or a `minute` entry runs no slot in the
+  second 02:00 to 03:00, and a `daily` slot of a time in it - `02:30` - runs at its first 02:30, as
+  two runs would make two backups of one name, which the second would refuse as it exists already.
+  The skipped slots are not told: nothing was missed.
+
 The default prefix joins the namespace, CHI and schedule names, shortened with a hash past 112
 characters, so that schedules of the same name of different CHIs, or of CHIs of the same name in
 different namespaces, get different prefixes; see [Storage paths](#storage-paths) for why that
@@ -1609,7 +1624,11 @@ backup each makes or restores and the base of an incremental one, every command 
 `actions`, with its `timeFrom` and the status the sidecar told, and the `plan` its preflight decided,
 such as the hosts that hold a local copy of the backup to restore. The operator runs the backup controllers
 leader-elected, by a `Lease` in its namespace, and the runs live in the leader: a new leader resumes
-every run the status records running. It reads the rows of the commands the run recorded rather than
+every run the status records running. An operator that loses the `Lease` - the API server did not
+answer in time to renew it - stops its backup controllers and its runs, builds new ones and enters the
+election again, waiting longer after each loss, up to a minute; it is not restarted, and the
+ClickHouse controllers go on. Whichever operator leads next, that one or another, resumes the runs as
+after a restart. It reads the rows of the commands the run recorded rather than
 inserting them again, and finds a command the run inserted before the status recorded it by its row,
 from 5 minutes before the run started on - but for a row that finished before the run started, which
 an earlier operation left: a new run never takes a row it did not insert.
@@ -2093,7 +2112,11 @@ operator's role grants `update` and `patch` on the three kinds for that.
   `kill "<command>"`, never a command of anything else - and deletes the local copy of the backup and
   its remote copy, the latter once per shard, each only where the sidecar lists it
   (`OrchestratorDeletionKilled`, `OrchestratorDeletionDeleted`). The clusters it completed on keep
-  their backup. `DeletionCleanedUp` tells it is done, and the resource goes.
+  their backup. `DeletionCleanedUp` tells it is done, and the resource goes. A backup that sent no
+  command - one refused in its preflight, as for a backup of its name that the storage holds already
+  - deletes nothing, above all not the backup that was there before it: `DeletionCleanedUp` tells
+  that it sent no command to any sidecar. A run that was cut before it recorded its hosts is
+  cleaned up on the hosts it inserted a command into.
 
   Every step is bounded by the [timeouts](#timeouts) of the backup: a host that does not answer is
   retried for `unreachableTimeout`, after which every host left is tried once; a kill or a delete is

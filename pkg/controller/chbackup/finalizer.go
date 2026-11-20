@@ -214,9 +214,10 @@ func (c *BackupController) finalize(ctx context.Context, chb *api.ClickHouseBack
 }
 
 // unfinishedHosts returns the hosts a backup that did not complete may have sent a command to on a cluster, with the
-// name of the backup on each: those its run made the backup on, as the run tells them, else those the cluster recorded
-// when the run started, under the name of the backup, and those its runs there made it on before spec.taskID reran it.
-// None when no run started there.
+// name of the backup on each: those its run made the backup on, as the run tells them, else those it inserted a command
+// into before it recorded its hosts, and those its runs there made it on before spec.taskID reran it. None when its run
+// sent no command: one the preflight refused, as for a backup of that name the storage holds already, which is another
+// backup's, never the run's own to delete.
 func unfinishedHosts(chb *api.ClickHouseBackup, cluster *api.OperationClusterStatus) []api.BackupRunHost {
 	status := cluster.Run
 	if run := runs.get(runKeyOf(chb, api.ClickHouseBackupCRDResourceKind, cluster.Name, api.BackupRunOperationBackup)); run != nil {
@@ -227,16 +228,43 @@ func unfinishedHosts(chb *api.ClickHouseBackup, cluster *api.OperationClusterSta
 	case status == nil:
 	case len(status.Hosts) > 0:
 		hosts = slices.Clone(status.Hosts)
-	case chb.Status.BackupName != "":
-		for _, host := range cluster.Hosts {
-			hosts = append(hosts, api.BackupRunHost{Host: host, Backup: chb.Status.BackupName})
-		}
+	default:
+		hosts = hostsOfInsertedCommands(chb, cluster, status)
 	}
 	if previous := api.FindPreviousRun(chb.Status.PreviousRuns, cluster.Name); previous != nil {
 		for _, host := range previous.Hosts {
 			if !slices.Contains(hosts, host) {
 				hosts = append(hosts, host)
 			}
+		}
+	}
+	return hosts
+}
+
+// hostsOfInsertedCommands returns the hosts a run that recorded no hosts yet may have sent a command to, with the name
+// of the backup on each, which the command tells: a run that failed in its preflight inserted none, while one that
+// replaced the copies an earlier run of the backup left inserted a delete before it recorded its hosts. A run that
+// marks a command that changes something sent, but whose record of the command was lost, may have sent it to any host
+// of the cluster, under the name of the backup.
+func hostsOfInsertedCommands(chb *api.ClickHouseBackup, cluster *api.OperationClusterStatus, status *api.BackupRunStatus) []api.BackupRunHost {
+	var hosts []api.BackupRunHost
+	for _, action := range status.Actions {
+		if action.TimeFrom == "" {
+			// Planned, never inserted
+			continue
+		}
+		name := chb.Status.BackupName
+		if fields := strings.Fields(action.Command); len(fields) > 1 {
+			name = fields[len(fields)-1]
+		}
+		host := api.BackupRunHost{Host: action.Host, Backup: name}
+		if !slices.Contains(hosts, host) {
+			hosts = append(hosts, host)
+		}
+	}
+	if (len(hosts) == 0) && status.Mutated && (chb.Status.BackupName != "") {
+		for _, host := range cluster.Hosts {
+			hosts = append(hosts, api.BackupRunHost{Host: host, Backup: chb.Status.BackupName})
 		}
 	}
 	return hosts

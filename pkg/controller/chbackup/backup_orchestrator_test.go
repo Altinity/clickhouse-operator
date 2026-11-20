@@ -24,9 +24,11 @@ import (
 	"sync"
 	"testing"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -631,6 +633,18 @@ func TestOrchestratorResumesACommandItRecorded(t *testing.T) {
 	require.Empty(t, lost.commands(), "the row of the command started after the run did")
 }
 
+// A command a resumed run adopts, which it inserted before a restart lost its record, marks the run as one that changed
+// something, as a command it inserts does: the run's cleanup after a failure, and its deletion, count on it.
+func TestOrchestratorMarksAnAdoptedCommandMutated(t *testing.T) {
+	sc := newFakeSidecars("h0")
+	sc.hosts["h0"].actions = []actionRow{{Command: "create_remote --rbac b1", Start: sc.now(), Finish: sc.now(), Status: actionSuccess}}
+	status := &api.BackupRunStatus{Operation: api.BackupRunOperationBackup}
+	outcome, status, _ := runOf(t, sc, backupSpec("b1", "h0"), status)
+	require.False(t, outcome.failed, outcome.message)
+	require.Empty(t, sc.commands(), "the command is adopted, not inserted again")
+	require.True(t, status.Mutated)
+}
+
 // An identical command of an earlier operation is no command of the run: a new run inserts its own, and so does a run
 // resumed after a restart for a row that finished before it started.
 func TestOrchestratorAdoptsNoCommandOfAnEarlierOperation(t *testing.T) {
@@ -663,7 +677,7 @@ func TestOrchestratorPrunesAfterAScheduledRun(t *testing.T) {
 	spec := &model.RunSpec{
 		Operation: api.BackupRunOperationBackup, Cluster: "main", Prefix: "nightly",
 		Slot:           time.Date(2026, time.November, 12, 3, 0, 0, 0, time.UTC),
-		Entries:        model.SlotEntries([]api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Time: "03:00", Keep: 2}}),
+		Entries:        model.SlotEntries([]api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Time: "03:00", Keep: 2}}, ""),
 		BackupHosts:    []string{"h0", "h1"},
 		RetentionHosts: []string{"h0", "h1"},
 	}
@@ -686,6 +700,39 @@ func TestOrchestratorPrunesAfterAScheduledRun(t *testing.T) {
 	require.Len(t, sc.commands(), before+2)
 }
 
+// The run of a slot whose time does not exist the day the clocks go forward, 02:30 in Berlin on 2026-03-29, which the zone
+// moves to 03:30, which the backup is named after, is the run of the entry whose slot it is: it makes the backup as that
+// entry says, with its config overrides and as incremental, and retention keeps it, as it keeps the backup of any slot.
+func TestOrchestratorRunsTheSlotOfASpringForwardGap(t *testing.T) {
+	sc := newFakeSidecars("h0")
+	for _, name := range []string{"nightly-20260327023000", "nightly-20260328023000"} {
+		sc.hosts["h0"].remote = append(sc.hosts["h0"].remote, backupRow{Name: name, DataSize: 1, MetadataSize: 1})
+	}
+	spec := &model.RunSpec{
+		Operation: api.BackupRunOperationBackup, Cluster: "main", Prefix: "nightly", TimeZone: "Europe/Berlin",
+		Slot: time.Date(2026, time.March, 29, 1, 30, 0, 0, time.UTC),
+		Entries: model.SlotEntries([]api.BackupScheduleEntry{
+			{Period: api.BackupPeriodDaily, Time: "02:30", Keep: 2},
+			{Period: api.BackupPeriodWeekly, Day: ptr.To(int32(0)), Time: "02:30", Keep: 1,
+				ConfigOverrides: []string{"S3_STORAGE_CLASS=GLACIER"}},
+		}, "Europe/Berlin"),
+		BackupHosts:    []string{"h0"},
+		RetentionHosts: []string{"h0"},
+	}
+	outcome, _, _ := runOf(t, sc, spec, nil)
+	require.False(t, outcome.failed, outcome.message)
+	require.Equal(t, "nightly-20260329033000", outcome.backupName)
+	require.Equal(t, []string{"h0: create_remote --rbac --env=S3_STORAGE_CLASS=GLACIER nightly-20260329033000"}, sc.commands()[:1],
+		"the slot is the weekly entry's, whose overrides the backup is made with")
+
+	// The next day's run keeps the backup of the gap, which is the Sunday's, and prunes the one before it
+	spec.Slot = time.Date(2026, time.March, 30, 0, 30, 0, 0, time.UTC)
+	outcome, _, _ = runOf(t, sc, spec, nil)
+	require.False(t, outcome.failed, outcome.message)
+	require.ElementsMatch(t, []string{"h0: delete remote nightly-20260328023000", "h0: delete remote nightly-20260327023000"},
+		commandsHolding(sc, "delete remote"), "the backup of the gap is kept")
+}
+
 // An incremental entry makes the backup incremental from the newest backup of the series every host holds, until the
 // chain is as long as the entry keeps.
 func TestOrchestratorMakesIncrementalBackups(t *testing.T) {
@@ -698,7 +745,7 @@ func TestOrchestratorMakesIncrementalBackups(t *testing.T) {
 		Operation: api.BackupRunOperationBackup, Cluster: "main", Prefix: "nightly",
 		Slot: time.Date(2026, time.November, 12, 3, 0, 0, 0, time.UTC),
 		Entries: model.SlotEntries([]api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Time: "03:00", Keep: 3,
-			Incremental: types.NewStringBool(true)}}),
+			Incremental: types.NewStringBool(true)}}, ""),
 		BackupHosts:    []string{"h0"},
 		RetentionHosts: []string{"h0"},
 	}
@@ -716,7 +763,7 @@ func TestOrchestratorNamesTheBackupOfEveryShard(t *testing.T) {
 		Operation: api.BackupRunOperationBackup, Cluster: "main", Prefix: "nightly",
 		Slot:        time.Date(2026, time.November, 12, 3, 0, 0, 0, time.UTC),
 		Naming:      model.Naming{Template: api.BackupNamingShardTime, Cluster: "main", Shards: []string{"0", "1"}, ShardOf: map[string]int{"h0": 0, "h1": 1}},
-		Entries:     model.SlotEntries([]api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Time: "03:00", Keep: 2}}),
+		Entries:     model.SlotEntries([]api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Time: "03:00", Keep: 2}}, ""),
 		BackupHosts: []string{"h0", "h1"},
 	}
 	outcome, _, _ := runOf(t, sc, spec, nil)

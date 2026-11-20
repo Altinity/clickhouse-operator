@@ -119,6 +119,41 @@ func TestDeletedRunningBackupIsKilledAndDeleted(t *testing.T) {
 	require.Len(t, eventMessages(t, c, "OrchestratorDeletionKilled"), 2)
 }
 
+// A backup refused in preflight, as one of the name the storage holds already, sent no command to any sidecar: it
+// deletes nothing on its deletion, above all not the backup of that name which was there before it, and tells so.
+func TestDeletedRefusedBackupDeletesNothing(t *testing.T) {
+	sc := newFakeSidecars()
+	sc.any = true
+	withSidecars(t, sc)
+	for _, host := range backupHosts {
+		sc.hosts[host] = &fakeHost{
+			remote: []backupRow{{Name: "manual", Location: "remote", DataSize: 100, MetadataSize: 10}},
+			local:  []backupRow{{Name: "manual", Location: "local", DataSize: 100, MetadataSize: 10}},
+		}
+	}
+	chb := newBackupCR("b1")
+	chb.Spec.BackupName = "manual"
+	c := newClient(t, nil, chb)
+	controller := NewBackupController(c, c, newScheme(t), newFakeCR(readyInstallation(t)))
+	reconcile := func() (ctrl.Result, error) { return controller.Reconcile(context.Background(), request("b1")) }
+	reconcileUntil(t, reconcile, func() bool { return getBackup(t, c, "b1").Status.Phase == api.OperationPhaseFailed })
+	require.Empty(t, sc.commands(), "the preflight refused the backup before any command")
+	got := getBackup(t, c, "b1")
+	require.Empty(t, got.Status.Clusters[0].Run.Hosts)
+
+	require.NoError(t, c.Delete(context.Background(), got))
+	reconcileUntil(t, reconcile, func() bool { return gone(t, c, &api.ClickHouseBackup{}, "b1") })
+	require.Empty(t, sc.commands(), "the backup that was there before is not the refused backup's to delete")
+	for _, host := range backupHosts {
+		require.Len(t, sc.hosts[host].remote, 1)
+		require.Len(t, sc.hosts[host].local, 1)
+	}
+	require.Empty(t, eventMessages(t, c, reasonDeletionCleanup))
+	cleaned := eventMessages(t, c, reasonDeletionCleanedUp)
+	require.Len(t, cleaned, 1)
+	require.Contains(t, cleaned[0], "it sent no command to any sidecar")
+}
+
 // A backup deleted once it completed keeps its remote backup, which retention owns: no command is sent, and it goes.
 func TestDeletedCompletedBackupKeepsItsRemoteBackup(t *testing.T) {
 	sc := newFakeSidecars()
@@ -351,4 +386,28 @@ func TestKillCommandQuotesTheCommand(t *testing.T) {
 	require.True(t, namesBackup("create_remote --rbac --diff-from-remote=b0 b1", "b1"))
 	require.False(t, namesBackup("create_remote --rbac --diff-from-remote=b1 b2", "b1"), "a base is no backup of the deletion")
 	require.False(t, namesBackup("b1", "b1"))
+}
+
+// A run that did not record its hosts yet cleans up what it may have sent a command to: the hosts it inserted a command
+// into, under the name the command tells, or any host of the cluster when it marks a command sent whose record was
+// lost; one that sent none, planned commands included, cleans up nothing.
+func TestUnfinishedHostsOfARunThatRecordedNoHosts(t *testing.T) {
+	chb := newBackupCR("b1")
+	chb.Status.BackupName = "manual"
+	cluster := func(run *api.BackupRunStatus) *api.OperationClusterStatus {
+		return &api.OperationClusterStatus{Name: "main", Hosts: []string{"h0", "h1"}, Run: run}
+	}
+	op := api.BackupRunOperationBackup
+	require.Empty(t, unfinishedHosts(chb, cluster(&api.BackupRunStatus{Operation: op})), "refused in preflight")
+	require.Empty(t, unfinishedHosts(chb, cluster(&api.BackupRunStatus{Operation: op,
+		Actions: []api.BackupRunAction{{Step: stepCreate, Host: "h0", Command: "create_remote --rbac manual"}}})), "planned, never inserted")
+	require.Equal(t, []api.BackupRunHost{{Host: "h1", Backup: "manual"}}, unfinishedHosts(chb, cluster(&api.BackupRunStatus{
+		Operation: op,
+		Mutated:   true,
+		Actions: []api.BackupRunAction{
+			{Step: stepReplaceLocal, Host: "h1", Command: "delete local manual", TimeFrom: "2026-11-12 00:00:01"},
+			{Step: stepCreate, Host: "h0", Command: "create_remote --rbac manual"},
+		}})), "a command inserted before the hosts were recorded")
+	require.Equal(t, []api.BackupRunHost{{Host: "h0", Backup: "manual"}, {Host: "h1", Backup: "manual"}},
+		unfinishedHosts(chb, cluster(&api.BackupRunStatus{Operation: op, Mutated: true})), "a command whose record was lost")
 }

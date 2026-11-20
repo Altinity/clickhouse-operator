@@ -55,6 +55,9 @@ func TestMain(m *testing.M) {
 	os.Unsetenv("WATCH_NAMESPACE")
 	os.Unsetenv("WATCH_NAMESPACES")
 	chop.New(nil, nil, "")
+	// The tests run as the leader of a term that never ends, which the manager of the backup controllers starts in the
+	// operator
+	runs.ctx = context.Background()
 	os.Exit(m.Run())
 }
 

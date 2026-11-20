@@ -48,14 +48,85 @@ func lastDayOfMonth(t time.Time) int {
 	return time.Date(t.Year(), t.Month()+1, 0, 0, 0, 0, 0, time.UTC).Day()
 }
 
+// inGapSlot reports whether the wall time wall, which is read as a UTC time but is a wall-clock time in the zone, is the
+// slot a daily, weekly or monthly entry that sets the time hour:minute has on the day of wall, or on the day before,
+// when that time does not exist in the zone that day, as 02:30 in Europe/Berlin on the last Sunday of March, where the
+// clock goes from 02:00 to 03:00: Go normalizes the time to 03:30, which the run of the slot, and the backup it makes, go
+// by. It is the slot of the entry whose day, day being the weekday of a weekly entry and the day of the month of a
+// monthly one, is that day, no more than tolerance seconds after it, a minute for none. A time that exists is no
+// concern of this: the entry matches it as it is.
+func inGapSlot(period api.BackupPeriod, hour, minute, day int, zone *time.Location, wall time.Time, tolerance int) bool {
+	if (zone == nil) || (zone == time.UTC) {
+		return false
+	}
+	switch period {
+	case api.BackupPeriodDaily, api.BackupPeriodWeekly, api.BackupPeriodMonthly:
+	default:
+		return false
+	}
+	within := time.Minute
+	if tolerance > 0 {
+		within = time.Duration(tolerance) * time.Second
+	}
+	for back := 0; back <= 1; back++ {
+		configured := time.Date(wall.Year(), wall.Month(), wall.Day()-back, hour, minute, 0, 0, time.UTC)
+		switch period {
+		case api.BackupPeriodWeekly:
+			if int(configured.Weekday()) != day {
+				continue
+			}
+		case api.BackupPeriodMonthly:
+			if configured.Day() != min(day, lastDayOfMonth(configured)) {
+				continue
+			}
+		}
+		slot := time.Date(configured.Year(), configured.Month(), configured.Day(), hour, minute, 0, 0, zone)
+		shown := time.Date(slot.Year(), slot.Month(), slot.Day(), slot.Hour(), slot.Minute(), 0, 0, time.UTC)
+		if shown.Equal(configured) {
+			continue
+		}
+		if diff := wall.Sub(shown); (diff >= 0) && (diff < within) {
+			return true
+		}
+	}
+	return false
+}
+
+// secondOccurrence reports whether t is in the stretch of a wall-clock time the zone repeats when it sets the clock back,
+// as 02:00 to 03:00 in Europe/Berlin on the last Sunday of October, its second occurrence, which starts where the clock
+// was set back, start, by delta. t is in the zone, as ZoneBounds tells the zone of t.
+func secondOccurrence(t time.Time) (start time.Time, delta time.Duration, ok bool) {
+	start, _ = t.ZoneBounds()
+	if start.IsZero() {
+		return time.Time{}, 0, false
+	}
+	_, before := start.Add(-time.Nanosecond).Zone()
+	_, after := t.Zone()
+	delta = time.Duration(before-after) * time.Second
+	return start, delta, (delta > 0) && (t.Sub(start) < delta)
+}
+
+// firstOccurrence returns t, or the instant of the same wall-clock time its first occurrence is, when it is the second
+// one: a slot of a wall-clock time the zone repeats is that of its first occurrence, which runs once.
+func firstOccurrence(t time.Time) time.Time {
+	if _, delta, ok := secondOccurrence(t); ok {
+		return t.Add(-delta)
+	}
+	return t
+}
+
 // matches reports whether the entry, its time resolved, is due at the minute of t, a wall-clock time in the
-// schedule's time zone.
+// schedule's time zone, the zone of t.
 func matches(entry api.BackupScheduleEntry, t time.Time) bool {
 	hour, minute, err := entry.ParseTime()
 	if err != nil {
 		return false
 	}
 	if entry.Period == api.BackupPeriodMinute {
+		return true
+	}
+	wall := time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), 0, time.UTC)
+	if inGapSlot(entry.Period, hour, minute, entry.GetDay(), t.Location(), wall, 0) {
 		return true
 	}
 	if t.Minute() != minute {
@@ -104,6 +175,10 @@ func Winner(matched []api.BackupScheduleEntry) *api.BackupScheduleEntry {
 // LatestSlot returns the latest slot of the entry at or before now, in the time zone tz, nil meaning UTC. The entry
 // is taken as given: resolve its time first, see api.ResolveScheduleTimes. An entry that does not validate yields the
 // zero time.
+//
+// A slot whose wall-clock time the zone repeats, as it sets the clock back, is that of its first occurrence: the second
+// one is no slot, as the backup of a slot is named after its wall-clock time, and two would be named alike. A slot whose
+// time the zone skips, as it sets the clock forward, is the time Go normalizes it to.
 func LatestSlot(entry api.BackupScheduleEntry, tz *time.Location, now time.Time) time.Time {
 	if tz == nil {
 		tz = time.UTC
@@ -115,16 +190,21 @@ func LatestSlot(entry api.BackupScheduleEntry, tz *time.Location, now time.Time)
 	local := now.In(tz)
 	switch entry.Period {
 	case api.BackupPeriodMinute:
-		return now.Truncate(time.Minute)
+		slot := now.Truncate(time.Minute)
+		if start, _, repeated := secondOccurrence(slot.In(tz)); repeated {
+			// The minutes of the repeated stretch are those of its first occurrence
+			slot = start.Add(-time.Minute)
+		}
+		return slot
 	case api.BackupPeriodHour:
 		// Every instant has a local minute, so the slot is found in absolute time, which a DST change never upsets
 		back := time.Duration((local.Minute()-minute+60)%60)*time.Minute +
 			time.Duration(local.Second())*time.Second + time.Duration(local.Nanosecond())
-		return local.Add(-back)
+		return firstOccurrence(local.Add(-back))
 	case api.BackupPeriod6Hours:
 		for day := 0; day <= 1; day++ {
 			for k := 3; k >= 0; k-- {
-				slot := time.Date(local.Year(), local.Month(), local.Day()-day, hour%6+6*k, minute, 0, 0, tz)
+				slot := firstOccurrence(time.Date(local.Year(), local.Month(), local.Day()-day, hour%6+6*k, minute, 0, 0, tz))
 				if !slot.After(now) {
 					return slot
 				}
@@ -132,7 +212,7 @@ func LatestSlot(entry api.BackupScheduleEntry, tz *time.Location, now time.Time)
 		}
 	case api.BackupPeriodDaily:
 		for day := 0; day <= 2; day++ {
-			slot := time.Date(local.Year(), local.Month(), local.Day()-day, hour, minute, 0, 0, tz)
+			slot := firstOccurrence(time.Date(local.Year(), local.Month(), local.Day()-day, hour, minute, 0, 0, tz))
 			if !slot.After(now) {
 				return slot
 			}
@@ -140,7 +220,7 @@ func LatestSlot(entry api.BackupScheduleEntry, tz *time.Location, now time.Time)
 	case api.BackupPeriodWeekly:
 		back := (int(local.Weekday()) - entry.GetDay() + 7) % 7
 		for week := 0; week <= 2; week++ {
-			slot := time.Date(local.Year(), local.Month(), local.Day()-back-7*week, hour, minute, 0, 0, tz)
+			slot := firstOccurrence(time.Date(local.Year(), local.Month(), local.Day()-back-7*week, hour, minute, 0, 0, tz))
 			if !slot.After(now) {
 				return slot
 			}
@@ -169,15 +249,27 @@ func NextSlot(entry api.BackupScheduleEntry, tz *time.Location, now time.Time) t
 	local := now.In(tz)
 	switch entry.Period {
 	case api.BackupPeriodMinute:
-		return now.Truncate(time.Minute).Add(time.Minute)
+		slot := now.Truncate(time.Minute).Add(time.Minute)
+		if start, delta, repeated := secondOccurrence(slot.In(tz)); repeated {
+			// The minutes of the repeated stretch are those of its first occurrence
+			slot = start.Add(delta)
+		}
+		return slot
 	case api.BackupPeriodHour:
 		if latest := LatestSlot(entry, tz, now); !latest.IsZero() {
-			return latest.Add(time.Hour)
+			slot := latest.Add(time.Hour)
+			for {
+				if _, _, repeated := secondOccurrence(slot); !repeated {
+					break
+				}
+				slot = slot.Add(time.Hour)
+			}
+			return slot
 		}
 	case api.BackupPeriod6Hours:
 		for day := 0; day <= 1; day++ {
 			for k := 0; k <= 3; k++ {
-				slot := time.Date(local.Year(), local.Month(), local.Day()+day, hour%6+6*k, minute, 0, 0, tz)
+				slot := firstOccurrence(time.Date(local.Year(), local.Month(), local.Day()+day, hour%6+6*k, minute, 0, 0, tz))
 				if slot.After(now) {
 					return slot
 				}
@@ -185,7 +277,7 @@ func NextSlot(entry api.BackupScheduleEntry, tz *time.Location, now time.Time) t
 		}
 	case api.BackupPeriodDaily:
 		for day := 0; day <= 2; day++ {
-			slot := time.Date(local.Year(), local.Month(), local.Day()+day, hour, minute, 0, 0, tz)
+			slot := firstOccurrence(time.Date(local.Year(), local.Month(), local.Day()+day, hour, minute, 0, 0, tz))
 			if slot.After(now) {
 				return slot
 			}
@@ -193,7 +285,7 @@ func NextSlot(entry api.BackupScheduleEntry, tz *time.Location, now time.Time) t
 	case api.BackupPeriodWeekly:
 		ahead := (entry.GetDay() - int(local.Weekday()) + 7) % 7
 		for week := 0; week <= 2; week++ {
-			slot := time.Date(local.Year(), local.Month(), local.Day()+ahead+7*week, hour, minute, 0, 0, tz)
+			slot := firstOccurrence(time.Date(local.Year(), local.Month(), local.Day()+ahead+7*week, hour, minute, 0, 0, tz))
 			if slot.After(now) {
 				return slot
 			}
@@ -216,7 +308,7 @@ func monthlySlot(year int, month time.Month, day, hour, minute int, tz *time.Loc
 	if day > last {
 		day = last
 	}
-	return time.Date(first.Year(), first.Month(), day, hour, minute, 0, 0, tz)
+	return firstOccurrence(time.Date(first.Year(), first.Month(), day, hour, minute, 0, 0, tz))
 }
 
 // DueEntry is an entry of a schedule that is due, with the slot it is due at.

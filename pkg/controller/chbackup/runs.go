@@ -16,6 +16,7 @@ package chbackup
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -84,13 +85,21 @@ func (r *run) finished() (runOutcome, bool) {
 	}
 }
 
+// errRunsNotStarted is what a run is refused with while this operator leads no term of the backup controllers: the
+// reconcile that asked is retried, as the controllers of a manager that is about to lead, or has just lost the lease,
+// run a reconcile or two before, or after, its registry does.
+var errRunsNotStarted = errors.New("the backup runs of this operator are not started: it does not lead the backup controllers (yet)")
+
 // runRegistry keeps the runs of the operator. The backup controllers are leader-elected, so the runs of one
-// installation live in one operator; a run outlives the reconcile that started it, and a reconcile after a restart of
-// the operator resumes it from its status.
+// installation live in one operator, in one term of its leadership; a run outlives the reconcile that started it, and a
+// reconcile that follows a restart of the operator, or a term of its leadership that ended with the lease lost, resumes
+// it from its status: the registry holds the runs of a term as long as it lasts, and Start of the next term drops those
+// the end of the earlier one interrupted.
 type runRegistry struct {
 	mu   sync.Mutex
 	runs map[runKey]*run
-	// ctx is the lifetime of the operator, which stops every run
+	// ctx is the lifetime of the term the registry runs in, which stops every run: nil until the first term starts, and
+	// done once it ended, when no run starts
 	ctx context.Context
 	// notify enqueues a reconcile of the resource a run works for, by kind
 	notify map[string]chan event.GenericEvent
@@ -103,7 +112,6 @@ type runRegistry struct {
 func newRunRegistry() *runRegistry {
 	return &runRegistry{
 		runs:        map[runKey]*run{},
-		ctx:         context.Background(),
 		notify:      map[string]chan event.GenericEvent{},
 		newSidecars: func(spec *model.RunSpec) (sidecars, error) { return newSQLSidecars(spec.Endpoint) },
 		clock:       clock.RealClock{},
@@ -114,12 +122,45 @@ func newRunRegistry() *runRegistry {
 // runs holds the runs of the operator, shared by every backup controller.
 var runs = newRunRegistry()
 
-// Start sets the lifetime of the runs, until ctx is done: the manager of the backup controllers runs it.
+// Start starts a term of the runs, which lasts until ctx is done: the manager of the backup controllers runs it, once it
+// leads, as many times as the operator leads, each time with a manager of its own. It first lets the runs of an earlier
+// term end, which stopped with it, and drops those that ended interrupted, which the controllers of the new term
+// resume from their status, as they do after a restart of the operator; a run that completed keeps its outcome, which
+// its resource has still to record.
 func (r *runRegistry) Start(ctx context.Context) error {
+	if err := r.settle(ctx); err != nil {
+		return nil
+	}
 	r.mu.Lock()
 	r.ctx = ctx
 	r.mu.Unlock()
 	<-ctx.Done()
+	return nil
+}
+
+// settle waits until the runs of the registry ended, which a term that ended stopped, then drops those that ended
+// interrupted; it gives up with the error of ctx when ctx is done first, which leaves them as they are.
+func (r *runRegistry) settle(ctx context.Context) error {
+	r.mu.Lock()
+	var pending []*run
+	for _, run := range r.runs {
+		pending = append(pending, run)
+	}
+	r.mu.Unlock()
+	for _, run := range pending {
+		select {
+		case <-run.done:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for key, run := range r.runs {
+		if run.ended() && run.interrupted {
+			delete(r.runs, key)
+		}
+	}
 	return nil
 }
 
@@ -225,6 +266,9 @@ func (r *runRegistry) start(
 	}
 	ctx := r.ctx
 	r.mu.Unlock()
+	if (ctx == nil) || (ctx.Err() != nil) {
+		return nil, errRunsNotStarted
+	}
 
 	sc, err := r.newSidecars(spec)
 	if err != nil {
@@ -266,8 +310,10 @@ func (r *runRegistry) start(
 	r.runs[key] = run
 	r.mu.Unlock()
 	go func() {
-		defer close(run.done)
+		// The deferred calls run in the opposite order: the run is cancelled, then done, then its resource is told, so
+		// that the reconcile that follows finds the run ended
 		defer run.orch.changed()
+		defer close(run.done)
 		defer cancel()
 		run.outcome = run.orch.run(runCtx)
 		run.interrupted = ctx.Err() != nil
