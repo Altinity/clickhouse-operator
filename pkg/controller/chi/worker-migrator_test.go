@@ -77,6 +77,50 @@ func TestShouldMigrateTablesSkipsHostThatHasData(t *testing.T) {
 		"a host with no tables recorded must remain eligible for migration retry")
 }
 
+// Initial CHI creation does not record hostsWithTablesCreated. During scale-up,
+// the original host is already populated and must not query an unavailable new peer.
+func TestShouldMigrateTablesSkipsAncestorWithoutMigrationMarker(t *testing.T) {
+	w := &worker{}
+	previousHost := &api.Host{Name: "0-0"}
+	previousHost.Runtime.Address.HostName = "0-0"
+	previous := &api.ClickHouseInstallation{}
+	previous.Spec.Configuration = &api.Configuration{
+		Clusters: []*api.Cluster{{
+			Name: "simple",
+			Layout: &api.ChiClusterLayout{
+				Shards: []*api.ChiShard{{
+					Name: "0",
+					Hosts: []*api.Host{previousHost},
+				}},
+			},
+		}},
+	}
+
+	makeHost := func(name string) *api.Host {
+		host := newTestHost()
+		host.Name = name
+		host.Runtime.Address.ClusterName = "simple"
+		host.Runtime.Address.ShardName = "0"
+		host.Runtime.Address.HostName = name
+		host.GetCR().(*api.ClickHouseInstallation).SetAncestor(previous)
+		return host
+	}
+
+	existingHost := makeHost("0-0")
+	require.True(t, existingHost.HasAncestor())
+	require.Empty(t, existingHost.GetCR().IEnsureStatus().GetHostsWithTablesCreated())
+	require.False(t, existingHost.HasData())
+	require.False(t, w.shouldMigrateTables(existingHost),
+		"an existing host must not read its schema from an unready new peer")
+
+	newHost := makeHost("0-1")
+	require.False(t, newHost.HasAncestor())
+	require.True(t, w.shouldMigrateTables(newHost),
+		"a newly added host must still migrate even when the marker list is empty")
+	require.True(t, w.shouldMigrateTables(existingHost, NewMigrateTableOptions().SetForceMigrate()),
+		"forced migration after data loss must override the ancestor guard")
+}
+
 // ForceMigrate outranks HasData, which is what lets the data-loss recovery path replay the schema
 // onto a host that is already listed as tables-created.
 func TestShouldMigrateTablesForceOutranksHasData(t *testing.T) {

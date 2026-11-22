@@ -175,6 +175,12 @@ func (w *worker) shouldMigrateTables(host *api.Host, opts ...*migrateTableOption
 		// Force migration requested
 		return true
 
+	case host.HasAncestor():
+		// Existing hosts already have a schema even when hostsWithTablesCreated is
+		// empty (initial installation skips migration). Only new hosts need it.
+		// ForceMigrate above still handles schema restoration after data loss.
+		return false
+
 	case host.HasData():
 		// This host is listed as having tables created already, no need to migrate again
 		return false
