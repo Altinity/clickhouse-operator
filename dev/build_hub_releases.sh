@@ -29,10 +29,22 @@ set -euo pipefail
 #   OCP_REPO_PATH       — path to community-operators-prod clone (default: ~/dev/community-operators-prod)
 #   UPSTREAM_REMOTE     — git remote name for canonical upstream (default: community)
 #   PREVIOUS_VERSION    — version this release replaces in OLM upgrade graph
+#   SRC_REMOTE          — git remote of clickhouse-operator repo to push hub manifests to (default: origin)
+#   FORK_OWNER          — GitHub account owning the catalog forks (default: current gh user)
 
 # Source configuration (sets VERSION, SRC_ROOT, etc. from release file and repo paths)
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${CUR_DIR}/go_build_config.sh"
+
+# gh is required to open release PRs (Section 7) — check upfront, before anything is pushed
+if ! command -v gh >/dev/null 2>&1; then
+    echo "ERROR: gh (GitHub CLI) not found. Install it: brew install gh  (other platforms: https://cli.github.com)" >&2
+    exit 1
+fi
+if ! gh auth status >/dev/null 2>&1; then
+    echo "ERROR: gh is not authenticated. Run: gh auth login" >&2
+    exit 1
+fi
 
 # ==================================================================================
 # Section 1: Build OLM bundle manifests locally
@@ -78,14 +90,21 @@ OPERATORHUB_DIR="${SRC_ROOT}/deploy/operatorhub"
 # Section 2: Define destination catalog repos
 #
 # The operator is published to two community catalogs:
-#   1. community-operators       — OperatorHub.io (vanilla Kubernetes)
-#   2. community-operators-prod  — Red Hat OpenShift certified catalog
+#   1. community-operators       — OperatorHub.io (vanilla Kubernetes) - https://github.com/k8s-operatorhub/community-operators
+#   2. community-operators-prod  — Red Hat OpenShift certified catalog - https://github.com/redhat-openshift-ecosystem/community-operators-prod
+# Forks, clones and remotes are prepared by dev/clone_hub_repos.sh
 # Both follow the same directory layout: operators/clickhouse/<version>/manifests/
 # ==================================================================================
 
+# Upstream catalog repos, index-aligned with REPO_ROOTS
+UPSTREAMS=(
+    "k8s-operatorhub/community-operators"
+    "redhat-openshift-ecosystem/community-operators-prod"
+)
+
 REPO_ROOTS=(
-    "${CO_REPO_PATH:-${HOME}/dev/community-operators}"
-    "${OCP_REPO_PATH:-${HOME}/dev/community-operators-prod}"
+    "${CO_REPO_PATH:-${HOME}/src/github.com/k8s-operatorhub/community-operators}"
+    "${OCP_REPO_PATH:-${HOME}/src/github.com/redhat-openshift-ecosystem/community-operators-prod}"
 )
 
 DESTINATIONS=()
@@ -228,12 +247,58 @@ done
 # so the build artifacts are tracked in version control.
 # ==================================================================================
 
+SRC_REMOTE="${SRC_REMOTE:-origin}"
+
 echo ""
 echo "Committing hub manifests to clickhouse-operator repo ..."
 git -C "${SRC_ROOT}" add "deploy/operatorhub/" || { echo "  [ERROR] git add failed in ${SRC_ROOT}"; exit 1; }
 git -C "${SRC_ROOT}" commit -m "env: hub manifests" || { echo "  [ERROR] git commit failed in ${SRC_ROOT}"; exit 1; }
-git -C "${SRC_ROOT}" push altinity || { echo "  [ERROR] git push altinity failed in ${SRC_ROOT}"; exit 1; }
-echo "  [OK]   Committed and pushed hub manifests to altinity"
+git -C "${SRC_ROOT}" push "${SRC_REMOTE}" || { echo "  [ERROR] git push ${SRC_REMOTE} failed in ${SRC_ROOT}"; exit 1; }
+echo "  [OK]   Committed and pushed hub manifests to ${SRC_REMOTE}"
+
+# ==================================================================================
+# Section 7: Open release PRs from forks to upstream catalog repos
+#
+# PR head is <FORK_OWNER>:main (force-pushed in Section 5). Skipped if an open PR
+# with the same title from the same author already exists (re-run safe).
+# ==================================================================================
+
+FORK_OWNER="${FORK_OWNER:-$(gh api user --jq .login)}"
+PR_TITLE="operator clickhouse (${VERSION})"
+
+function create_release_pr() {
+    local UPSTREAM="$1"
+    local REPO_ROOT="$2"
+
+    local existing
+    existing=$(gh pr list -R "${UPSTREAM}" --state open --author "${FORK_OWNER}" \
+        --search "\"${PR_TITLE}\" in:title" --json url --jq '.[0].url // empty')
+    if [[ -n "${existing}" ]]; then
+        echo "  [SKIP] PR already open: ${existing}"
+        return 0
+    fi
+
+    local body_args=(--body "Release ${VERSION} of Altinity Kubernetes Operator for ClickHouse: https://github.com/Altinity/clickhouse-operator/releases/tag/release-${VERSION}")
+    if [[ -f "${REPO_ROOT}/docs/pull_request_template.md" ]]; then
+        body_args=(--body-file "${REPO_ROOT}/docs/pull_request_template.md")
+    fi
+
+    gh pr create -R "${UPSTREAM}" --base main --head "${FORK_OWNER}:main" \
+        --title "${PR_TITLE}" "${body_args[@]}" \
+        || { echo "  [ERROR] gh pr create failed for ${UPSTREAM}"; return 1; }
+}
+
+echo ""
+echo "=================================================================================="
+echo "Release PRs '${PR_TITLE}' will be opened from ${FORK_OWNER}:main to:"
+for UPSTREAM in "${UPSTREAMS[@]}"; do
+    echo "  https://github.com/${UPSTREAM}"
+done
+read -n 1 -r -s -p $'Press enter to create PRs...\n'
+
+for i in "${!UPSTREAMS[@]}"; do
+    create_release_pr "${UPSTREAMS[$i]}" "${REPO_ROOTS[$i]}"
+done
 
 echo ""
 echo "DONE"
