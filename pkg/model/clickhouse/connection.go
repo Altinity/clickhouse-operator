@@ -225,6 +225,11 @@ func legacyVerifiedTLSConfig() *tls.Config {
 // (InsecureSkipVerify=true, preserves pre-0.27.1 behavior). Empty verify with
 // other knobs (e.g. user set minVersion but not verify) is treated as Strict —
 // users opting into TLS hardening should not silently get InsecureSkipVerify=true.
+//
+// A client certificate (chopconf clickhouse.access.clientCertFile/clientKeyFile) leaves the
+// legacy path and is presented on every handshake, but it does not change the verify polarity:
+// like rootCA it is not an opt-in to server verification, so mutual TLS should be paired with an
+// explicit verify=Strict.
 func (c *Connection) setupTLSAdvanced() {
 	// Nothing to do for HTTP DSNs.
 	if c.params.scheme != api.ChSchemeHTTPS {
@@ -235,10 +240,13 @@ func (c *Connection) setupTLSAdvanced() {
 	minVersion := c.params.TLSMinVersion()
 	serverName := c.params.TLSServerName()
 	certString := c.params.rootCA
+	clientCertFile := c.params.ClientCertFile()
+	clientKeyFile := c.params.ClientKeyFile()
+	clientCert := c.params.hasClientCertificate()
 
 	// Legacy path: no knobs set at all → the basic registration from setupTLSBasic
 	// already covers this DSN (InsecureSkipVerify=true, default MinVersion).
-	if (verify == "") && (minVersion == "") && (serverName == "") && (certString == "") {
+	if (verify == "") && (minVersion == "") && (serverName == "") && (certString == "") && !clientCert {
 		c.l.V(1).F().Info("TLS setup: no security knobs set, using legacy registration")
 		return
 	}
@@ -271,13 +279,21 @@ func (c *Connection) setupTLSAdvanced() {
 		}
 	}
 
+	if clientCert {
+		// Present the client certificate on every handshake (mutual TLS). The pair is read
+		// from disk on each new handshake, so rotation needs no restart; see
+		// clientCertificateFor. The driver clones the registered config per
+		// connection and tls.Config.Clone keeps this function field.
+		tlsConfig.GetClientCertificate = clientCertificateFor(clientCertFile, clientKeyFile, c.l)
+	}
+
 	if err := goch.RegisterTLSConfig(c.params.TLSConfigKey(), tlsConfig); err != nil {
 		c.l.V(1).F().Error("unable to register TLS config err: %v", err)
 		return
 	}
 
-	c.l.V(1).F().Info("TLS setup OK - registered as %q (verify=%s minVersion=%s serverName=%s rootCA=%t)",
-		c.params.TLSConfigKey(), verify, minVersion, serverName, certString != "")
+	c.l.V(1).F().Info("TLS setup OK - registered as %q (verify=%s minVersion=%s serverName=%s rootCA=%t clientCert=%t)",
+		c.params.TLSConfigKey(), verify, minVersion, serverName, certString != "", clientCert)
 }
 
 // resolveInsecureSkipVerify is the pure-function form of the InsecureSkipVerify

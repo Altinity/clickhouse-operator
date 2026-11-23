@@ -1,0 +1,20 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-010089-chopconf-client-cert"
+spec:
+  clickhouse:
+    access:
+      scheme: https
+      port: 8443
+      rootCASecretRef:
+        name: test-010089-client-tls
+        key: ca.crt
+      # Mounted into both the clickhouse-operator and metrics-exporter containers by
+      # mount_operator_client_tls (steps_fips.py, OPERATOR_CLIENT_TLS_MOUNT).
+      clientCertFile: /etc/clickhouse-operator-client-tls/tls.crt
+      clientKeyFile: /etc/clickhouse-operator-client-tls/tls.key
+  security:
+    clickhouse:
+      tls:
+        verify: Strict

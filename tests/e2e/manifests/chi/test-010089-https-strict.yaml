@@ -1,0 +1,54 @@
+# test-034-https with the server requiring a client certificate on its TLS ports
+# (verificationMode strict, client certificates verified against the scenario CA).
+apiVersion: "clickhouse.altinity.com/v1"
+
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: test-010089-https-strict
+
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    clusters:
+    - name: default
+    settings:
+      https_port: 8443
+    files:
+      openssl.xml: |
+        <yandex>
+          <openSSL>
+            <server>
+              <certificateFile>/etc/clickhouse-server/secrets.d/server.crt/clickhouse-certs/server.crt</certificateFile>
+              <privateKeyFile>/etc/clickhouse-server/secrets.d/server.key/clickhouse-certs/server.key</privateKeyFile>
+              <dhParamsFile>/etc/clickhouse-server/secrets.d/dhparam.pem/clickhouse-certs/dhparam.pem</dhParamsFile>
+              <caConfig>/etc/clickhouse-server/secrets.d/ca.crt/clickhouse-certs/ca.crt</caConfig>
+              <verificationMode>strict</verificationMode>
+              <loadDefaultCAFile>false</loadDefaultCAFile>
+              <cacheSessions>true</cacheSessions>
+              <disableProtocols>sslv2,sslv3</disableProtocols>
+              <preferServerCiphers>true</preferServerCiphers>
+            </server>
+          </openSSL>
+        </yandex>
+      server.crt:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: server.crt
+      server.key:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: server.key
+      dhparam.pem:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: dhparam.pem
+      ca.crt:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: ca.crt

@@ -36,7 +36,7 @@ const (
 
 	// tlsSettingsLegacy is the registry key used when no per-endpoint TLS knobs
 	// are configured (the legacy path). Identical knobs across endpoints share
-	// this key. Endpoints with explicit Verify/MinVersion/ServerName/rootCA get
+	// this key. Endpoints with explicit Verify/MinVersion/ServerName/rootCA/client certificate get
 	// a content-hash key (see tlsRegistryKey) so concurrent reconciles of
 	// differently-configured clusters cannot race on a global registration.
 	tlsSettingsLegacy = "tls-settings"
@@ -56,6 +56,10 @@ type EndpointCredentials struct {
 	tlsVerify     api.TLSVerify
 	tlsMinVersion api.TLSMinVersion
 	tlsServerName string
+
+	// Client certificate (mutual TLS) — empty values preserve legacy behavior.
+	clientCertFile string
+	clientKeyFile  string
 
 	// Internal generated data
 	tlsConfigKey         string
@@ -91,6 +95,19 @@ func (c *EndpointCredentials) SetTLSSecurity(verify api.TLSVerify, minVersion ap
 	return c
 }
 
+// SetClientCertificate injects the client certificate and key paths presented on https
+// connections. Empty values preserve legacy behavior. Recomputes the DSN(s) since the
+// tls_config registry key is derived from these paths.
+func (c *EndpointCredentials) SetClientCertificate(certFile, keyFile string) *EndpointCredentials {
+	if c == nil {
+		return nil
+	}
+	c.clientCertFile = certFile
+	c.clientKeyFile = keyFile
+	c.refreshDSN()
+	return c
+}
+
 // refreshDSN recomputes the registry key and DSN cache after any change to
 // security-affecting fields.
 func (c *EndpointCredentials) refreshDSN() {
@@ -113,12 +130,17 @@ func (c *EndpointCredentials) refreshDSN() {
 // since the key derives from the config content, identical configs sharing a key
 // is by design.
 func (c *EndpointCredentials) computeTLSRegistryKey() string {
-	if (c.tlsVerify == "") && (c.tlsMinVersion == "") && (c.tlsServerName == "") && (c.rootCA == "") {
+	if (c.tlsVerify == "") && (c.tlsMinVersion == "") && (c.tlsServerName == "") && (c.rootCA == "") && !c.hasClientCertificate() {
 		return tlsSettingsLegacy
 	}
-	h := sha256.Sum256([]byte(
-		string(c.tlsVerify) + "|" + string(c.tlsMinVersion) + "|" + c.tlsServerName + "|" + c.rootCA,
-	))
+	content := string(c.tlsVerify) + "|" + string(c.tlsMinVersion) + "|" + c.tlsServerName + "|" + c.rootCA
+	// Appended only when set, so every key computed without a client certificate is unchanged.
+	// The paths are quoted: a path may contain the "|" separator, and quoting keeps two different
+	// pairs from producing the same content.
+	if c.hasClientCertificate() {
+		content += fmt.Sprintf("|%q|%q", c.clientCertFile, c.clientKeyFile)
+	}
+	h := sha256.Sum256([]byte(content))
 	return "tls-settings-" + hex.EncodeToString(h[:8])
 }
 
@@ -144,6 +166,32 @@ func (c *EndpointCredentials) TLSServerName() string {
 		return ""
 	}
 	return c.tlsServerName
+}
+
+// hasClientCertificate reports whether a client certificate is configured. Either path counts:
+// a lone path is a misconfiguration that must fail the handshake (see clientCertificateFor), not
+// one that quietly connects without a certificate.
+func (c *EndpointCredentials) hasClientCertificate() bool {
+	if c == nil {
+		return false
+	}
+	return (c.clientCertFile != "") || (c.clientKeyFile != "")
+}
+
+// ClientCertFile returns the path of the client certificate presented on https connections, or empty.
+func (c *EndpointCredentials) ClientCertFile() string {
+	if c == nil {
+		return ""
+	}
+	return c.clientCertFile
+}
+
+// ClientKeyFile returns the path of the client certificate's private key, or empty.
+func (c *EndpointCredentials) ClientKeyFile() string {
+	if c == nil {
+		return ""
+	}
+	return c.clientKeyFile
 }
 
 // TLSConfigKey returns the go-clickhouse RegisterTLSConfig registry key for

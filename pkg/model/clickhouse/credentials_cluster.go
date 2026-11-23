@@ -34,6 +34,13 @@ type ClusterCredentials struct {
 	TLSVerify     api.TLSVerify
 	TLSMinVersion api.TLSMinVersion
 	TLSServerName string
+
+	// ClientCertFile and ClientKeyFile are paths of a PEM client certificate and key the
+	// operator presents on https connections (mutual TLS). Operator-scoped: populated from
+	// chopconf clickhouse.access only, never overlaid per cluster. Empty preserves the
+	// legacy path.
+	ClientCertFile string
+	ClientKeyFile  string
 }
 
 // NewClusterCredentials creates new ClusterCredentials
@@ -55,5 +62,16 @@ func (c *ClusterCredentials) SetTLSSecurity(verify api.TLSVerify, minVersion api
 	c.TLSVerify = verify
 	c.TLSMinVersion = minVersion
 	c.TLSServerName = serverName
+	return c
+}
+
+// SetClientCertificate injects the client certificate and key paths. Empty values preserve
+// legacy behavior.
+func (c *ClusterCredentials) SetClientCertificate(certFile, keyFile string) *ClusterCredentials {
+	if c == nil {
+		return nil
+	}
+	c.ClientCertFile = certFile
+	c.ClientKeyFile = keyFile
 	return c
 }

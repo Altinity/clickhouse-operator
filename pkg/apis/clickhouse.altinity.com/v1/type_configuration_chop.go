@@ -440,6 +440,16 @@ type OperatorConfigClickHouse struct {
 			Key  string `json:"key,omitempty"  yaml:"key,omitempty"`
 		} `json:"rootCASecretRef,omitempty" yaml:"rootCASecretRef,omitempty"`
 
+		// ClientCertFile and ClientKeyFile are paths, inside the operator's (and the metrics
+		// exporter's) container, of a PEM client certificate and its private key. When both are
+		// set, the operator presents this certificate on every https connection to ClickHouse
+		// (mutual TLS), so ClickHouse can run with verificationMode=strict. Set both or neither:
+		// with a lone path every https connection fails. The files are not read at load; they
+		// are read on each new TLS handshake, so a rotated certificate (for example a
+		// re-projected Secret volume) is picked up without a restart.
+		ClientCertFile string `json:"clientCertFile,omitempty" yaml:"clientCertFile,omitempty"`
+		ClientKeyFile  string `json:"clientKeyFile,omitempty"  yaml:"clientKeyFile,omitempty"`
+
 		// Location of k8s Secret with username and password to be used by the operator to connect to ClickHouse instances
 		// Can be used instead of explicitly specified (above) username and password
 		Secret struct {
@@ -1366,6 +1376,7 @@ func (c *OperatorConfig) normalizeSectionClickHouseAccess() {
 	if c.ClickHouse.Access.RootCA == "" {
 		c.ClickHouse.Access.RootCA = defaultChRootCA
 	}
+	c.normalizeSectionClickHouseAccessClientCert()
 	// config.CHCredentialsSecretNamespace
 	// config.CHCredentialsSecretName
 
@@ -1393,6 +1404,20 @@ func (c *OperatorConfig) normalizeSectionClickHouseAccess() {
 	// Adjust seconds to time.Duration
 	c.ClickHouse.Access.Timeouts.Query = c.ClickHouse.Access.Timeouts.Query * time.Second
 
+}
+
+// normalizeSectionClickHouseAccessClientCert checks that the client certificate and key paths are
+// set together. A lone path cannot form a key pair. It is a misconfiguration like a missing file,
+// so it is treated the same way: logged here, and kept, so every https connection to ClickHouse
+// fails rather than going out without the certificate the user asked for. The files themselves
+// are not read here: they may be written after the operator starts (for example by a sidecar).
+func (c *OperatorConfig) normalizeSectionClickHouseAccessClientCert() {
+	certFile := c.ClickHouse.Access.ClientCertFile
+	keyFile := c.ClickHouse.Access.ClientKeyFile
+	if (certFile == "") == (keyFile == "") {
+		return
+	}
+	log.Errorf("clickhouse.access: clientCertFile and clientKeyFile must be set together; https connections to ClickHouse will fail until both are set (clientCertFile=%q clientKeyFile=%q)", certFile, keyFile)
 }
 
 func (c *OperatorConfig) normalizeSectionClickHouseMetrics() {

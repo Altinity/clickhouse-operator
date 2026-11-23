@@ -123,6 +123,41 @@ with the CA from `clickhouse.access.rootCA` (inline PEM) or `clickhouse.access.r
 `rootCA` wins). Verification is enforced when TLS hardening is opted in —
 `security.clickhouse.tls.verify: Strict`, or a non-empty `minVersion`/`serverName`; otherwise
 the CA is loaded but verification stays relaxed for backward compatibility.
+
+To connect to ClickHouse servers that require a client certificate (`verificationMode: strict`
+in the server's `openSSL` settings), set `clickhouse.access.clientCertFile` and
+`clickhouse.access.clientKeyFile` to the paths of a PEM certificate and key mounted into the
+operator container. The metrics-exporter container reads its own copy of the operator config, so
+mount the same files there too. Both keys must be set together; with only one set, connections
+to ClickHouse fail, as they do when the files are missing. The files are read on each new TLS
+connection, so a rotated certificate (for example, an updated Secret volume) is used without
+restarting the operator.
+Mount the Secret as a whole volume, not with `subPath`: a `subPath` mount never receives updates.
+A pair that fails to load, such as a key that does not match its certificate, or files that are
+missing, keeps the last certificate that loaded and logs a warning. Deleting the files therefore
+does not withdraw a certificate already in use; to revoke it, remove its trust on the ClickHouse
+server. Until a pair has loaded once, connections to ClickHouse fail instead of going out without
+a certificate.
+The client certificate does not by itself turn on server-certificate verification: pair it with
+`security.clickhouse.tls.verify: Strict` and a CA as described above.
+
+```yaml
+clickhouse:
+  access:
+    scheme: https
+    port: 8443
+    clientCertFile: /etc/clickhouse-operator/client-tls/tls.crt
+    clientKeyFile: /etc/clickhouse-operator/client-tls/tls.key
+```
+
+The operator user still authenticates with its username and password, sent over the
+mutually-authenticated connection.
+
+The client certificate is operator-wide. A ClickHouseInstallation's `security.tls` settings
+(`verify`, `minVersion`, `serverName`) apply per cluster, but cannot set or override the client
+certificate. Backup Jobs created by the operator do not present it yet, so backups do not work
+against a server with `verificationMode: strict`; see
+[#2141](https://github.com/Altinity/clickhouse-operator/issues/2141).
 See the [operator config example](chi-examples/70-chop-config.yaml) for a short starting point,
 or [99-clickhouseoperatorconfiguration-max.yaml](chi-examples/99-clickhouseoperatorconfiguration-max.yaml)
 for an annotated list of every available option.
