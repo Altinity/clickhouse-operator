@@ -1250,8 +1250,8 @@ func (n *Normalizer) rejectFIPSBypass(security *chi.ClusterSecurity) {
 // Hosts with no PodTemplate at all, or one holding only the operator's sidecars, use the
 // default `clickhouse/clickhouse-server:latest`,
 // which by construction lacks "fips" — so they fail-closed under Required.
-// Hosts of backup-enabled clusters run the operator's clickhouse-backup sidecar as well, whose image
-// the backup Jobs run, so it is held to the policy too — unless checkBackupSidecars is off, as it is
+// Hosts of backup-enabled clusters also run the clickhouse-backup sidecar in the ClickHouse Pods,
+// so the policy applies to it too — unless checkBackupSidecars is off, as it is
 // once a pod template a backup names was found invalid.
 func (n *Normalizer) enforceFIPSImagePolicy(checkBackupSidecars bool) {
 	if !chop.Config().Security.GetImages().IsRequired() {
@@ -1552,7 +1552,7 @@ func describeInvalidContainers(spec *core.PodSpec, imageProvided ...string) (str
 }
 
 // describeInvalidBackupContainer describes what keeps a clickhouse-backup container from serving as the base of the
-// operator's sidecar, if anything. A REST API over TLS, which the container asks for, no backup Job could call: the
+// operator's sidecar, if anything. The integration tables cannot call a REST API over TLS: the
 // operator serves it over plain HTTP whatever the container sets, so it refuses such a pod template rather than turn
 // TLS off unasked. Of two entries of one name kubelet sets the last; one taken from a source the operator cannot read
 // is pinned off.
@@ -1563,7 +1563,7 @@ func describeInvalidBackupContainer(sidecar *core.Container) (string, bool) {
 			continue
 		}
 		if secure, err := strconv.ParseBool(envVar.Value); (envVar.ValueFrom == nil) && (err == nil) && secure {
-			return fmt.Sprintf("has container %q with %s=%s, while the backup Jobs call its REST API over plain HTTP",
+			return fmt.Sprintf("has container %q with %s=%s, while ClickHouse calls its REST API over plain HTTP through the integration tables",
 				sidecar.Name, envVar.Name, envVar.Value), true
 		}
 		break

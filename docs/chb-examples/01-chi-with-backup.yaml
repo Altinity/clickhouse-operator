@@ -9,12 +9,11 @@
 # Replicated tables need ZooKeeper or ClickHouse Keeper; this example references the
 # ClickHouseKeeperInstallation from docs/chk-examples/01-simple-1.yaml.
 #
-# No example names a namespace: kubectl creates each in the namespace given with -n, or else in that
-# of its current context, "default" unless the context names another. Apply them all to one
-# namespace, together with the ClickHouseKeeperInstallation: every reference these examples make
-# names a resource in the namespace of the one making it. The names of the schedule's backups the
-# examples quote, such as default-backup-demo-nightly-20261003-020000, start with "default", as the
-# default spec.backupNamePrefix of a schedule starts with its namespace.
+# No example sets a namespace. kubectl uses the namespace of -n, or else of the current context
+# ("default" if the context sets none). Apply all examples and the ClickHouseKeeperInstallation to
+# one namespace: each reference in the examples is to a resource in the same namespace.
+# The backup names in the examples, such as default-backup-demo-nightly-20261003023000, start with
+# "default", because the default spec.backupNamePrefix of a schedule starts with its namespace.
 ---
 apiVersion: v1
 kind: Secret
@@ -22,13 +21,12 @@ metadata:
   name: backup-demo-storage
 type: Opaque
 stringData:
-  # The clickhouse-backup configuration of the storage, a YAML mapping of the sections of its
-  # configuration file. The operator generates the configuration file of the sidecars from it,
-  # with the credentials of the sidecar and the default paths filled in, and the sidecars follow
-  # a change of it within minutes, without a restart. Keep the whole configuration here and in the
-  # env of the sidecar's container in its pod template, where backup and restore Jobs can check the
-  # storage paths: with several backup-enabled clusters, they refuse to run when the sidecar takes
-  # settings from envFrom or from a configuration file its command names.
+  # The clickhouse-backup configuration of the storage, as YAML sections of its configuration file.
+  # The operator makes the configuration file of the sidecars from it, and adds the sidecar
+  # credentials and the default paths. The sidecars read a change within minutes, without a restart.
+  # Keep all settings here, or in the env of the sidecar container in its pod template. With several
+  # backup-enabled clusters, backups and restores must check the storage paths. They refuse to run
+  # if the sidecar gets settings from envFrom, or from a configuration file named in its command.
   config.yml: |
     general:
       remote_storage: s3
@@ -59,8 +57,11 @@ spec:
     # The sidecar is customized through the clickhouse-backup container of the pod template named:
     # podTemplate: backup-sidecar
     # The clickhouse-backup configuration of the sidecar, kept in the Secret above
-    configSecretRef:
-      name: backup-demo-storage
+    storageConfig:
+      valueFrom:
+        secretKeyRef:
+          name: backup-demo-storage
+          key: config.yml
   defaults:
     templates:
       dataVolumeClaimTemplate: data-volume-template
@@ -73,9 +74,9 @@ spec:
         layout:
           shardsCount: 2
           replicasCount: 2
-      # A cluster can override any field of spec.backup in its own
-      # spec.configuration.clusters[].backup, e.g. opt out of backup. Every backup, schedule and
-      # restore runs one Job per backup-enabled cluster it targets, all under one backup name.
+      # A cluster can override each field of spec.backup in spec.configuration.clusters[].backup,
+      # for example to disable backup. A backup, schedule or restore makes one run for each
+      # backup-enabled cluster it targets. All runs use one backup name.
       # - name: scratch
       #   backup:
       #     enabled: "no"
@@ -86,8 +87,8 @@ spec:
     #   - name: backup-sidecar
     #     spec:
     #       containers:
-    #         # The operator keeps what this container sets and fills in the rest; the Jobs run its
-    #         # image under its identity. Only this container is taken, not volumes or pod settings.
+    #         # The operator keeps the values of this container and adds the missing ones. It uses
+    #         # only this container, not the volumes or Pod settings of the template.
     #         - name: clickhouse-backup
     #           env:
     #             - name: LOG_LEVEL
@@ -103,5 +104,5 @@ spec:
             - ReadWriteOnce
           resources:
             requests:
-              # Room for the data plus one downloaded copy of a backup (verify, restore)
+              # Room for the data plus one downloaded copy of a backup, which a restore needs
               storage: 10Gi

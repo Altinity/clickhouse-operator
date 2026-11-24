@@ -769,14 +769,19 @@ spec:
                   properties:
                     revisionHistoryLimit:
                       type: integer
-                      description: "revisionHistoryLimit is the maximum number of revisions that will be\nmaintained in the StatefulSet's revision history.                         \nLook details in `statefulset.spec.revisionHistoryLimit`\n"
+                      description: |
+                        revisionHistoryLimit is the maximum number of revisions that will be
+                        maintained in the StatefulSet's revision history.                         
+                        Look details in `statefulset.spec.revisionHistoryLimit`
                 pod:
                   type: object
                   description: "define pod specific parameters"
                   properties:
                     terminationGracePeriod:
                       type: integer
-                      description: "Optional duration in seconds the pod needs to terminate gracefully. \nLook details in `pod.spec.terminationGracePeriodSeconds`\n"
+                      description: |
+                        Optional duration in seconds the pod needs to terminate gracefully. 
+                        Look details in `pod.spec.terminationGracePeriodSeconds`
                 backup:
                   type: object
                   description: "EXPERIMENTAL. Defaults of operator-managed backup, see docs/backup.md"
@@ -795,6 +800,29 @@ spec:
                         Where in its storage the clickhouse-backup sidecar of a host keeps the object disk data of its backups when
                         the settings of that storage set no object disk path. A template like storagePath.
                         Default: object_disks/{namespace}/{installation}/{cluster}/{shard}
+                    timeouts:
+                      type: object
+                      description: |
+                        Defaults for spec.timeouts of every ClickHouseBackup, ClickHouseRestore and ClickHouseBackupSchedule.
+                        A resource overrides them field by field. An unset field uses the built-in default.
+                      properties:
+                        actionTimeout:
+                          type: string
+                          format: duration
+                          description: "Maximum wait for one command on one host, a Go duration, e.g. 12h or 90m. Default 12h. Maximum 720h."
+                        unreachableTimeout:
+                          type: string
+                          format: duration
+                          description: "How long the operator retries a host after its first error before the host fails. An error is: ClickHouse does not answer, or the sidecar returns an error. Go duration. Default 10m. Maximum 168h."
+                        errorResponsesMax:
+                          type: integer
+                          minimum: 1
+                          maximum: 1000
+                          description: "Number of polls in a row that can find no status row for a command before the operator treats the command as lost, e.g. after a sidecar restart. Default 5."
+                        httpReceiveTimeout:
+                          type: string
+                          format: duration
+                          description: "http_receive_timeout and http_send_timeout of the inserts into system.backup_actions, a Go duration. It must cover a synchronous delete local or delete remote. Default 4h. Maximum 168h."
                 logger:
                   type: object
                   description: "allow setup clickhouse-operator logger behavior"

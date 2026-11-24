@@ -18,16 +18,11 @@ import (
 	"fmt"
 	"strings"
 
-	batch "k8s.io/api/batch/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chbackup"
 )
 
-// operation is a view of the status fields a backup and a restore share, so both walk their
-// phases through the same transitions: on each cluster they target, in a Job of its own, and as a
-// whole, which the clusters add up to.
 type operation struct {
 	phase          *api.OperationPhase
 	clusters       *[]api.OperationClusterStatus
@@ -104,9 +99,8 @@ func (o *operation) refuse(reason, message string) {
 	o.fail(reason, message)
 }
 
-// fail records the operation as failed, for good: nothing is ever retried.
 func (o *operation) fail(reason, message string) {
-	*o.phase = api.OperationPhaseFailed
+	*o.phase = failurePhase(reason)
 	o.finish(meta.Now())
 	o.setCondition(api.BackupConditionReady, meta.ConditionFalse, reason, message)
 }
@@ -118,38 +112,17 @@ func (o *operation) finish(completion meta.Time) {
 	}
 }
 
-// waitOn records why the operation cannot start its Job on a cluster yet.
 func waitOn(cluster *api.OperationClusterStatus, reason, message string) {
 	cluster.Phase = api.OperationPhasePending
 	cluster.Reason = reason
 	cluster.Message = message
 }
 
-// runOn records the Job the operation runs in on a cluster and reports whether this starts the
-// operation there. A Job found without a recorded name was created by a reconcile whose status
-// write was lost.
-func runOn(cluster *api.OperationClusterStatus, job *batch.Job) bool {
-	started := (cluster.Phase != api.OperationPhaseRunning) || (cluster.JobName == "")
-	cluster.Phase = api.OperationPhaseRunning
-	cluster.JobName = job.GetName()
-	cluster.Hosts = model.JobHosts(job)
-	cluster.ConfigSecret = model.ObjectConfigSecret(job)
-	if cluster.StartTime == nil {
-		start := jobStartTime(job)
-		cluster.StartTime = &start
-	}
-	cluster.Reason = api.BackupReasonJobCreated
-	cluster.Message = fmt.Sprintf("Job %s created", job.GetName())
-	return started
-}
-
-// completeOn records the completion of the operation's Job on a cluster with the reason and the
-// message that tell how it went, and reports whether it is news.
-func completeOn(cluster *api.OperationClusterStatus, job *batch.Job, reason, message string) bool {
+func completeOn(cluster *api.OperationClusterStatus, reason, message string) bool {
 	if cluster.CompletionTime != nil {
 		return false
 	}
-	completion := jobCompletionTime(job)
+	completion := meta.Now()
 	cluster.Phase = api.OperationPhaseCompleted
 	cluster.CompletionTime = &completion
 	cluster.Reason = reason
@@ -157,10 +130,9 @@ func completeOn(cluster *api.OperationClusterStatus, job *batch.Job, reason, mes
 	return true
 }
 
-// failOn records the operation as failed on a cluster, for good.
 func failOn(cluster *api.OperationClusterStatus, reason, message string) {
 	now := meta.Now()
-	cluster.Phase = api.OperationPhaseFailed
+	cluster.Phase = failurePhase(reason)
 	cluster.CompletionTime = &now
 	cluster.Reason = reason
 	cluster.Message = message
@@ -174,14 +146,24 @@ type operationOutcome struct {
 	failed    []*api.OperationClusterStatus
 }
 
+func (out operationOutcome) failurePhase() api.OperationPhase {
+	if len(out.completed) > 0 {
+		return api.OperationPhaseFailed
+	}
+	for _, cluster := range out.failed {
+		if cluster.Phase == api.OperationPhaseFailed {
+			return api.OperationPhaseFailed
+		}
+	}
+	return api.OperationPhaseAborted
+}
+
 // succeeded reports whether the operation finished successfully on every cluster.
 func (out operationOutcome) succeeded() bool {
 	return out.finished && (len(out.failed) == 0)
 }
 
-// aggregate adds up the clusters into the phase, the times and the JobCreated condition of the
-// operation, and returns the outcome. Its Ready condition, which tells the outcome, is the caller's,
-// as only the caller knows what makes a success.
+// The caller sets the Ready condition, because only the caller knows what counts as success.
 func (o *operation) aggregate() operationOutcome {
 	var out operationOutcome
 	if !o.validated() {
@@ -190,25 +172,24 @@ func (o *operation) aggregate() operationOutcome {
 	out.finished = true
 	started := false
 	var waiting *api.OperationClusterStatus
-	var jobs []string
+	var runs []string
 	var completion *meta.Time
 	for i := range *o.clusters {
 		cluster := &(*o.clusters)[i]
 		switch cluster.Phase {
 		case api.OperationPhaseCompleted:
 			out.completed = append(out.completed, cluster)
-		case api.OperationPhaseFailed:
+		case api.OperationPhaseFailed, api.OperationPhaseAborted:
 			out.failed = append(out.failed, cluster)
 		case api.OperationPhasePending:
-			// A cluster whose Job was found created meanwhile waits for nothing the condition could tell
 			if (waiting == nil) && (cluster.Reason != "") {
 				waiting = cluster
 			}
 		}
 		out.finished = out.finished && cluster.Phase.IsTerminal()
 		started = started || (cluster.Phase != api.OperationPhasePending)
-		if cluster.JobName != "" {
-			jobs = append(jobs, cluster.JobName)
+		if cluster.Run != nil {
+			runs = append(runs, cluster.Name)
 		}
 		if (cluster.StartTime != nil) && ((*o.startTime == nil) || cluster.StartTime.Before(*o.startTime)) {
 			*o.startTime = cluster.StartTime.DeepCopy()
@@ -220,9 +201,9 @@ func (o *operation) aggregate() operationOutcome {
 
 	switch {
 	case waiting != nil:
-		o.setCondition(api.BackupConditionJobCreated, meta.ConditionFalse, waiting.Reason, waiting.Message)
-	case len(jobs) > 0:
-		o.setCondition(api.BackupConditionJobCreated, meta.ConditionTrue, api.BackupReasonJobCreated, jobsCreatedMessage(jobs))
+		o.setCondition(api.BackupConditionStarted, meta.ConditionFalse, waiting.Reason, waiting.Message)
+	case len(runs) > 0:
+		o.setCondition(api.BackupConditionStarted, meta.ConditionTrue, api.BackupReasonStarted, startedMessage(runs))
 	}
 	switch {
 	case out.finished && (*o.completionTime == nil):
@@ -233,7 +214,7 @@ func (o *operation) aggregate() operationOutcome {
 		o.finish(finished)
 		*o.phase = api.OperationPhaseRunning
 		if len(out.failed) > 0 {
-			*o.phase = api.OperationPhaseFailed
+			*o.phase = out.failurePhase()
 		}
 	case out.finished:
 	case started:
@@ -244,12 +225,8 @@ func (o *operation) aggregate() operationOutcome {
 	return out
 }
 
-// jobsCreatedMessage tells the Jobs an operation created.
-func jobsCreatedMessage(jobs []string) string {
-	if len(jobs) == 1 {
-		return fmt.Sprintf("Job %s created", jobs[0])
-	}
-	return fmt.Sprintf("Jobs %s created", strings.Join(jobs, ", "))
+func startedMessage(clusters []string) string {
+	return fmt.Sprintf("started on %s", clusterList(clusters))
 }
 
 // failureOf returns the reason and the message of the Ready condition of an operation that failed
@@ -286,17 +263,4 @@ func clusterList(clusters []string) string {
 		return "cluster " + clusters[0]
 	}
 	return "clusters " + strings.Join(clusters, ", ")
-}
-
-// failureMessage describes a failed Job by its reason alone.
-func failureMessage(job *batch.Job, reason string) string {
-	switch reason {
-	case api.BackupReasonDeadlineExceeded:
-		return fmt.Sprintf("Job %s exceeded its active deadline", job.GetName())
-	case api.BackupReasonJobNotStarted:
-		// The pod is gone once the Job is stopped, while the events of both outlive it for a while
-		return fmt.Sprintf("no pod of Job %s started within %s, see the events of the Job and its pod: kubectl get events -n %s",
-			job.GetName(), jobStartTimeout, job.GetNamespace())
-	}
-	return fmt.Sprintf("Job %s failed, see its logs", job.GetName())
 }

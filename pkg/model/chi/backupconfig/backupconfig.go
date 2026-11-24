@@ -24,6 +24,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -48,6 +49,16 @@ const ManagedClickHouseUserKey = "managed-clickhouse-user"
 // configuration file of clickhouse-backup.
 var ErrInvalidStorageConfig = errors.New("invalid backup storage configuration")
 
+var yamlErrorLine = regexp.MustCompile(`line (\d+)`)
+
+// The YAML error quotes the input, which holds credentials, so keep only the line number.
+func invalidYAML(err error) error {
+	if match := yamlErrorLine.FindStringSubmatch(err.Error()); match != nil {
+		return fmt.Errorf("%w: not valid YAML, see line %s", ErrInvalidStorageConfig, match[1])
+	}
+	return fmt.Errorf("%w: not valid YAML", ErrInvalidStorageConfig)
+}
+
 // Sections and keys of the configuration file of clickhouse-backup
 const (
 	sectionGeneral    = "general"
@@ -55,10 +66,18 @@ const (
 	sectionAPI        = "api"
 
 	keyDisableEnvironmentOverride = "disable_environment_override"
+	keyBackupsToKeepRemote        = "backups_to_keep_remote"
+	keyRebaseDuringDelete         = "rebase_during_delete"
+	keyRebaseBeforeRemoveOld      = "rebase_before_remove_old_remote"
 	keyUsername                   = "username"
+	keyCreateIntegrationTables    = "create_integration_tables"
+	keyIntegrationTablesHost      = "integration_tables_host"
+	IntegrationTablesHost         = "127.0.0.1"
 	keyPassword                   = "password"
 	keyPath                       = "path"
 	keyObjectDiskPath             = "object_disk_path"
+	keyRestoreDistributed         = "restore_distributed_cluster"
+	RestoreDistributedCluster     = "{cluster}"
 )
 
 // storageSections are the sections of the storage types of clickhouse-backup, each of which takes a path of the
@@ -66,32 +85,34 @@ const (
 var storageSections = []string{"s3", "gcs", "azblob", "cos", "ftp", "sftp"}
 
 // Settings maps the env var a setting of clickhouse-backup is known by to its section and key in the configuration
-// file: the storage path check of the backup Jobs reads them by their env var names.
+// file. The storage path check reads the settings that tell where the backups are, by their env var names.
 var Settings = map[string]Setting{
-	"REMOTE_STORAGE":          {"general", "remote_storage"},
-	"S3_BUCKET":               {"s3", "bucket"},
-	"S3_ENDPOINT":             {"s3", "endpoint"},
-	"S3_PATH":                 {"s3", keyPath},
-	"S3_OBJECT_DISK_PATH":     {"s3", keyObjectDiskPath},
-	"GCS_BUCKET":              {"gcs", "bucket"},
-	"GCS_ENDPOINT":            {"gcs", "endpoint"},
-	"GCS_PATH":                {"gcs", keyPath},
-	"GCS_OBJECT_DISK_PATH":    {"gcs", keyObjectDiskPath},
-	"AZBLOB_ACCOUNT_NAME":     {"azblob", "account_name"},
-	"AZBLOB_CONTAINER":        {"azblob", "container"},
-	"AZBLOB_ENDPOINT_SUFFIX":  {"azblob", "endpoint_suffix"},
-	"AZBLOB_PATH":             {"azblob", keyPath},
-	"AZBLOB_OBJECT_DISK_PATH": {"azblob", keyObjectDiskPath},
-	"COS_URL":                 {"cos", "url"},
-	"COS_PATH":                {"cos", keyPath},
-	"COS_OBJECT_DISK_PATH":    {"cos", keyObjectDiskPath},
-	"FTP_ADDRESS":             {"ftp", "address"},
-	"FTP_PATH":                {"ftp", keyPath},
-	"FTP_OBJECT_DISK_PATH":    {"ftp", keyObjectDiskPath},
-	"SFTP_ADDRESS":            {"sftp", "address"},
-	"SFTP_PORT":               {"sftp", "port"},
-	"SFTP_PATH":               {"sftp", keyPath},
-	"SFTP_OBJECT_DISK_PATH":   {"sftp", keyObjectDiskPath},
+	"REMOTE_STORAGE":                         {"general", "remote_storage"},
+	"S3_BUCKET":                              {"s3", "bucket"},
+	"S3_ENDPOINT":                            {"s3", "endpoint"},
+	"S3_PATH":                                {"s3", keyPath},
+	"S3_OBJECT_DISK_PATH":                    {"s3", keyObjectDiskPath},
+	"GCS_BUCKET":                             {"gcs", "bucket"},
+	"GCS_ENDPOINT":                           {"gcs", "endpoint"},
+	"GCS_PATH":                               {"gcs", keyPath},
+	"GCS_OBJECT_DISK_PATH":                   {"gcs", keyObjectDiskPath},
+	"AZBLOB_ACCOUNT_NAME":                    {"azblob", "account_name"},
+	"AZBLOB_CONTAINER":                       {"azblob", "container"},
+	"AZBLOB_ENDPOINT_SUFFIX":                 {"azblob", "endpoint_suffix"},
+	"AZBLOB_PATH":                            {"azblob", keyPath},
+	"AZBLOB_OBJECT_DISK_PATH":                {"azblob", keyObjectDiskPath},
+	"COS_URL":                                {"cos", "url"},
+	"COS_PATH":                               {"cos", keyPath},
+	"COS_OBJECT_DISK_PATH":                   {"cos", keyObjectDiskPath},
+	"FTP_ADDRESS":                            {"ftp", "address"},
+	"FTP_PATH":                               {"ftp", keyPath},
+	"FTP_OBJECT_DISK_PATH":                   {"ftp", keyObjectDiskPath},
+	"SFTP_ADDRESS":                           {"sftp", "address"},
+	"SFTP_PORT":                              {"sftp", "port"},
+	"SFTP_PATH":                              {"sftp", keyPath},
+	"SFTP_OBJECT_DISK_PATH":                  {"sftp", keyObjectDiskPath},
+	"CLICKHOUSE_USE_EMBEDDED_BACKUP_RESTORE": {sectionClickHouse, "use_embedded_backup_restore"},
+	"CLICKHOUSE_EMBEDDED_BACKUP_DISK":        {sectionClickHouse, "embedded_backup_disk"},
 }
 
 // Setting is where the configuration file holds a setting
@@ -100,8 +121,6 @@ type Setting struct {
 	Key     string
 }
 
-// Credentials are what the sidecar authenticates with: the ones of its REST API, which the backup Jobs call it
-// with, and the ones it connects to ClickHouse with
 type Credentials struct {
 	APIUsername        string
 	APIPassword        string
@@ -130,13 +149,13 @@ type Config struct {
 
 // Build builds the configuration file of the sidecar from the storage settings, a YAML mapping of the sections of
 // the configuration file of clickhouse-backup, empty for none. The file takes the default paths of every storage
-// type the settings name none of, and the credentials over whatever the settings hold. The operator sets what the
-// backup Jobs rely on as env vars of the sidecar, which take precedence over the file: the file never turns that
+// type that the settings do not set, and the credentials replace those in the settings. The operator sets what it
+// relies on as sidecar env vars, which take precedence over the file, so the file never turns that
 // off.
 func Build(storageConfig []byte, credentials Credentials, defaults Defaults) (*Config, error) {
 	file := map[string]any{}
 	if err := yaml.Unmarshal(storageConfig, &file); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidStorageConfig, err)
+		return nil, invalidYAML(err)
 	}
 	if file == nil {
 		file = map[string]any{}
@@ -156,6 +175,10 @@ func Build(storageConfig []byte, credentials Credentials, defaults Defaults) (*C
 		return nil, err
 	}
 	general[keyDisableEnvironmentOverride] = false
+	// Only schedule retention deletes backups. A delete rebases dependent incremental backups, so none loses its base.
+	general[keyBackupsToKeepRemote] = 0
+	general[keyRebaseDuringDelete] = true
+	general[keyRebaseBeforeRemoveOld] = true
 
 	api, err := sectionOf(file, sectionAPI)
 	if err != nil {
@@ -163,17 +186,19 @@ func Build(storageConfig []byte, credentials Credentials, defaults Defaults) (*C
 	}
 	api[keyUsername] = credentials.APIUsername
 	api[keyPassword] = credentials.APIPassword
+	api[keyCreateIntegrationTables] = true
+	api[keyIntegrationTablesHost] = IntegrationTablesHost
 
+	clickHouse, err := sectionOf(file, sectionClickHouse)
+	if err != nil {
+		return nil, err
+	}
+	// A schema restore without ON CLUSTER points a Distributed table with an unknown cluster at the restored cluster.
+	setDefault(clickHouse, keyRestoreDistributed, RestoreDistributedCluster)
 	// ClickHouse credentials the Secret does not set leave the file with what the storage settings say, or none,
 	// which clickhouse-backup takes its own defaults for
-	if (credentials.ClickHouseUsername != "") || (credentials.ClickHousePassword != "") {
-		clickHouse, err := sectionOf(file, sectionClickHouse)
-		if err != nil {
-			return nil, err
-		}
-		setNonEmpty(clickHouse, keyUsername, credentials.ClickHouseUsername)
-		setNonEmpty(clickHouse, keyPassword, credentials.ClickHousePassword)
-	}
+	setNonEmpty(clickHouse, keyUsername, credentials.ClickHouseUsername)
+	setNonEmpty(clickHouse, keyPassword, credentials.ClickHousePassword)
 
 	settings := map[string]string{}
 	for name, setting := range Settings {
@@ -189,7 +214,7 @@ func Build(storageConfig []byte, credentials Credentials, defaults Defaults) (*C
 	// Marshalling sorts the keys of every mapping, so equal settings always make an equal file
 	out, err := yaml.Marshal(file)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidStorageConfig, err)
+		return nil, invalidYAML(err)
 	}
 	managed := ""
 	if (credentials.ClickHouseUsername != "") && (credentials.ClickHousePassword != "") {

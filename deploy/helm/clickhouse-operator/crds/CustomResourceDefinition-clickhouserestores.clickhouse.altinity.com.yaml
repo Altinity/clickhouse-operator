@@ -24,12 +24,12 @@ spec:
           jsonPath: .spec.clickHouseInstallation
         - name: cluster
           type: string
-          description: Target cluster, empty means every backup-enabled cluster
+          description: "Target cluster. Empty means all backup-enabled clusters."
           jsonPath: .spec.cluster
           priority: 1
         - name: backup
           type: string
-          description: Backup the restore Job restores
+          description: "Backup to restore"
           jsonPath: .status.backupName
         - name: phase
           type: string
@@ -39,6 +39,11 @@ spec:
           type: integer
           description: Restore duration (seconds)
           jsonPath: .status.durationSeconds
+        - name: taskID
+          type: string
+          description: "Current task ID"
+          priority: 1
+          jsonPath: .status.taskID
         - name: age
           type: date
           jsonPath: .metadata.creationTimestamp
@@ -47,11 +52,9 @@ spec:
       schema:
         openAPIV3Schema:
           description: |
-            EXPERIMENTAL. ClickHouseRestore defines a one-off restore of a backup into a
-            ClickHouseInstallation. The operator runs one Job per backup-enabled cluster it targets,
-            each driving the clickhouse-backup sidecar it injects into the cluster (see
-            ClickHouseInstallation spec.backup). Restoring into a fresh, empty installation is
-            recommended. The API may change in a future release.
+            EXPERIMENTAL. ClickHouseRestore restores a backup into a ClickHouseInstallation.
+            The operator runs clickhouse-backup through SQL on each backup-enabled cluster (see ClickHouseInstallation spec.backup).
+            Restore into a new, empty installation if possible. The API can change in a future release. See docs/backup.md.
           type: object
           required:
             - spec
@@ -77,10 +80,10 @@ spec:
                   type: string
                   minLength: 1
                   maxLength: 253
-                  description: "Name of the target ClickHouseInstallation in the same namespace (a fresh, empty installation is recommended). Immutable"
+                  description: "Name of the target ClickHouseInstallation in the same namespace. A new, empty installation is recommended. Immutable."
                 cluster:
                   type: string
-                  description: "Optional cluster of the ClickHouseInstallation to restore into. Empty restores every backup-enabled cluster, each in a Job of its own. Immutable"
+                  description: "Cluster to restore into. Empty restores all backup-enabled clusters, each with its own run. Immutable."
                   # Mirrors the ClickHouseInstallation cluster name constraint
                   maxLength: 15
                   pattern: "^[a-zA-Z0-9-]{0,15}$"
@@ -92,68 +95,159 @@ spec:
                 sourceInstallation:
                   type: string
                   description: |
-                    ClickHouseInstallation that made the backup, when not the restored one: the restore reads the backup from the
-                    storage paths the {installation} macro gives there. Empty, that of the restored installation. Immutable
+                    ClickHouseInstallation that made the backup, if it is not the target installation.
+                    The restore reads the backup from its storage paths ({installation} macro). Empty means the target installation. Immutable.
                   maxLength: 253
                   pattern: "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
                 sourceNamespace:
                   type: string
                   description: |
-                    Namespace of the ClickHouseInstallation that made the backup, when not that of the restored one: the restore
-                    reads the backup from the storage paths the {namespace} macro gives there. Empty, that of the restored installation. Immutable
+                    Namespace of the ClickHouseInstallation that made the backup, if it is not the target namespace.
+                    The restore reads the backup from its storage paths ({namespace} macro). Empty means the target namespace. Immutable.
                   maxLength: 63
                   pattern: "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
                 schemaOnly: &TypeStringBool
-                  description: "Restore table/database definitions only (no data)"
-                  # StringBool is polymorphic — accepts native YAML bool (true/false),
-                  # integer (0/1), or string from the recognized vocabulary.
-                  # See pkg/apis/common/types/string_bool.go (UnmarshalJSON + IsValid).
-                  # Structural-schema rules don't natively support bool|int|string
-                  # union, so we use x-kubernetes-preserve-unknown-fields: true.
+                  description: "Restore only table and database definitions, no data."
+                  # StringBool accepts a YAML bool, 0/1, or a known string (see pkg/apis/common/types/string_bool.go).
+                  # A structural schema cannot express this union, so the field uses x-kubernetes-preserve-unknown-fields.
                   x-kubernetes-preserve-unknown-fields: true
                 overwrite:
                   <<: *TypeStringBool
-                  description: "Allow restoring over existing tables, which are dropped first. When false (default) the restore is refused if any target host already holds user tables"
+                  description: |
+                    Without tables: recreate the databases of the backup (clickhouse-backup restore --rm) and drop their tables that are not in the backup.
+                    With tables, or when false (default): recreate only the tables of the backup and keep all other tables.
                 validateTopology:
                   <<: *TypeStringBool
-                  description: "When true (default) the restore is refused unless every target shard holds the backup, so a backup taken from a different layout is not half-applied"
+                  description: "If true (default), the operator refuses the restore unless every target shard has the backup. This prevents a partial restore from a different layout."
                 tables:
-                  type: string
-                  description: "Optional clickhouse-backup --tables pattern, e.g. db.table or db.*, comma-separated, restricting the schema and the data restored. Empty restores every table"
-                  maxLength: 1024
-                  pattern: "^([A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*)?$"
+                  type: array
+                  description: "clickhouse-backup --tables patterns, one per item, e.g. db.table or db.*. Joined with commas, at most 1024 characters. They limit both schema and data. Empty restores all tables."
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    maxLength: 1024
+                    pattern: "^[A-Za-z0-9_.*?][A-Za-z0-9_.*?-]*$"
+                partitions:
+                  type: array
+                  description: |
+                    Partition IDs to restore (clickhouse-backup --partitions). Their data replaces these partitions in the existing tables.
+                    The schema is not restored, as in the Altinity usual backup workflow. Not allowed with schemaOnly or rbac.
+                  nullable: true
+                  items:
+                    type: string
+                    pattern: "^[A-Za-z0-9_-]{1,128}$"
+                skipTables:
+                  type: array
+                  description: "Patterns of tables to skip, one per item, e.g. db.tmp* or logs.* (CLICKHOUSE_SKIP_TABLES). System databases are always skipped. Joined with commas, at most 1024 characters."
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    maxLength: 1024
+                    pattern: "^[A-Za-z0-9_.*?][A-Za-z0-9_.*?-]*$"
+                skipTableEngines:
+                  type: array
+                  description: "Table engines to skip, e.g. Kafka (CLICKHOUSE_SKIP_TABLE_ENGINES)."
+                  nullable: true
+                  maxItems: 64
+                  items:
+                    type: string
+                    pattern: "^[A-Za-z][A-Za-z0-9_]{0,127}$"
+                databaseMapping:
+                  type: object
+                  description: |
+                    Map from a backup database (key) to a target database (value) (clickhouse-backup --restore-database-mapping).
+                  additionalProperties:
+                    type: string
+                    pattern: "^[A-Za-z0-9_][A-Za-z0-9_-]{0,127}$"
+                configOverrides:
+                  type: array
+                  nullable: true
+                  maxItems: 16
+                  x-kubernetes-list-type: set
+                  description: |
+                    clickhouse-backup settings for this restore that replace the sidecar settings.
+                    Each item is KEY=VALUE, where KEY is the env var of the setting, e.g. DOWNLOAD_CONCURRENCY=8. A leading --env= is removed.
+                    You cannot override the settings that the operator sets: storage location, API and secrets.
+                  items:
+                    type: string
+                    pattern: '^(--env=)?[A-Z][A-Z0-9_]{0,63}=[A-Za-z0-9_.,:/@+=-]{1,256}$'
                 rbac:
                   <<: *TypeStringBool
                   description: |
-                    Also restore the users, roles, grants and other access entities the backup holds. They belong to the
-                    whole installation, so only a restore with an empty cluster may set it. Needs ClickHouse 23.3 or later
+                    Also restore users, roles, grants and other access entities from the backup.
+                    Allowed only when cluster is empty, because these belong to the whole installation. Needs ClickHouse 23.3 or later.
+                replicatedCopyToDetached:
+                  <<: *TypeStringBool
+                  description: |
+                    If true (default), all replicas download the data. The replicas other than the first copy it to the detached directories
+                    of their Replicated*MergeTree tables (--replicated-copy-to-detached). Replication then uses these local parts, not the network.
+                    If false, the other replicas download only the schema and fetch the data by replication: less disk and download, more replication traffic.
+                    See docs/backup.md.
+                resumeDownload:
+                  <<: *TypeStringBool
+                  description: |
+                    If true (default), a rerun by spec.taskID resumes the downloads of earlier runs on each host (--hardlink-exists-files).
+                    If false, a rerun deletes the local copies (delete local) and downloads the backup again. The first run is the same either way.
                 activeDeadlineSeconds:
                   type: integer
                   format: int64
                   minimum: 1
-                  description: "How long the restore Job may run before it is stopped and the restore fails. Defaults to 24 hours"
+                  maximum: 2147483647
+                  description: "Maximum run time in seconds on a cluster. After it, the restore fails. Default 24 hours."
+                timeouts:
+                  type: object
+                  description: |
+                    Wait limits for the clickhouse-backup commands of this restore. All fields are optional.
+                    An unset field comes from backup.timeouts of the operator configuration, then from the built-in default.
+                  properties:
+                    actionTimeout:
+                      type: string
+                      format: duration
+                      description: "Maximum wait for one command on one host, a Go duration, e.g. 12h or 90m. Default 12h. Maximum 720h."
+                    unreachableTimeout:
+                      type: string
+                      format: duration
+                      description: "How long the operator retries a host after its first error before the host fails. An error is: ClickHouse does not answer, or the sidecar returns an error. Go duration. Default 10m. Maximum 168h."
+                    errorResponsesMax:
+                      type: integer
+                      format: int32
+                      minimum: 1
+                      maximum: 1000
+                      description: "Number of polls in a row that can find no status row for a command before the operator treats the command as lost, e.g. after a sidecar restart. Default 5."
+                    httpReceiveTimeout:
+                      type: string
+                      format: duration
+                      description: "http_receive_timeout and http_send_timeout of the inserts into system.backup_actions, a Go duration. It must cover a synchronous delete local or delete remote. Default 4h. Maximum 168h."
+                taskID:
+                  type: string
+                  description: |
+                    Set a new value to rerun a failed or aborted restore. A new value is one that is not in status.taskID, taskIDsStarted or taskIDsCompleted.
+                    The restore runs again on the clusters where it did not complete, and resumes their downloads (status.previousRuns).
+                    A completed or running restore is not rerun.
             status:
               type: object
               properties:
                 phase:
                   type: string
-                  description: "Lifecycle phase of the restore"
+                  description: "Phase of the restore."
                   enum:
                     - Pending
                     - Running
                     - Completed
                     - Failed
+                    - Aborted
                 backupName:
                   type: string
-                  description: "Backup the restore Jobs restore, as it was when the first Job was created"
+                  description: "Backup that the restore restores, fixed at the first run."
                 cluster:
                   type: string
-                  description: "Cluster spec.cluster named when the restore was validated, empty for every backup-enabled cluster: what the restore holds and whether it restores access entities follow it"
+                  description: "spec.cluster at validation. Empty means all backup-enabled clusters. It sets the restore scope and whether access entities are restored."
                 clusters:
                   type: array
                   description: |
-                    The clusters the restore targets, resolved once it is validated, each run by a Job of its own,
-                    and the state of the restore on each
+                    Target clusters, resolved at validation, with the restore state on each. Each cluster has its own run.
                   x-kubernetes-list-type: map
                   x-kubernetes-list-map-keys:
                     - name
@@ -167,24 +261,22 @@ spec:
                         description: "Name of the cluster"
                       phase:
                         type: string
-                        description: "Lifecycle phase of the restore on the cluster"
+                        description: "Phase of the restore on the cluster."
                         enum:
                           - Pending
                           - Running
                           - Completed
                           - Failed
-                      jobName:
-                        type: string
-                        description: "Job that drives the restore on the cluster"
+                          - Aborted
                       hosts:
                         type: array
                         nullable: true
-                        description: "Hosts of the cluster the Job drives"
+                        description: "Hosts of the cluster that the run works on."
                         items:
                           type: string
                       configSecret:
                         type: string
-                        description: "Secret of the clickhouse-backup configuration of the cluster the Job keeps the backup by, or reads it by, as the Job was built: the storage the backup lies in"
+                        description: "Secret with the clickhouse-backup configuration that the run uses. It identifies the storage that holds the backup."
                       startTime:
                         type: string
                         format: date-time
@@ -195,10 +287,56 @@ spec:
                         nullable: true
                       reason:
                         type: string
-                        description: "Why the cluster waits, or how the restore went on it, in one word"
+                        description: "One-word reason why the cluster waits, or the result of the restore on it."
                       message:
                         type: string
-                        description: "Why the cluster waits, or how the restore went on it"
+                        description: "Why the cluster waits, or the result of the restore on it."
+                      run:
+                        type: object
+                        nullable: true
+                        description: "Run state on the cluster. The operator resumes the run from it after a restart."
+                        properties:
+                          operation:
+                            type: string
+                          step:
+                            type: string
+                          mutated:
+                            type: boolean
+                          hosts:
+                            type: array
+                            nullable: true
+                            items:
+                              type: object
+                              properties:
+                                host:
+                                  type: string
+                                backup:
+                                  type: string
+                                base:
+                                  type: string
+                          actions:
+                            type: array
+                            nullable: true
+                            description: "Commands the run inserted into system.backup_actions"
+                            items:
+                              type: object
+                              properties:
+                                step:
+                                  type: string
+                                host:
+                                  type: string
+                                command:
+                                  type: string
+                                timeFrom:
+                                  type: string
+                                status:
+                                  type: string
+                                error:
+                                  type: string
+                          plan:
+                            type: object
+                            nullable: true
+                            x-kubernetes-preserve-unknown-fields: true
                 startTime:
                   type: string
                   format: date-time
@@ -210,6 +348,67 @@ spec:
                 durationSeconds:
                   type: integer
                   format: int64
+                previousRuns:
+                  type: array
+                  nullable: true
+                  description: |
+                    What earlier runs did on the clusters that spec.taskID reran. The rerun resumes their downloads.
+                    Without this record, a restore from another installation refuses local copies that it did not download.
+                  items:
+                    type: object
+                    required:
+                      - cluster
+                    properties:
+                      cluster:
+                        type: string
+                        description: "Name of the cluster"
+                      hosts:
+                        type: array
+                        nullable: true
+                        description: "Hosts of the earlier runs, with the backup name on each."
+                        items:
+                          type: object
+                          properties:
+                            host:
+                              type: string
+                            backup:
+                              type: string
+                            base:
+                              type: string
+                      actions:
+                        type: array
+                        nullable: true
+                        description: "Commands of the earlier runs that changed data on the hosts."
+                        items:
+                          type: object
+                          properties:
+                            step:
+                              type: string
+                            host:
+                              type: string
+                            command:
+                              type: string
+                            timeFrom:
+                              type: string
+                            status:
+                              type: string
+                            error:
+                              type: string
+                taskID:
+                  type: string
+                  description: "The spec.taskID that the resource processes."
+                taskIDsStarted:
+                  type: array
+                  description: "Task IDs that the resource started, newest first, at most 10."
+                  nullable: true
+                  items:
+                    type: string
+                taskIDsCompleted:
+                  type: array
+                  description: "Task IDs that the resource finished, newest first, at most 10. This includes IDs that arrived during a run and reran nothing."
+                  nullable: true
+                  items:
+                    type: string
                 conditions:
                   type: array
                   nullable: true

@@ -307,6 +307,11 @@ settings of that storage set no path of their own.
 backup:
   storagePath: "backup/{namespace}/{installation}/{cluster}/{shard}"
   storageObjectDiskPath: "object_disks/{namespace}/{installation}/{cluster}/{shard}"
+  timeouts:
+    actionTimeout: "12h"
+    unreachableTimeout: "10m"
+    errorResponsesMax: 5
+    httpReceiveTimeout: "4h"
 ```
 
 | Setting | Default | Description |
@@ -314,8 +319,21 @@ backup:
 | `storagePath` | `backup/{namespace}/{installation}/{cluster}/{shard}` | Storage path template, expanded on every host with its macros: `{namespace}`, `{installation}`, `{cluster}`, `{shard}`, `{replica}` |
 | `storageObjectDiskPath` | `object_disks/{namespace}/{installation}/{cluster}/{shard}` | Object disk path template, the same way |
 
-Changing either rolls the Pods of every backup-enabled cluster, and leaves the backups made under the
+Changing either changes the paths of every backup-enabled cluster within minutes, without a Pod restart. It leaves the backups made under the
 old paths where they are. See [Storage paths](backup.md#storage-paths).
+
+`timeouts` sets the defaults for `spec.timeouts` of each `ClickHouseBackup`, `ClickHouseRestore` and
+`ClickHouseBackupSchedule`. A resource can override each field. Durations are Go durations, such as
+`"12h"` or `"90m"`. A field that is not set, or is out of its bounds, uses the built-in default.
+
+| Setting | Default | Description |
+|---|---|---|
+| `actionTimeout` | `12h` | How long the operator waits for one command on a host |
+| `unreachableTimeout` | `10m` | How long the operator retries a host that does not answer |
+| `errorResponsesMax` | `5` | How many reads in a row that find no row of a command mark the command as lost |
+| `httpReceiveTimeout` | `4h` | The `http_receive_timeout` of the inserts into `system.backup_actions` |
+
+See [Timeouts](backup.md#timeouts).
 
 ## Security
 

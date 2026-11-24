@@ -17,11 +17,12 @@ package chbackup
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
-	batch "k8s.io/api/batch/v1"
 	apiEquality "k8s.io/apimachinery/pkg/api/equality"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	apiMeta "k8s.io/apimachinery/pkg/api/meta"
@@ -37,8 +38,6 @@ import (
 	model "github.com/altinity/clickhouse-operator/pkg/model/chbackup"
 )
 
-// BackupController reconciles a ClickHouseBackup into a Job per cluster that makes the backup there
-// and, when asked, a Job per cluster that verifies it.
 type BackupController struct {
 	*reconciler
 }
@@ -56,8 +55,6 @@ func NewBackupController(
 	}
 }
 
-// Reconcile drives a ClickHouseBackup through its phases. A finished backup is never touched
-// again.
 func (c *BackupController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	if c.skip(ctx, req.Namespace) {
 		return ctrl.Result{}, nil
@@ -67,26 +64,40 @@ func (c *BackupController) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err := c.Get(ctx, req.NamespacedName, cur); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	if cur.Status.Phase.IsTerminal() {
+	if deleting(cur) {
+		result, err := c.finalize(ctx, cur)
+		if err != nil {
+			return ignoreConflict(err)
+		}
+		return result, nil
+	}
+	if err := c.addFinalizer(ctx, cur, backupFinalizer); err != nil {
+		return ignoreConflict(err)
+	}
+
+	next := cur.DeepCopy()
+	var out announcements
+	c.applyTaskID(next, &out)
+	if next.Status.Phase.IsTerminal() {
+		if result, err := c.commitStatus(ctx, next, !apiEquality.Semantic.DeepEqual(cur.Status, next.Status), ctrl.Result{}, out); (err != nil) || result.Requeue {
+			return result, err
+		}
 		return ctrl.Result{}, c.reportFinishedBackup(ctx, cur)
 	}
 	reportBackupOutcome(cur, everyCluster)
 
-	next := cur.DeepCopy()
-	var out announcements
 	result, err := c.reconcile(ctx, next, &out)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	if next.Status.Phase.IsTerminal() {
+		next.Status.Complete()
+	}
+	c.announcePhase(next, cur.Status.Phase, next.Status.Phase, next.Status.Conditions, &out)
 	return c.commitStatus(ctx, next, !apiEquality.Semantic.DeepEqual(cur.Status, next.Status), result, out)
 }
 
 func (c *BackupController) reconcile(ctx context.Context, chb *api.ClickHouseBackup, out *announcements) (ctrl.Result, error) {
-	// A completed backup stays completed while it is verified: its Jobs may be gone by then, removed
-	// by hand or by a policy that sets ttlSecondsAfterFinished, and the backup exists either way.
-	if chb.Spec.Verify.IsTrue() && apiMeta.IsStatusConditionTrue(chb.Status.Conditions, api.BackupConditionReady) {
-		return c.verify(ctx, chb, out)
-	}
 	op := newBackupOperation(chb)
 	if !op.validated() {
 		result, validated, err := c.validate(ctx, chb, op, out)
@@ -95,21 +106,18 @@ func (c *BackupController) reconcile(ctx context.Context, chb *api.ClickHouseBac
 		}
 	}
 
-	jobs, err := c.observeClusterJobs(ctx, chb, chb.Status.Clusters, func(cluster string) string {
-		return model.BackupJobName(chb, cluster)
-	})
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	// Every cluster makes the backup under one name: the one a Job makes already, created by a reconcile
-	// whose status write was lost, else the one the spec resolves to now, whatever it names later
+	// Pin the name now, so a later spec edit cannot give the clusters different names.
 	if chb.Status.BackupName == "" {
-		chb.Status.BackupName = cmp.Or(jobsBackupName(jobs), model.ResolveBackupName(chb))
+		chb.Status.BackupName = model.ResolveBackupName(chb)
 	}
 	targets := c.newTargetResolver(ctx, chb.GetNamespace(), chb.TargetInstallation(), true)
 	var result ctrl.Result
-	for _, job := range jobs {
-		clusterResult, err := c.reconcileCluster(ctx, chb, job, targets, out)
+	for i := range chb.Status.Clusters {
+		cluster := &chb.Status.Clusters[i]
+		if cluster.Phase.IsTerminal() {
+			continue
+		}
+		clusterResult, err := c.reconcileCluster(ctx, chb, cluster, targets, out)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -129,18 +137,10 @@ func (c *BackupController) reconcile(ctx context.Context, chb *api.ClickHouseBac
 		return ctrl.Result{}, nil
 	}
 	c.succeeded(chb, op, outcome)
-	if !chb.Spec.Verify.IsTrue() {
-		chb.Status.Phase = api.OperationPhaseCompleted
-		return ctrl.Result{}, nil
-	}
-	return c.verify(ctx, chb, out)
+	chb.Status.Phase = api.OperationPhaseCompleted
+	return ctrl.Result{}, nil
 }
 
-// validate resolves the clusters the backup targets once it is due, its spec is valid and its target can run it,
-// and reports whether it did: until then the backup waits, and a backup its starting deadline passes before is
-// refused, as is one whose target can never run it. A backup that runs a schedule records what it takes from
-// the schedule first, and the target it names. The spec matters only for building the Jobs: once they exist, an
-// edit cannot change them.
 func (c *BackupController) validate(ctx context.Context, chb *api.ClickHouseBackup, op *operation, out *announcements) (ctrl.Result, bool, error) {
 	now := c.clock.Now()
 	if missed := missedStartingDeadline(chb, now, validatedMessage(chb)); missed != nil {
@@ -179,12 +179,46 @@ func (c *BackupController) validate(ctx context.Context, chb *api.ClickHouseBack
 		op.wait(api.BackupConditionValidated, wait.reason, wait.message)
 		return ctrl.Result{RequeueAfter: untilStartingDeadline(chb, now, wait.requeue)}, false, nil
 	}
+	name, err := templateBackupName(chb, target.topology)
+	if err != nil {
+		op.wait(api.BackupConditionValidated, api.BackupReasonInvalidSpec, err.Error())
+		return ctrl.Result{RequeueAfter: untilStartingDeadline(chb, now, 0)}, false, nil
+	}
+	// A failed run's name can be reused, because the rerun replaces what it left.
+	if made := cmp.Or(chb.Status.BackupName, name, model.ResolveBackupName(chb)); slices.Contains(chb.Status.PreviousBackupNames, made) {
+		refusal := &pending{reason: api.BackupReasonInvalidSpec, message: fmt.Sprintf("backup %s was made by this ClickHouseBackup "+
+			"before spec.taskID reran it, and stays in the storage: set another spec.backupName with another spec.taskID", made)}
+		op.refuse(refusal.reason, refusal.message)
+		out.add(c.refused(chb, refusal))
+		return ctrl.Result{}, false, nil
+	}
+	if (chb.Status.BackupName == "") && (name != "") {
+		chb.Status.BackupName = name
+	}
 	op.pin(target.topology.ClusterNames())
 	retainRequestedClusters(chb.GetNamespace(), chb.TargetInstallation(), target.chi)
 	if leftOut := leftOutWithoutStorage(target, chb.TargetCluster()); leftOut != "" {
 		out.add(c.warning(chb, a.EventActionReconcile, api.BackupReasonNoBackupStorage, "backup %s", leftOut))
 	}
 	return ctrl.Result{}, true, nil
+}
+
+// All clusters must share one template without {cluster}, because one backup has one name.
+func templateBackupName(chb *api.ClickHouseBackup, topology *model.Topology) (string, error) {
+	namings := topology.ClusterNamings()
+	templates := map[string]bool{}
+	for _, template := range namings {
+		templates[template] = true
+	}
+	naming := topology.BackupNaming()
+	if (len(templates) == 1) && templates[""] {
+		return "", nil
+	}
+	if (len(templates) > 1) || ((len(namings) > 1) && api.BackupNamingHolds(naming.Template, api.BackupNamingCluster)) {
+		return "", fmt.Errorf("the clusters %s name their backups by naming templates that differ between them, or hold {cluster}: "+
+			"back up each of them in a ClickHouseBackup of its own (spec.cluster)", strings.Join(topology.ClusterNames(), ", "))
+	}
+	return model.ResolveTemplateBackupName(chb, naming)
 }
 
 // recordSchedule records what a backup that runs a schedule takes from it, the schedule as it is now: until the
@@ -227,6 +261,11 @@ func (c *BackupController) recordSchedule(ctx context.Context, chb *api.ClickHou
 		ClickHouseInstallation: chbs.Spec.ClickHouseInstallation,
 		Cluster:                cluster,
 		BackupNamePrefix:       model.BackupNamePrefix(chbs),
+		Schedules:              chbs.Spec.DeepCopy().Schedules,
+		TimeZone:               chbs.Spec.TimeZone,
+		KeepBackups:            slices.Clone(chbs.Spec.Retention.GetKeepBackups()),
+		PreviousSchedules:      chbs.Status.Retention.DeepCopy().GetPrevious(),
+		Timeouts:               chbs.Spec.Timeouts.DeepCopy(),
 		BackupOptions:          *chbs.Spec.BackupOptions.DeepCopy(),
 	}
 	return nil, nil
@@ -268,57 +307,72 @@ func untilStartingDeadline(chb *api.ClickHouseBackup, now time.Time, delay time.
 func (c *BackupController) reconcileCluster(
 	ctx context.Context,
 	chb *api.ClickHouseBackup,
-	observed clusterJob,
+	cluster *api.OperationClusterStatus,
 	targets *targetResolver,
 	out *announcements,
 ) (ctrl.Result, error) {
-	cluster, job, state := observed.cluster, observed.job, observed.state
-	switch state {
-	case jobMissing:
-		return c.start(ctx, chb, cluster, targets, out)
-	case jobStale:
-		waitOn(cluster, api.BackupReasonWaitingForGarbageCollection, staleOwnerMessage(kindJob, job.GetName()))
-		return ctrl.Result{RequeueAfter: pendingRequeueInterval}, nil
-	case jobConflict:
-		failOn(cluster, api.BackupReasonNameConflict, takenNameMessage(kindJob, job))
-		out.add(c.failed(chb, cluster))
-		return ctrl.Result{}, nil
-	case jobLost:
-		message := fmt.Sprintf("Job %s is gone, the backup is not repeated", cluster.JobName)
-		failOn(cluster, api.BackupReasonJobLost, message)
-		out.add(c.failed(chb, cluster))
-		return ctrl.Result{}, nil
-	case jobActive:
-		c.run(chb, cluster, job, out)
-		return ctrl.Result{RequeueAfter: runningRequeueInterval}, nil
-	case jobFailed:
-		c.run(chb, cluster, job, out)
-		reason := failureReason(job)
-		failure, err := c.describeFailure(ctx, job, reason)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		failOn(cluster, reason, failure.message)
-		out.add(c.failed(chb, cluster))
-		return ctrl.Result{}, nil
-	case jobSucceeded:
-	default:
-		return ctrl.Result{}, fmt.Errorf("%w: %d", errUnexpectedJobState, state)
+	key := runKeyOf(chb, api.ClickHouseBackupCRDResourceKind, cluster.Name, api.BackupRunOperationBackup)
+	if cluster.Run == nil {
+		return c.start(ctx, chb, cluster, key, targets, out)
 	}
-
-	c.run(chb, cluster, job, out)
-	return ctrl.Result{}, c.complete(ctx, chb, cluster, job, out)
+	run, err := c.resumeRun(chb, chb.TargetInstallation(), key, cluster, func() (*model.RunSpec, error) {
+		return c.backupSpec(ctx, chb, cluster.Name, targets)
+	})
+	switch {
+	case errors.Is(err, errNoClickHouseAccess) || errors.Is(err, errTargetGone):
+		failOn(cluster, api.BackupReasonFailed, fmt.Sprintf("the backup cannot resume: %v", err))
+		out.add(c.failed(chb, cluster))
+		return ctrl.Result{}, nil
+	case err != nil:
+		return ctrl.Result{}, err
+	}
+	outcome, finished := observeOn(cluster, run)
+	if !finished {
+		return ctrl.Result{RequeueAfter: runningRequeueInterval}, nil
+	}
+	out.add(func() { runs.forget(key) })
+	if outcome.failed {
+		failOn(cluster, outcomeReason(outcome, api.BackupRunOperationBackup), outcome.message)
+		out.add(c.failed(chb, cluster))
+		return ctrl.Result{}, nil
+	}
+	c.complete(chb, cluster, outcome, out)
+	return ctrl.Result{}, nil
 }
 
-// start creates the backup Job of a cluster once the installation has completed its reconcile, no
-// other operation runs on the cluster and no restore of the access entities of the installation is
-// unfinished, see accessRestoreGate. The readiness gate applies only here: once the Job exists it
-// is tracked whatever the installation does meanwhile. A cluster the installation no longer has, or
-// no longer backs up, fails the backup there, as does one whose Job the starting deadline passes before.
+var errTargetGone = errors.New("the installation or the cluster is gone")
+
+func (c *BackupController) backupSpec(ctx context.Context, chb *api.ClickHouseBackup, cluster string, targets *targetResolver) (*model.RunSpec, error) {
+	target, wait, err := targets.forCluster(cluster)
+	switch {
+	case err != nil:
+		return nil, err
+	case wait != nil:
+		return nil, fmt.Errorf("%w: %s", errTargetGone, wait.message)
+	}
+	spec := model.BackupRunSpec(chb, target.topology)
+	spec.PreviousActions = previousActions(chb.Status.PreviousRuns, cluster)
+	if err := spec.CheckPaths(target.topology, chb.GetBackupOptions().GetReplicaSelection(), c.settingResolver(ctx, chb.GetNamespace())); err != nil {
+		return nil, err
+	}
+	return spec, nil
+}
+
+func refusedPaths(spec *model.RunSpec) string {
+	if spec.PathCheck == nil {
+		return ""
+	}
+	if _, err := spec.PathCheck.Check(); err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
 func (c *BackupController) start(
 	ctx context.Context,
 	chb *api.ClickHouseBackup,
 	cluster *api.OperationClusterStatus,
+	key runKey,
 	targets *targetResolver,
 	out *announcements,
 ) (ctrl.Result, error) {
@@ -342,61 +396,81 @@ func (c *BackupController) start(
 	}
 
 	retainRequestedClusters(chb.GetNamespace(), chb.TargetInstallation(), target.chi)
-	job := model.BuildBackupJob(chb, target.chi, target.topology)
-	gate := c.accessRestoreGate(chb.GetNamespace(), chb.TargetInstallation())
-	result, err := c.startJob(ctx, chb, chb.TargetInstallation(), cluster.Name, job, gate, func(reason, message string) {
-		waitOn(cluster, reason, message)
-	}, func() {
-		c.run(chb, cluster, job, out)
-	})
-	if (err == nil) && (cluster.Phase == api.OperationPhasePending) {
-		result.RequeueAfter = untilStartingDeadline(chb, now, result.RequeueAfter)
+	checked, err := c.backupSpec(ctx, chb, cluster.Name, targets)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
-	return result, err
+	if refusal := refusedPaths(checked); refusal != "" {
+		failOn(cluster, api.BackupReasonStoragePathConflict, refusal)
+		out.add(c.failed(chb, cluster))
+		return ctrl.Result{}, nil
+	}
+	restoreInProgress := false
+	if chb.Spec.ScheduleRef != nil {
+		schedules := &ScheduleController{c.reconciler}
+		holder := &api.ClickHouseBackupSchedule{}
+		holder.Namespace = chb.GetNamespace()
+		holder.Spec.ClickHouseInstallation = chb.TargetInstallation()
+		holds, err := schedules.restoreHolds(ctx, c.Client, holder, target.chi, []string{cluster.Name})
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		restoreInProgress = holds[cluster.Name] != nil
+	}
+	var spec *model.RunSpec
+	gate := c.accessRestoreGate(chb.GetNamespace(), chb.TargetInstallation(), cluster.Name)
+	run, wait, err := c.startRun(ctx, chb, chb.TargetInstallation(), key, gate, func() (*model.RunSpec, error) {
+		var err error
+		if spec, err = c.backupSpec(ctx, chb, cluster.Name, targets); err != nil {
+			return nil, err
+		}
+		spec.RestoreInProgress = restoreInProgress
+		return spec, nil
+	})
+	switch {
+	case err != nil:
+		return ctrl.Result{}, err
+	case wait != nil:
+		waitOn(cluster, wait.reason, wait.message)
+		return ctrl.Result{RequeueAfter: untilStartingDeadline(chb, now, wait.requeue)}, nil
+	}
+	startOn(cluster, run, spec.BackupHosts, spec.ConfigSecret, now)
+	c.run(chb, cluster, out)
+	return ctrl.Result{RequeueAfter: runningRequeueInterval}, nil
 }
 
-// run records the running backup Job of a cluster, announcing the start of the backup there once.
-func (c *BackupController) run(chb *api.ClickHouseBackup, cluster *api.OperationClusterStatus, job *batch.Job, out *announcements) {
-	if !runOn(cluster, job) {
-		return
-	}
+func (c *BackupController) run(chb *api.ClickHouseBackup, cluster *api.OperationClusterStatus, out *announcements) {
 	namespace, chiName, clusterName := chb.GetNamespace(), chb.TargetInstallation(), cluster.Name
-	out.add(c.info(chb, a.EventActionCreate, api.BackupReasonJobCreated, "backup %s of cluster %s started in Job %s",
-		chb.Status.BackupName, clusterName, job.GetName()))
+	out.add(c.info(chb, a.EventActionCreate, api.BackupReasonStarted, "backup %s of cluster %s started", chb.Status.BackupName, clusterName))
 	out.add(func() { metrics.BackupStarted(context.Background(), namespace, chiName, clusterName) })
 }
 
-// complete records the completion of the backup Job of a cluster, announcing it once. A backup that
-// holds no data there, as its Job tells, completed all the same, which is warned about: it restores no
-// data on the cluster.
-func (c *BackupController) complete(
-	ctx context.Context,
-	chb *api.ClickHouseBackup,
-	cluster *api.OperationClusterStatus,
-	job *batch.Job,
-	out *announcements,
-) error {
-	withoutData, err := c.backupHoldsNoData(ctx, job)
-	switch {
-	case err != nil:
-		return err
-	case withoutData:
-		noData := noDataCause(job)
-		if completeOn(cluster, job, api.BackupReasonCompletedWithoutData,
-			fmt.Sprintf("Job %s completed, but the backup holds no data: %s", job.GetName(), noData)) {
-			out.add(c.completed(chb, cluster, job, noData))
-		}
-	case completeOn(cluster, job, api.BackupReasonCompleted, fmt.Sprintf("Job %s completed", job.GetName())):
-		out.add(c.completed(chb, cluster, job, ""))
+func (c *BackupController) complete(chb *api.ClickHouseBackup, cluster *api.OperationClusterStatus, outcome runOutcome, out *announcements) {
+	if len(outcome.hostsUsed) > 0 {
+		cluster.Hosts = outcome.hostsUsed
 	}
-	return nil
+	reason, message := api.BackupReasonCompleted, "the backup completed"
+	if outcome.noData != "" {
+		reason, message = api.BackupReasonCompletedWithoutData, fmt.Sprintf("the backup completed, but holds no data: %s", outcome.noData)
+	}
+	if completeOn(cluster, reason, message) {
+		out.add(c.completed(chb, cluster, outcome.noData))
+	}
+	if outcome.stored != nil {
+		chb.Status.Backups = api.ReplaceStoredBackups(chb.Status.Backups, cluster.Name, outcome.stored)
+		chb.Status.BackupsListTime = cluster.CompletionTime.DeepCopy()
+	}
 }
 
 // completed announces the completion of the backup on a cluster, as a warning when noData tells why
 // the backup holds no data there.
-func (c *BackupController) completed(chb *api.ClickHouseBackup, cluster *api.OperationClusterStatus, job *batch.Job, noData string) func() {
+func (c *BackupController) completed(chb *api.ClickHouseBackup, cluster *api.OperationClusterStatus, noData string) func() {
 	namespace, chiName, clusterName := chb.GetNamespace(), chb.TargetInstallation(), cluster.Name
-	duration, completion := jobDuration(job), jobCompletionTime(job)
+	completion := *cluster.CompletionTime
+	duration := time.Duration(0)
+	if cluster.StartTime != nil {
+		duration = completion.Sub(cluster.StartTime.Time)
+	}
 	announce := c.info(chb, a.EventActionReconcile, api.BackupReasonCompleted, "backup %s of cluster %s completed in %ds",
 		chb.Status.BackupName, clusterName, int64(duration.Seconds()))
 	if noData != "" {
@@ -441,187 +515,6 @@ func (c *BackupController) succeeded(chb *api.ClickHouseBackup, op *operation, o
 		reason = api.BackupReasonCompletedWithoutData
 	}
 	op.setCondition(api.BackupConditionReady, meta.ConditionTrue, reason, strings.Join(messages, "; "))
-}
-
-// verify runs the Jobs that verify a completed backup on each of its clusters. Verification is
-// advisory: the backup is in the storage either way, so the backup completes whatever
-// verification concludes, with the conclusion in its Verified condition.
-func (c *BackupController) verify(ctx context.Context, chb *api.ClickHouseBackup, out *announcements) (ctrl.Result, error) {
-	targets := c.newTargetResolver(ctx, chb.GetNamespace(), chb.TargetInstallation(), false)
-	var result ctrl.Result
-	for i := range chb.Status.Clusters {
-		cluster := &chb.Status.Clusters[i]
-		if verificationConcluded(chb, cluster) {
-			continue
-		}
-		clusterResult, err := c.verifyCluster(ctx, chb, cluster, targets, out)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		result = shorterResult(result, clusterResult)
-	}
-	c.concludeVerify(chb)
-	return result, nil
-}
-
-// verifyCluster runs the Job that verifies the backup on one of its clusters.
-func (c *BackupController) verifyCluster(
-	ctx context.Context,
-	chb *api.ClickHouseBackup,
-	cluster *api.OperationClusterStatus,
-	targets *targetResolver,
-	out *announcements,
-) (ctrl.Result, error) {
-	name := model.VerifyJobName(chb, cluster.Name)
-	job, state, err := c.observeJob(ctx, chb, name, cluster.JobName == name)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	switch state {
-	case jobMissing:
-		return c.startVerify(ctx, chb, cluster, targets, out)
-	case jobStale:
-		cluster.Reason, cluster.Message = api.BackupReasonWaitingForGarbageCollection, staleOwnerMessage(kindJob, job.GetName())
-		return ctrl.Result{RequeueAfter: pendingRequeueInterval}, nil
-	case jobConflict:
-		c.concludeVerifyOn(chb, cluster, api.BackupReasonNameConflict, takenNameMessage(kindJob, job), out)
-		return ctrl.Result{}, nil
-	case jobLost:
-		c.concludeVerifyOn(chb, cluster, api.BackupReasonJobLost, fmt.Sprintf("verify Job %s is gone", name), out)
-		return ctrl.Result{}, nil
-	case jobActive:
-		c.runVerify(chb, cluster, job, out)
-		return ctrl.Result{RequeueAfter: runningRequeueInterval}, nil
-	case jobFailed:
-		c.runVerify(chb, cluster, job, out)
-		reason := failureReason(job)
-		failure, err := c.describeFailure(ctx, job, reason)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if reason == api.BackupReasonJobFailed {
-			reason = api.BackupReasonVerificationFailed
-		}
-		c.concludeVerifyOn(chb, cluster, reason, failure.message, out)
-		return ctrl.Result{}, nil
-	case jobSucceeded:
-	default:
-		return ctrl.Result{}, fmt.Errorf("%w: %d", errUnexpectedJobState, state)
-	}
-
-	c.runVerify(chb, cluster, job, out)
-	c.concludeVerifyOn(chb, cluster, api.BackupReasonVerified, fmt.Sprintf("Job %s verified the backup", job.GetName()), out)
-	return ctrl.Result{}, nil
-}
-
-func (c *BackupController) startVerify(
-	ctx context.Context,
-	chb *api.ClickHouseBackup,
-	cluster *api.OperationClusterStatus,
-	targets *targetResolver,
-	out *announcements,
-) (ctrl.Result, error) {
-	target, wait, err := targets.forCluster(cluster.Name)
-	switch {
-	case err != nil:
-		return ctrl.Result{}, err
-	case (wait != nil) && wait.refusesOneOff():
-		c.concludeVerifyOn(chb, cluster, wait.reason, wait.message, out)
-		return ctrl.Result{}, nil
-	case wait != nil:
-		cluster.Reason, cluster.Message = wait.reason, wait.message
-		return ctrl.Result{RequeueAfter: wait.requeue}, nil
-	}
-
-	job := model.BuildVerifyJob(chb, target.chi, target.topology)
-	gate := c.accessRestoreGate(chb.GetNamespace(), chb.TargetInstallation())
-	return c.startJob(ctx, chb, chb.TargetInstallation(), cluster.Name, job, gate, func(reason, message string) {
-		cluster.Reason, cluster.Message = reason, message
-	}, func() {
-		c.runVerify(chb, cluster, job, out)
-	})
-}
-
-// runVerify records the running verify Job of a cluster, announcing the start of verification there
-// once.
-func (c *BackupController) runVerify(chb *api.ClickHouseBackup, cluster *api.OperationClusterStatus, job *batch.Job, out *announcements) {
-	if cluster.JobName == job.GetName() {
-		return
-	}
-	cluster.JobName = job.GetName()
-	cluster.Reason, cluster.Message = api.BackupReasonVerifying, fmt.Sprintf("Job %s verifies the backup", job.GetName())
-	out.add(c.info(chb, a.EventActionCreate, api.BackupReasonVerifying, "backup %s of cluster %s is verified by Job %s",
-		chb.Status.BackupName, cluster.Name, job.GetName()))
-}
-
-// concludeVerifyOn records the outcome of verification on a cluster.
-func (c *BackupController) concludeVerifyOn(chb *api.ClickHouseBackup, cluster *api.OperationClusterStatus, reason, message string, out *announcements) {
-	cluster.JobName = model.VerifyJobName(chb, cluster.Name)
-	cluster.Reason, cluster.Message = reason, message
-	if reason == api.BackupReasonVerified {
-		out.add(c.info(chb, a.EventActionReconcile, reason, "backup %s of cluster %s verified", chb.Status.BackupName, cluster.Name))
-		return
-	}
-	namespace, chiName, clusterName := chb.GetNamespace(), chb.TargetInstallation(), cluster.Name
-	announce := c.warning(chb, a.EventActionReconcile, reason, "backup %s of cluster %s verification failed: %s",
-		chb.Status.BackupName, clusterName, message)
-	out.add(func() {
-		announce()
-		metrics.VerificationFailed(context.Background(), namespace, chiName, clusterName)
-	})
-}
-
-// concludeVerify adds the verification of the clusters up into the Verified condition, and completes
-// the backup once every cluster concluded.
-func (c *BackupController) concludeVerify(chb *api.ClickHouseBackup) {
-	concluded := true
-	var running *api.OperationClusterStatus
-	var failed []*api.OperationClusterStatus
-	var messages []string
-	for i := range chb.Status.Clusters {
-		cluster := &chb.Status.Clusters[i]
-		switch {
-		case !verificationConcluded(chb, cluster):
-			concluded = false
-			// A cluster still telling how its backup went has neither a verify Job nor a reason to wait for one
-			if (running == nil) && !backupCompletion(cluster.Reason) {
-				running = cluster
-			}
-		case cluster.Reason != api.BackupReasonVerified:
-			failed = append(failed, cluster)
-			messages = append(messages, clusterMessage(len(chb.Status.Clusters), cluster.Name, cluster.Message))
-		default:
-			messages = append(messages, clusterMessage(len(chb.Status.Clusters), cluster.Name, cluster.Message))
-		}
-	}
-	switch {
-	case !concluded:
-		if running != nil {
-			c.setVerified(chb, meta.ConditionUnknown, running.Reason, clusterMessage(len(chb.Status.Clusters), running.Name, running.Message))
-		}
-		return
-	case len(failed) > 0:
-		c.setVerified(chb, meta.ConditionFalse, failed[0].Reason, strings.Join(messages, "; "))
-	default:
-		c.setVerified(chb, meta.ConditionTrue, api.BackupReasonVerified, strings.Join(messages, "; "))
-	}
-	chb.Status.Phase = api.OperationPhaseCompleted
-}
-
-func (c *BackupController) setVerified(chb *api.ClickHouseBackup, status meta.ConditionStatus, reason, message string) {
-	setCondition(&chb.Status.Conditions, chb.GetGeneration(), api.BackupConditionVerified, status, reason, message)
-}
-
-// backupCompletion reports whether a reason of a cluster tells how the backup went there.
-func backupCompletion(reason string) bool {
-	return (reason == api.BackupReasonCompleted) || (reason == api.BackupReasonCompletedWithoutData)
-}
-
-// verificationConcluded reports whether verification concluded on a cluster: its verify Job was
-// created, as the cluster records it, and finished or is gone.
-func verificationConcluded(chb *api.ClickHouseBackup, cluster *api.OperationClusterStatus) bool {
-	return (cluster.JobName == model.VerifyJobName(chb, cluster.Name)) && (cluster.Reason != api.BackupReasonVerifying)
 }
 
 // shorterResult returns the result that comes back sooner.

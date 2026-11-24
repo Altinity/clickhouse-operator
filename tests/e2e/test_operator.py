@@ -4319,8 +4319,6 @@ def test_010035_3(self):
         delete_test_namespace()
 
 
-
-
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_EnableHttps("1.0"))
 @Name("test_010034. Check HTTPS support for health check")
@@ -6087,7 +6085,6 @@ def test_010054(self):
 
     with Finally("I clean up"):
         delete_test_namespace()
-
 
 
 @TestScenario
@@ -7947,7 +7944,6 @@ def test_010082(self):
                 )
 
 
-
     with Finally("I clean up"):
         delete_test_namespace()
 
@@ -8136,8 +8132,6 @@ def test_010083(self):
 
     with Finally("I clean up"):
         delete_test_namespace()
-
-
 
 
 @TestScenario
@@ -8658,10 +8652,8 @@ def test_010086_1(self, version_from="0.27.4", version_to=None):
 backup_kind = "clickhousebackup"
 restore_kind = "clickhouserestore"
 schedule_kind = "clickhousebackupschedule"
-backup_terminal_phases = ("Completed", "Failed")
-backup_label_chi = "clickhouse.altinity.com/backup-chi"
-backup_label_cr_name = "clickhouse.altinity.com/backup-cr-name"
-backup_label_cluster = "clickhouse.altinity.com/backup-cluster"
+# Failed: the operation failed; Aborted: the operator stopped the operation, or never started it.
+backup_terminal_phases = ("Completed", "Failed", "Aborted")
 backup_annotation_recovered_from = "clickhouse.altinity.com/recovered-from"
 # The message of the validation rule that keeps the target of a backup, restore or schedule as it was created.
 backup_target_immutable_message = "clickHouseInstallation and cluster are immutable"
@@ -8678,17 +8670,19 @@ backup_user = "backup_user"
 backup_auto_secret_keys = ("API_USERNAME", "API_PASSWORD")
 # Sidecar settings the operator pins whatever the storage settings or the sidecar's base container say,
 # mirrored from newBackupEnvVars of pkg/model/chi/creator/backup.go: the REST API on port 7171 over plain HTTP, as
-# the Jobs call it, no schema restore ON CLUSTER but where a Job asks for it, one operation at a time, access objects
-# loaded once restored, and no restore into databases or tables other than the backup's, which the guard of a Job
-# would not check.
+# the integration tables call it, which the operator drives the sidecar through, no schema restore ON CLUSTER but where
+# a restore asks for it, one operation at a time, access objects
+# loaded once restored, and no restore into databases or tables other than the backup's, or than databaseMapping names.
 backup_pinned_env = {
     "API_LISTEN": f"0.0.0.0:{backup_api_port}",
     "API_SECURE": "false",
     "RESTORE_SCHEMA_ON_CLUSTER": "",
     "API_ALLOW_PARALLEL": "false",
-    "CLICKHOUSE_RESTART_COMMAND": "sql:SYSTEM RELOAD USERS",
+    "CLICKHOUSE_RESTART_COMMAND": "sql:SYSTEM RELOAD USERS; sql:SYSTEM RELOAD CONFIG",
     "RESTORE_DATABASE_MAPPING": "",
     "RESTORE_TABLE_MAPPING": "",
+    "API_CREATE_INTEGRATION_TABLES": "true",
+    "API_INTEGRATION_TABLES_HOST": "127.0.0.1",
 }
 # Settings the configuration file of the sidecar holds, which no env var of the sidecar may override
 backup_config_file_env = ("API_USERNAME", "API_PASSWORD", "CLICKHOUSE_USERNAME", "CLICKHOUSE_PASSWORD", "CLICKHOUSE_BACKUP_CONFIG")
@@ -8696,16 +8690,72 @@ backup_config_file_env = ("API_USERNAME", "API_PASSWORD", "CLICKHOUSE_USERNAME",
 # pkg/model/chi/config/const.go, and where it is mounted
 backup_config_volume = "clickhouse-backup-config"
 backup_config_dir = "/etc/clickhouse-backup"
-# The exit code of a Job that failed before it changed anything, UnchangedExitCode of pkg/model/chbackup/script.go.
-backup_unchanged_exit_code = 3
 # The engine of the replicated tables of the scenarios: one replication group per installation, cluster and shard.
 backup_replicated_engine = (
     "ReplicatedMergeTree('/clickhouse/{installation}/{cluster}/tables/{shard}/{database}/{table}', '{replica}')"
 )
 
 
+# The orchestrator events are posted by the operator itself, of reasons that start with Orchestrator.
+backup_image = "altinity/clickhouse-backup:stable"
+# Kinds of the backup resources as Events name them.
+backup_event_kinds = {
+    "clickhousebackup": "ClickHouseBackup",
+    "clickhouserestore": "ClickHouseRestore",
+    "clickhousebackupschedule": "ClickHouseBackupSchedule",
+}
+
+
 def backup_unset(value):
     return value in (None, "", "<none>")
+
+
+def backup_events(kind, name):
+    """The Events on a backup resource, kind as backup_kind and its siblings name it."""
+    selector = f"--field-selector involvedObject.kind={backup_event_kinds[kind]},involvedObject.name={name}"
+    return (kubectl.get("events", "", label=selector, ok_to_fail=True) or {}).get("items", [])
+
+
+def backup_event_component(event):
+    return (event.get("source") or {}).get("component") or event.get("reportingComponent") or ""
+
+
+def check_backup_events(kind, name, operator_reasons, orchestrator_reasons, timeout=120):
+    """Checks that the operator posted Events of every reason of operator_reasons on a backup resource, and of every
+    reason of orchestrator_reasons, those of the steps of its runs."""
+    with Then(f"{kind} {name} carries Events {sorted(operator_reasons)} and of its runs {sorted(orchestrator_reasons)}"):
+        for attempt in retries(timeout=timeout, delay=5):
+            with attempt:
+                reasons = {e.get("reason") for e in backup_events(kind, name)}
+                assert set(operator_reasons) <= reasons, error(f"{kind} {name}: Events {sorted(reasons)}")
+                assert set(orchestrator_reasons) <= reasons, error(f"{kind} {name}: Events {sorted(reasons)}")
+
+
+def check_no_backup_workloads():
+    """Checks that nothing runs for backup but the sidecars: no Job, CronJob or backup Pod in the test namespace."""
+    for kind in ("jobs", "cronjobs"):
+        items = (kubectl.get(kind, "", ok_to_fail=True) or {}).get("items") or []
+        assert items == [], error(f"{kind} run for backup: {[item['metadata']['name'] for item in items]}")
+
+
+def check_integration_tables(chi, pod_name):
+    """Checks that the sidecar of the pod created the integration tables in its ClickHouse, which the operator drives
+    it through, and that they answer."""
+    for attempt in retries(timeout=300, delay=10):
+        with attempt:
+            out = clickhouse.query(
+                chi,
+                "SELECT count() FROM system.tables WHERE database = 'system' AND name IN ('backup_actions', 'backup_list')",
+                pod=pod_name,
+            )
+            assert out == "2", error(f"{pod_name}: integration tables {out}")
+            clickhouse.query(chi, "SELECT count() FROM system.backup_actions", pod=pod_name)
+
+
+def backup_actions(chi, pod_name):
+    """The rows of system.backup_actions of the ClickHouse of the pod: the commands its sidecar ran."""
+    out = clickhouse.query(chi, "SELECT command, status FROM system.backup_actions FORMAT JSONEachRow", pod=pod_name)
+    return [json.loads(line) for line in out.splitlines() if line.strip()]
 
 
 def backup_auto_secret(chi):
@@ -8749,19 +8799,32 @@ def backup_api_auth(chi):
     return data["API_USERNAME"], data["API_PASSWORD"]
 
 
+# How long a request to the sidecar REST API may take. clickhouse-backup retries a ClickHouse connection it cannot
+# open without end, with the credentials it read when the request came in, so a request made while those are not
+# the ones ClickHouse takes never answers: the client gives up instead of holding the shell for good.
+backup_api_timeout = 60
+backup_api_code_marker = "HTTP_CODE="
+
+
 def backup_api_get(pod_name, path, auth=None):
     """GET the sidecar REST API from inside the sidecar of pod_name, authenticated with auth = (user, password)
-    unless it is None. Returns (HTTP code, body)."""
+    unless it is None. Returns (HTTP code, body); the code is 000 when the request timed out."""
     credentials = ""
     if auth is not None:
         credentials = "-u " + shlex.quote(f"{auth[0]}:{auth[1]}")
     out = kubectl.launch(
         f"exec {pod_name} -c {backup_sidecar} -- "
-        f"curl -sS -w '\\n%{{http_code}}' {credentials} http://127.0.0.1:{backup_api_port}{path}",
+        f"curl -sS -m {backup_api_timeout} -w '\\n{backup_api_code_marker}%{{http_code}}\\n' {credentials} "
+        f"http://127.0.0.1:{backup_api_port}{path}",
         ok_to_fail=True,
     )
-    body, _, code = out.replace("\r", "").rpartition("\n")
-    return code.strip(), body
+    # The code follows a marker of its own: the local shell may write a line of its own, such as a mail notice, into the
+    # output, even on the line of the code.
+    body, _, rest = out.replace("\r", "").rpartition(f"\n{backup_api_code_marker}")
+    code = re.match(r"[0-9]{3}", rest)
+    if code is None:
+        return "", out
+    return code.group(0), body
 
 
 def backup_remote_list(pod_name, auth):
@@ -8771,7 +8834,8 @@ def backup_remote_list(pod_name, auth):
     # One JSON object per line; an array is accepted as well.
     items = []
     for line in body.splitlines():
-        if line.strip():
+        # Lines the local shell may add, such as a mail notice, are no JSON.
+        if line.strip().startswith(("{", "[")):
             parsed = json.loads(line)
             items.extend(parsed if isinstance(parsed, list) else [parsed])
     return items
@@ -8811,65 +8875,6 @@ def backup_cluster_status(kind, name):
     return {item.get("name"): item for item in backup_status(kind, name).get("clusters") or []}
 
 
-def backup_jobs(selector=""):
-    return (kubectl.get("jobs", "", label=selector, ok_to_fail=True) or {}).get("items", [])
-
-
-def backup_job_names(items):
-    return [job["metadata"]["name"] for job in items]
-
-
-def backup_job_state(job, state):
-    return bool((job.get("status") or {}).get(state))
-
-
-def backup_job_finished(job):
-    return backup_job_state(job, "succeeded") or backup_job_state(job, "failed")
-
-
-def backup_job_exit_codes(job):
-    """The exit codes of the containers of the pods of a Job that terminated."""
-    pods = (kubectl.get("pods", "", label=f"-l job-name={job}", ok_to_fail=True) or {}).get("items", [])
-    return [
-        ((status.get("state") or {}).get("terminated") or {}).get("exitCode")
-        for pod in pods
-        for status in (pod.get("status") or {}).get("containerStatuses") or []
-        if (status.get("state") or {}).get("terminated")
-    ]
-
-
-def backup_owned_by(obj, kind, name):
-    return any(
-        (owner.get("kind") == kind) and (owner.get("name") == name)
-        for owner in obj["metadata"].get("ownerReferences") or []
-    )
-
-
-def backup_scheduled_jobs(cronjob):
-    """The Jobs of the runs of a CronJob."""
-    return [job for job in backup_jobs() if backup_owned_by(job, "CronJob", cronjob)]
-
-
-def backup_schedule_cronjobs(schedule):
-    """The CronJobs of a schedule, by the cluster each of them backs up."""
-    items = (kubectl.get("cronjob", "", ok_to_fail=True) or {}).get("items", [])
-    return {
-        (cronjob["metadata"].get("labels") or {}).get(backup_label_cluster, ""): cronjob
-        for cronjob in items
-        if backup_owned_by(cronjob, "ClickHouseBackupSchedule", schedule)
-    }
-
-
-def backup_cronjob_suspended(cronjob):
-    return bool((cronjob.get("spec") or {}).get("suspend"))
-
-
-def backup_cronjob_env(cronjob):
-    """The environment the Jobs of a CronJob run with, by name."""
-    pod_spec = cronjob["spec"]["jobTemplate"]["spec"]["template"]["spec"]
-    return {env["name"]: env.get("value") for container in pod_spec["containers"] for env in container.get("env") or []}
-
-
 def backup_recovered_from(chi):
     """The recovery the operator, or the user, recorded on an installation."""
     metadata = (kubectl.get("chi", chi, ok_to_fail=True) or {}).get("metadata") or {}
@@ -8877,8 +8882,8 @@ def backup_recovered_from(chi):
 
 
 def backup_patch(kind, name, patch, ok_to_fail=False):
-    """Merge-patches an object. The output carries the error of a refused patch."""
-    body = json.dumps(patch, separators=(",", ":"))
+    """Merge-patches an object with a patch given as a dict or as JSON. The output carries the error of a refused patch."""
+    body = patch if isinstance(patch, str) else json.dumps(patch, separators=(",", ":"))
     return kubectl.launch(f"patch {kind} {name} --type=merge -p '{body}' 2>&1", ok_to_fail=ok_to_fail)
 
 
@@ -8901,11 +8906,14 @@ def backup_apply_edited(manifest, edit, ok_to_fail=False):
 
 
 def backup_dump(kind, name):
-    """The backup and restore scripts log why they failed, so a failure shows the object and every Job log."""
+    """The operator logs and posts as Events what its runs did, so a failure shows the object, its Events and the log
+    of the operator."""
     note(kubectl.launch(f"get {kind} {name} -o yaml", ok_to_fail=True))
-    note(kubectl.launch("get jobs,cronjobs -o wide", ok_to_fail=True))
-    for job in backup_job_names(backup_jobs()):
-        note(f"--- job/{job} ---\n" + kubectl.launch(f"logs job/{job} --all-containers --tail=100", ok_to_fail=True))
+    note(kubectl.launch(f"get events --field-selector involvedObject.name={name} --sort-by=.lastTimestamp", ok_to_fail=True))
+    note(kubectl.launch(
+        f"logs deployment/clickhouse-operator -c clickhouse-operator -n {current().context.operator_namespace} --tail=200",
+        ok_to_fail=True,
+    ))
 
 
 def wait_backup_phase(kind, name, expected, timeout=300):
@@ -8932,7 +8940,7 @@ def backup_delete_resources(resources):
 
 
 @TestScenario
-@Name("test_010087. Operator-managed backup: per-cluster sidecar, Jobs, restore and schedule")
+@Name("test_010087. Operator-managed backup: per-cluster sidecar, runs of the operator, restore and schedule")
 @Tags("HEAVY")
 def test_010087(self):
     """Operator-managed backup end to end, on an installation of two backup-enabled clusters, against an S3
@@ -8941,46 +8949,25 @@ def test_010087(self):
     spec.backup enables backup for the whole installation and one cluster opts out with
     clusters[].backup.enabled: "no". The operator must run its clickhouse-backup sidecar in the pods of
     the inheriting clusters only, keep the sidecar credentials in a Secret of its own, and fail a backup
-    aimed at the cluster that opted out at once, without a Job. The storage Secret asks, as a common
-    recipe for clickhouse-backup does, for a schema restore ON CLUSTER, for parallel operations and for a
-    REST API over TLS on another address: the operator pins all of them in every sidecar whatever the
-    Secret says, and the Jobs reach every sidecar.
+    aimed at the cluster that opted out at once. The storage Secret asks, as a common recipe for
+    clickhouse-backup does, for a schema restore ON CLUSTER, for parallel operations and for a REST API over
+    TLS on another address: the operator pins all of them in every sidecar whatever the Secret says, and
+    turns on the integration tables, system.backup_actions and system.backup_list, which it drives every
+    sidecar through, by SQL with its own ClickHouse credentials. No Job, CronJob or Pod runs for backup.
 
     The backup-enabled clusters differ in shape - hot has two shards of one replica holding different row
     counts, cold one shard of two replicas - and share one storage Secret whose s3.path carries the
-    {cluster} and {shard} macros, so every shard of every cluster writes to a path of its own. A verified
-    backup of the whole installation runs one backup Job and one verify Job per cluster, under one backup
+    {cluster} and {shard} macros. A backup of the whole installation runs on every cluster, under one backup
     name, and reports every cluster.
 
-    The cold cluster is then restored alone, only the tables of one of its databases, while the schedule of
-    the installation goes on backing up the hot cluster: the restore holds the CronJob of the cold cluster
-    and never the one of the hot cluster. The schema is restored on every replica, without ON CLUSTER, so
-    the Distributed tables of the cold cluster keep the clusters they name - all-sharded, and hot by its
-    literal name - where a schema restore ON CLUSTER would rewrite both to the cluster restored. Data is
-    restored on the first replica of the shard only, so a matching count on the second replica proves the
-    restored schema shares one Keeper path. Restoring again without overwrite onto the restored tables must
-    be refused, leave the data alone, and hold no schedule.
-
-    Restoring once more with overwrite replaces the live tables, which hold rows the backup does not. The
-    shard has two replicas and the restore drops a live replicated table, so a drop ON CLUSTER empties the
-    replication of every replica first, then every replica recreates the tables from the backup's
-    definitions and the data goes to the first replica. Every replica then holds the rows of the backup
-    once and none of the replaced ones, which a replica that only recreated its own table would have cloned
-    back from the other, and the Distributed tables name the clusters they read again.
-
-    The hot cluster is then restored with overwrite as well, over rows the backup does not hold. Every
-    shard of it has one replica, which no other replica could clone old parts back to, so every host drops
-    the tables of the backup on its own and no query of the restore runs ON CLUSTER. Every shard then holds
-    the rows of its backup once, the Distributed tables are unchanged, and the restore holds the CronJob of
-    the hot cluster, never the one of the cold cluster.
-
-    The targets of a restore and of a schedule cannot be edited, nor can the backup name prefix of a schedule
-    once set, and a backup that runs the schedule takes no backupName: it is named with the schedule's prefix.
-    The schedule runs one CronJob per cluster, keeps one backup per (cluster, shard) path with its prefix and
-    reports every cluster, as well as the newest backup every cluster completed; the one-off backups carry
-    other names and survive the pruning. Last, a storage path without {cluster} would make shard 0 of both
-    clusters upload to one path: the Job of every cluster refuses such a backup before it changes anything,
-    naming the other cluster.
+    A schedule running every minute keeps its newest backups on every path, its runs living in its status.
+    The cold cluster is then restored alone, only the tables of one of its databases, as the Altinity usual
+    backup workflow restores: downloaded on every replica, the schema restored on every replica - on the first
+    replica of the first shard ON CLUSTER - and the data on one replica per shard. Restoring again, without
+    overwrite, onto the restored tables leaves them as the backup holds them; the operator checks no existing
+    table. Restoring with overwrite over rows the backup does not hold leaves every replica with the rows of
+    the backup once, and so does the hot cluster, of one replica per shard. Last, a storage path without {cluster} would make shard 0 of both clusters upload to one path:
+    every cluster refuses such a backup before it changes anything, naming the other cluster.
     """
     chi_manifest = "manifests/chi/test-010087-backup.yaml"
     storage_manifest = "manifests/secret/test-010087-backup-storage.yaml"
@@ -9019,7 +9006,15 @@ def test_010087(self):
     # A backup that runs the schedule as from_schedule does, under a backupName of its own: the API server refuses it.
     named_from_schedule, named_from_schedule_name = f"{from_schedule}-named", "e2e-087-from-schedule"
     schedule_prefix = schedule_data["spec"]["backupNamePrefix"]
-    keep_last = schedule_data["spec"]["retention"]["keepLast"]
+    # The one entry of the schedule: every minute, keeping the newest backups of the series it matches.
+    schedule_entry = schedule_data["spec"]["schedules"][0]
+    assert (len(schedule_data["spec"]["schedules"]) == 1) and (schedule_entry["period"] == "minute"), error(
+        f"{schedule_manifest} must have one entry, of period minute"
+    )
+    keep = schedule_entry["keep"]
+    assert keep >= 2, error(f"{schedule_manifest}: keep {keep}, retention must keep more than the last backup")
+    # The backups of the series: <prefix>-YYYYMMDDHHMMSS; a run of the schedule now adds a T, which keeps it out.
+    scheduled_name_pattern = re.escape(schedule_prefix) + r"-\d{14}"
 
     hot, cold = "hot", "cold"
     disabled_cluster = "disabled"
@@ -9070,6 +9065,27 @@ def test_010087(self):
 
     enabled_hosts = [item for cluster in backup_clusters for item in cluster_hosts(cluster)]
 
+    def wait_sidecars_take_credentials(username, password):
+        # kubelet updates the users configuration of ClickHouse and the configuration file of the sidecar, two volumes,
+        # each in its own time: the Secret holding the credentials does not mean the pod uses them yet. A sidecar
+        # request made in between connects with credentials ClickHouse refuses and never answers.
+        for cluster, shard, replica in enabled_hosts:
+            name = pod(cluster, shard, replica)
+            for attempt in retries(timeout=300, delay=10):
+                with attempt:
+                    mounted = kubectl.launch(
+                        f"exec {name} -c {backup_sidecar} -- cat {backup_config_dir}/config.yml", ok_to_fail=True
+                    )
+                    section = (yaml.safe_load(mounted) or {}).get("clickhouse") or {}
+                    assert section.get("username") == username, error(
+                        f"{name}: the sidecar reads ClickHouse username {section.get('username')!r}"
+                    )
+                    assert section.get("password") == password, error(f"{name}: the sidecar reads another password")
+                    out = clickhouse.query_with_error(
+                        chi, "SELECT 1", user=username, pwd=shlex.quote(password), pod=name
+                    )
+                    assert out == "1", error(f"{name}: ClickHouse does not let {username} in yet: {out}")
+
     def query(sql, cluster, shard, replica, **kwargs):
         return clickhouse.query(chi, sql, pod=pod(cluster, shard, replica), **kwargs)
 
@@ -9077,25 +9093,28 @@ def test_010087(self):
         # Run on the first host of the cluster; DDL that waits for every host of a cluster may take a while.
         return query(sql, cluster, 0, 0, timeout=240)
 
-    def check_rows(kept):
+    def check_rows(kept, restored=False):
         for cluster, shard, replica in enabled_hosts:
             out = query(f"SELECT count() FROM {local_table}", cluster, shard, replica)
             expected = rows[(cluster, shard)]
             assert out == str(expected), error(f"{cluster} shard {shard} replica {replica}: expected {expected} rows, got {out}")
         out = query(f"SELECT count() FROM {distributed_table}", hot, 0, 0)
         assert out == str(hot_rows), error(f"{distributed_table}: expected {hot_rows} rows, got {out}")
-        # The cold cluster reads the hot one through the Distributed table naming it.
-        out = query(f"SELECT count() FROM {hot_table}", cold, 0, 0)
-        assert out == str(hot_rows), error(f"{hot_table} on {cold}: expected the {hot_rows} rows of {hot}, got {out}")
+        # The cold cluster reads the hot one through the Distributed table naming it - until a restore of the cold
+        # cluster: its schema restore ON CLUSTER, on the first replica, re-points the Distributed tables it restores
+        # at the cold cluster, as clickhouse-backup does.
+        if not restored:
+            out = query(f"SELECT count() FROM {hot_table}", cold, 0, 0)
+            assert out == str(hot_rows), error(f"{hot_table} on {cold}: expected the {hot_rows} rows of {hot}, got {out}")
         for cluster, shard, replica in cluster_hosts(cold):
             out = query(f"SELECT count() FROM {kept_table}", cluster, shard, replica)
             assert out == str(kept), error(f"{kept_table} on {cold} replica {replica}: expected {kept} rows, got {out}")
 
-    def wait_rows(kept):
+    def wait_rows(kept, restored=False):
         # Rows land on the first replica of each shard; the second one catches up through replication.
         for attempt in retries(timeout=180, delay=5):
             with attempt:
-                check_rows(kept)
+                check_rows(kept, restored)
 
     def check_backup_rows_once(restored):
         # After a restore with overwrite: the rows of the backup, each once, and none of those it replaced.
@@ -9119,61 +9138,20 @@ def test_010087(self):
             replica,
         )
 
-    def check_engines():
-        # A schema restore ON CLUSTER rewrites the cluster every Distributed table names to the cluster
-        # restored: all-sharded and hot would both have turned into cold.
-        for (table, shard, replica), engine in engines.items():
-            restored = engine_full(table, cold, shard, replica)
-            assert restored == engine, error(f"{table} on {cold} replica {replica}: was {engine}, restored as {restored}")
-
-    def wait_restore_of(name, restored):
-        # Polled rather than waited for, so that a hold of another cluster is seen at any time of the restore.
-        others = [cluster for cluster in backup_clusters if cluster != restored]
-        held = False
-        phase = ""
-        deadline = time.time() + 600
-        while time.time() < deadline:
-            suspended = {cluster: backup_cronjob_suspended(kubectl.get("cronjob", cronjob)) for cluster, cronjob in cronjobs.items()}
-            phase = kubectl.get_field(restore_kind, name, ".status.phase")
-            for other in others:
-                assert not suspended[other], error(f"the restore {name} of {restored} suspended CronJob {cronjobs[other]} of {other}")
-            # Read before the phase, so a hold seen with the restore ended was seen while it ran.
-            held = held or suspended[restored]
-            if phase in backup_terminal_phases:
-                break
-            time.sleep(3)
-        if phase != "Completed":
-            backup_dump(restore_kind, name)
-        assert phase == "Completed", error(f"{restore_kind} {name}: expected phase Completed, got {phase}")
-        assert held, error(f"CronJob {cronjobs[restored]} was never seen suspended while {name} restored cluster {restored}")
-
     def check_restored(name, restored):
         clusters = backup_cluster_status(restore_kind, name)
         assert sorted(clusters) == [restored], error(f"{name}: status.clusters {clusters}")
         entry = clusters[restored]
         assert entry.get("phase") == "Completed", error(f"{name}: cluster {restored} {entry}")
-        assert entry.get("jobName") == f"{name}-{restored}-restore", error(f"{name}: cluster {restored} {entry}")
+        assert (entry.get("run") or {}).get("operation") == "restore", error(f"{name}: cluster {restored} {entry}")
         listed = entry.get("hosts") or []
         assert listed and all(f"-{restored}-" in item for item in listed), error(f"{name}: cluster {restored} {entry}")
-        jobs = [
-            (job["metadata"]["name"], (job["metadata"].get("labels") or {}).get(backup_label_cluster))
-            for job in backup_jobs(f"-l {backup_label_cr_name}={name}")
-        ]
-        assert jobs == [(entry["jobName"], restored)], error(f"{name}: Jobs {jobs}")
         # The backup holds no access objects, so the restore has none to leave out.
         ready = backup_condition(restore_kind, name, "Ready")
         assert ready.get("reason") == "Completed", error(f"{name}: Ready condition {ready}")
         reported = kubectl.get_field(restore_kind, name, ".status.backupName")
         assert reported == backup_name, error(f"{name}: status.backupName is {reported}, expected {backup_name}")
-
-    def latest_slot(cronjob):
-        # The CronJob controller names the Job of a run after the minute it was due, in minutes since the epoch.
-        slots = [
-            int(name[len(cronjob) + 1:])
-            for name in backup_job_names(backup_scheduled_jobs(cronjob))
-            if name[len(cronjob) + 1:].isdigit()
-        ]
-        return max(slots, default=None)
+        check_no_backup_workloads()
 
     try:
         create_shell_namespace_clickhouse_template()
@@ -9217,6 +9195,12 @@ def test_010087(self):
                 mounts = {m["mountPath"]: m["name"] for m in containers[backup_sidecar].get("volumeMounts") or []}
                 assert mounts.get(backup_config_dir) == backup_config_volume, error(f"{name}: sidecar mounts {mounts}")
                 assert not containers[backup_sidecar].get("livenessProbe"), error(f"{name}: the sidecar has a liveness probe")
+                assert containers[backup_sidecar].get("image") == backup_image, error(
+                    f"{name}: sidecar image {containers[backup_sidecar].get('image')}"
+                )
+                assert containers[backup_sidecar].get("imagePullPolicy") == "Always", error(
+                    f"{name}: sidecar imagePullPolicy {containers[backup_sidecar].get('imagePullPolicy')}"
+                )
             name = pod(disabled_cluster, 0, 0)
             containers = [c["name"] for c in kubectl.get_pod_spec(chi, name)["containers"]]
             assert backup_sidecar not in containers, error(f"{name} runs {backup_sidecar} although its cluster opted out: {containers}")
@@ -9261,6 +9245,12 @@ def test_010087(self):
                 assert config_file["general"]["disable_environment_override"] is False, error(
                     f"{name}: the env vars the operator pins would not take precedence"
                 )
+                # Retention is the schedules' alone, and may delete the base of an incremental backup.
+                forced = {key: config_file["general"].get(key) for key in (
+                    "backups_to_keep_remote", "rebase_during_delete", "rebase_before_remove_old_remote")}
+                assert forced == {
+                    "backups_to_keep_remote": 0, "rebase_during_delete": True, "rebase_before_remove_old_remote": True
+                }, error(f"{name}: retention settings {forced}")
                 assert config_data.get("REMOTE_STORAGE") == "s3", error(f"{name}: settings {sorted(config_data)}")
 
         with And("Without ClickHouse credentials, every sidecar reaches ClickHouse with the defaults of clickhouse-backup"):
@@ -9291,6 +9281,9 @@ def test_010087(self):
                         assert clickhouse_section.get("password") == backup_password, error(
                             f"{name}: not the ClickHouse password set"
                         )
+
+        with And(f"Every pod takes them: the sidecar reads them, and ClickHouse lets {backup_user} in"):
+            wait_sidecars_take_credentials(backup_user, backup_password)
 
         with And(f"ClickHouse user {backup_user} logs in from its own pod only, not from another pod"):
             name = pod(hot, 0, 0)
@@ -9363,52 +9356,78 @@ def test_010087(self):
                     assert engine.startswith(f"Distributed('{target}'"), error(f"{table} on {cold} replica {replica}: {engine}")
                     engines[(table, shard, replica)] = engine
 
-        wait_backup_phase(backup_kind, disabled_backup, "Failed", timeout=120)
+        wait_backup_phase(backup_kind, disabled_backup, "Aborted", timeout=120)
 
-        with Then("The backup aimed at the opted-out cluster failed at once, and no Job is created"):
-            # Checked after the table setup above, which gives a wrongly created Job time to show up.
+        with Then("The backup aimed at the opted-out cluster was aborted at once, and nothing runs for it"):
             reasons = [c.get("reason") for c in backup_status(backup_kind, disabled_backup).get("conditions") or []]
             assert "BackupDisabled" in reasons, error(f"{disabled_backup}: condition reasons {reasons}")
-            created = backup_job_names(backup_jobs())
-            assert created == [], error(f"refused backup created Jobs: {created}")
-            reported = [e for e in backup_cluster_status(backup_kind, disabled_backup).values() if not backup_unset(e.get("jobName"))]
-            assert reported == [], error(f"refused backup reports Jobs: {reported}")
+            reported = [e for e in backup_cluster_status(backup_kind, disabled_backup).values() if e.get("run")]
+            assert reported == [], error(f"refused backup reports runs: {reported}")
+            check_no_backup_workloads()
+
+        check_backup_events(backup_kind, disabled_backup, ("BackupAborted",), ())
 
         with And("The refused backup is removed"):
             kubectl.delete_kind(backup_kind, disabled_backup)
 
-        with When("A verified backup of the whole installation is created"):
+        with And("Every sidecar created the integration tables the operator drives it through, in the ClickHouse of its pod"):
+            for cluster, shard, replica in enabled_hosts:
+                check_integration_tables(chi, pod(cluster, shard, replica))
+
+        with When("A backup of the whole installation is created"):
             kubectl.apply(util.get_full_path(backup_manifest))
 
-        wait_backup_phase(backup_kind, backup, "Completed")
+        wait_backup_phase(backup_kind, backup, "Completed", timeout=600)
 
-        with Then("It ran one backup Job and one verify Job per backup-enabled cluster, and reports every cluster completed"):
+        with Then("It ran the backup on every backup-enabled cluster, in the operator, and reports every cluster completed"):
             clusters = backup_cluster_status(backup_kind, backup)
             assert sorted(clusters) == backup_clusters, error(f"{backup}: status.clusters {clusters}")
             for cluster, entry in clusters.items():
                 assert entry.get("phase") == "Completed", error(f"{backup}: cluster {cluster} {entry}")
-                # A cluster reports the last Job it ran: the one that verified its backup.
-                assert entry.get("jobName") == f"{backup}-{cluster}-verify", error(f"{backup}: cluster {cluster} {entry}")
-                assert entry.get("reason") == "Verified", error(f"{backup}: cluster {cluster} {entry}")
+                assert entry.get("reason") == "Completed", error(f"{backup}: cluster {cluster} {entry}")
+                run = entry.get("run") or {}
+                assert run.get("operation") == "backup", error(f"{backup}: cluster {cluster} {entry}")
                 listed = entry.get("hosts") or []
                 assert listed and all(f"-{cluster}-" in item for item in listed), error(f"{backup}: cluster {cluster} {entry}")
                 # The Secret of the configuration the cluster keeps its backups by: where they lie.
                 assert entry.get("configSecret") == storage_secret, error(f"{backup}: cluster {cluster} {entry}")
-            labelled = {
-                job["metadata"]["name"]: (job["metadata"].get("labels") or {}).get(backup_label_cluster)
-                for job in backup_jobs(f"-l {backup_label_cr_name}={backup}")
-            }
-            expected = {f"{backup}-{cluster}-{step}": cluster for cluster in backup_clusters for step in ("backup", "verify")}
-            assert labelled == expected, error(f"{backup}: Jobs by cluster label {labelled}, expected {expected}")
+            check_no_backup_workloads()
 
-        with And("The backup is verified and reported under its one name"):
-            verified = backup_condition(backup_kind, backup, "Verified")
-            assert verified.get("status") == "True", error(f"{backup}: Verified condition {verified}")
+        with And("The operator made it through system.backup_actions of the first replica of every shard"):
+            for cluster in backup_clusters:
+                shards, _ = layout[cluster]
+                for shard in range(shards):
+                    actions = backup_actions(chi, pod(cluster, shard, 0))
+                    made = [a for a in actions if a.get("command") == f"create_remote --rbac {backup_name}"]
+                    assert made and made[-1].get("status") == "success", error(
+                        f"{cluster} shard {shard}: system.backup_actions {actions}"
+                    )
+
+        check_backup_events(
+            backup_kind,
+            backup,
+            ("BackupRunning", "BackupCompleted"),
+            ("OrchestratorBackupStarted", "OrchestratorBackupCompleted"),
+        )
+
+        with And("The backup is reported under its one name"):
             # Every shard holds rows, so the backup holds data and is not reported as one without.
             ready = backup_condition(backup_kind, backup, "Ready")
             assert ready.get("reason") == "Completed", error(f"{backup}: Ready condition {ready}")
             reported = kubectl.get_field(backup_kind, backup, ".status.backupName")
             assert reported == backup_name, error(f"{backup}: status.backupName is {reported}, expected {backup_name}")
+
+        with And("status.backups lists the backup on every cluster, complete and sized, as the run listed it"):
+            status = backup_status(backup_kind, backup)
+            stored = status.get("backups") or []
+            assert sorted(item.get("cluster") for item in stored) == backup_clusters, error(f"{backup}: status.backups {stored}")
+            for item in stored:
+                assert item.get("name") == backup_name, error(f"{backup}: status.backups {stored}")
+                assert item.get("state") == "Complete", error(f"{backup}: status.backups {stored}")
+                assert int(item.get("size") or 0) > 0, error(f"{backup}: status.backups {stored}")
+                assert not item.get("base"), error(f"{backup}: a full backup has no base {stored}")
+                assert not backup_unset(item.get("created")), error(f"{backup}: status.backups {stored}")
+            assert not backup_unset(status.get("backupsListTime")), error(f"{backup}: status {status}")
 
         with And("Every replica of every backup-enabled cluster sees the backup under the path of its shard"):
             for cluster, shard, replica in enabled_hosts:
@@ -9476,6 +9495,9 @@ def test_010087(self):
                     )
                     assert "AUTHENTICATION_FAILED" in out, error(f"{backup_user} still logs in: {out}")
 
+        with And(f"Every pod takes them: the sidecar reads them, and ClickHouse lets {rotated_user} in"):
+            wait_sidecars_take_credentials(rotated_user, rotated_password)
+
         with And("Every sidecar reaches ClickHouse with the new credentials"):
             for cluster, shard, replica in enabled_hosts:
                 name = pod(cluster, shard, replica)
@@ -9484,35 +9506,16 @@ def test_010087(self):
                         code, body = backup_api_get(name, "/backup/tables", api_auth)
                         assert code == "200", error(f"{name}: /backup/tables answered {code}: {body}")
 
-        with When(f"A schedule of the whole installation, running every minute and keeping {keep_last} backup, is created"):
+        with When(f"A schedule of the whole installation, running every minute and keeping {keep} backups, is created"):
             kubectl.apply(util.get_full_path(schedule_manifest))
 
-        with Then("The operator runs it in one CronJob per backup-enabled cluster, owned by the schedule"):
-            cronjobs = {}
+        with Then("The schedule is Active, with the minute entry next due, and runs in the operator: no CronJob, Job or Pod"):
             for attempt in retries(timeout=120, delay=5):
                 with attempt:
-                    entries = backup_cluster_status(schedule_kind, schedule)
-                    assert sorted(entries) == backup_clusters, error(f"{schedule}: status.clusters {entries}")
-                    cronjobs = {cluster: entry.get("cronJobName") for cluster, entry in entries.items()}
-                    for cluster, name in cronjobs.items():
-                        assert name == f"{schedule}-{cluster}-backup", error(f"{schedule}: cluster {cluster} reports CronJob {name}")
-            for cluster, name in cronjobs.items():
-                cronjob_data = kubectl.get("cronjob", name)
-                assert cronjob_data["spec"]["schedule"] == schedule_data["spec"]["schedule"], error(
-                    f"CronJob {name}: schedule {cronjob_data['spec']['schedule']}"
-                )
-                assert not backup_cronjob_suspended(cronjob_data), error(f"CronJob {name} is suspended")
-                owners = [
-                    (o.get("kind"), o.get("name"), o.get("controller"))
-                    for o in cronjob_data["metadata"].get("ownerReferences") or []
-                ]
-                assert ("ClickHouseBackupSchedule", schedule, True) in owners, error(f"CronJob {name}: owners {owners}")
-                labels = cronjob_data["metadata"].get("labels") or {}
-                assert labels.get(backup_label_chi) == chi, error(f"CronJob {name}: labels {labels}")
-                assert labels.get(backup_label_cluster) == cluster, error(f"CronJob {name}: labels {labels}")
-                template = cronjob_data["spec"]["jobTemplate"]["spec"]["template"]
-                pod_labels = (template.get("metadata") or {}).get("labels") or {}
-                assert pod_labels.get(backup_label_cluster) == cluster, error(f"CronJob {name}: pod labels {pod_labels}")
+                    status = backup_status(schedule_kind, schedule)
+                    assert status.get("phase") == "Active", error(f"{schedule}: status {status}")
+                    assert not backup_unset(status.get("nextScheduleTime")), error(f"{schedule}: status {status}")
+            check_no_backup_workloads()
 
         with When("A backup that names the schedule is given a backupName of its own"):
             def name_from_schedule(data):
@@ -9534,291 +9537,176 @@ def test_010087(self):
         from_schedule_name = ""
         with Then("It made the backup of the schedule under its prefix, outside the series the schedule's retention prunes"):
             from_schedule_name = kubectl.get_field(backup_kind, from_schedule, ".status.backupName")
-            assert re.fullmatch(re.escape(schedule_prefix) + r"-\d{8}T\d{6}", from_schedule_name), error(
+            assert re.fullmatch(re.escape(schedule_prefix) + r"-[0-9]{8}T[0-9]{6}", from_schedule_name), error(
                 f"{from_schedule}: status.backupName {from_schedule_name}"
             )
-            recorded = backup_status(backup_kind, from_schedule).get("schedule") or {}
-            assert (recorded.get("name") == schedule) and (recorded.get("clickHouseInstallation") == chi), error(
-                f"{from_schedule}: status.schedule {recorded}"
-            )
-            clusters = backup_cluster_status(backup_kind, from_schedule)
-            assert sorted(clusters) == backup_clusters, error(f"{from_schedule}: status.clusters {clusters}")
+
+        with And(f"At least {keep + 1} scheduled runs succeed on every backup-enabled cluster, each recorded in the status of the schedule"):
+            for attempt in retries(timeout=900, delay=15):
+                with attempt:
+                    status = backup_status(schedule_kind, schedule)
+                    entries = {entry["name"]: entry for entry in status.get("clusters") or []}
+                    assert sorted(entries) == backup_clusters, error(f"{schedule}: status.clusters {sorted(entries)}")
+                    for cluster in backup_clusters:
+                        names = [
+                            name for name in backup_remote_names(pod(cluster, 0, 0), api_auth)
+                            if re.fullmatch(scheduled_name_pattern, name)
+                        ]
+                        assert entries[cluster].get("lastBackupName") in names, error(
+                            f"{schedule}: cluster {cluster} last backup {entries[cluster].get('lastBackupName')} of {names}"
+                        )
+                    recent = status.get("recentRuns") or []
+                    assert len(recent) >= 2, error(f"{schedule}: status.recentRuns {recent}")
+                    assert all(run.get("phase") == "Completed" for run in recent), error(f"{schedule}: status.recentRuns {recent}")
+                    assert all(not run.get("run") for run in recent), error(f"{schedule}: a finished run keeps its state {recent}")
+                    last_run = backup_condition(schedule_kind, schedule, "LastBackupSucceeded")
+                    assert last_run.get("status") == "True", error(f"{schedule}: LastBackupSucceeded {last_run}")
+                    runs_made = [
+                        event for event in backup_events(schedule_kind, schedule) if event.get("reason") == "ScheduledBackupSucceeded"
+                    ]
+                    assert sum(event.get("count") or 1 for event in runs_made) >= (keep + 1) * len(backup_clusters), error(
+                        f"{schedule}: {len(runs_made)} successful runs"
+                    )
+            check_no_backup_workloads()
+
+        with And(f"Every (cluster, shard) path keeps the {keep} newest scheduled backups; the one-off backup survives"):
+            for attempt in retries(timeout=300, delay=15):
+                with attempt:
+                    for cluster in backup_clusters:
+                        shards, _ = layout[cluster]
+                        for shard in range(shards):
+                            names = backup_remote_names(pod(cluster, shard, 0), api_auth)
+                            series = sorted(name for name in names if re.fullmatch(scheduled_name_pattern, name))
+                            assert len(series) == keep, error(f"{cluster} shard {shard}: scheduled backups {series}")
+                            assert backup_name in names, error(f"{cluster} shard {shard}: the one-off backup is gone: {names}")
+
+        with And("status.backups of the schedule lists, per cluster, the backups of its series that the storage holds, newest first"):
+            # The series of retention: the scheduled runs and the backup made at once by a backup that names the schedule
+            series_pattern = re.escape(schedule_prefix) + r"-\d{8}T?\d{6}"
+            for attempt in retries(timeout=180, delay=5):
+                with attempt:
+                    status = backup_status(schedule_kind, schedule)
+                    stored = status.get("backups") or []
+                    entries = {entry["name"]: entry for entry in status.get("clusters") or []}
+                    for cluster in backup_clusters:
+                        assert not backup_unset(entries[cluster].get("backupsListTime")), error(
+                            f"{schedule}: cluster {cluster} {entries[cluster]}"
+                        )
+                        shards, _ = layout[cluster]
+                        held = set()
+                        for shard in range(shards):
+                            held |= {
+                                name for name in backup_remote_names(pod(cluster, shard, 0), api_auth)
+                                if re.fullmatch(series_pattern, name)
+                            }
+                        listed = [item for item in stored if item.get("cluster") == cluster]
+                        assert sorted(item.get("name") for item in listed) == sorted(held), error(
+                            f"{schedule}: cluster {cluster} status.backups {listed}, the storage holds {sorted(held)}"
+                        )
+                        assert all(item.get("state") == "Complete" and int(item.get("size") or 0) > 0 for item in listed), error(
+                            f"{schedule}: cluster {cluster} status.backups {listed}"
+                        )
+                    assert backup_name not in [item.get("name") for item in stored], error(
+                        f"{schedule}: the one-off backup is no backup of the schedule: {stored}"
+                    )
+                    created = [item.get("created") or "" for item in stored]
+                    assert created == sorted(created, reverse=True), error(f"{schedule}: status.backups not newest first {created}")
+
+        check_backup_events(schedule_kind, schedule, ("ScheduleActive", "ScheduledBackupStarted", "ScheduledBackupSucceeded"),
+                            ("OrchestratorBackupStarted", "OrchestratorBackupCompleted", "OrchestratorRetentionDeleted"))
 
         with When(f"Database {database} is dropped on the whole {cold} cluster, and rows are added to {kept_table}"):
             on_cluster(cold, f"DROP DATABASE {database} ON CLUSTER '{cold}' SYNC")
-            for cluster, shard, replica in cluster_hosts(cold):
-                out = query(f"SELECT count() FROM system.databases WHERE name = '{database}'", cluster, shard, replica)
-                assert out == "0", error(f"{cold} replica {replica} still has database {database}")
-            # Other numbers than the rows backed up, so that the insert is no duplicate of theirs.
             query(f"INSERT INTO {kept_table} SELECT number + 1000 FROM numbers({kept_rows_added})", cold, 0, 0)
 
-        with When(f"The {cold} cluster alone is restored, and of it only the tables matching {restored_tables}"):
+        with And(f"The {cold} cluster alone is restored, and of it only the tables matching {restored_tables}"):
             kubectl.apply(util.get_full_path(restore_manifest))
-            restore_created = kubectl.get(restore_kind, restore)["metadata"]["creationTimestamp"]
 
-        with Then(f"While it runs, it holds the CronJob of the {cold} cluster, never the one of the {hot} cluster"):
-            wait_restore_of(restore, cold)
+        wait_backup_phase(restore_kind, restore, "Completed", timeout=900)
 
-        with And(f"It restored the {cold} cluster in one Job, and reports that cluster alone"):
+        with Then(f"It restored the {cold} cluster in the operator, and reports that cluster alone"):
             check_restored(restore, cold)
 
         with And(f"Every replica of the {cold} cluster holds its rows again; the {hot} cluster and {kept_table} were left alone"):
-            wait_rows(kept_rows_backed_up + kept_rows_added)
+            wait_rows(kept_rows_backed_up + kept_rows_added, restored=True)
 
-        with And("The restored Distributed tables still name the clusters they read"):
-            check_engines()
-
-        with And(f"The schedule went on backing up the {hot} cluster, and resumes the {cold} cluster"):
-            for attempt in retries(timeout=180, delay=10):
-                with attempt:
-                    since_restore = [
-                        job
-                        for job in backup_scheduled_jobs(cronjobs[hot])
-                        if job["metadata"]["creationTimestamp"] >= restore_created
-                    ]
-                    assert any(backup_job_state(job, "succeeded") for job in since_restore), error(
-                        f"no scheduled backup of {hot} succeeded since the restore of {cold}: {backup_job_names(since_restore)}"
-                    )
-            kubectl.wait_field("cronjob", cronjobs[cold], ".spec.suspend", "false")
 
         with When("The same restore is applied again, without overwrite, onto the restored tables"):
             kubectl.apply(util.get_full_path(restore_again_manifest))
 
-        wait_backup_phase(restore_kind, restore_again, "Failed")
+        wait_backup_phase(restore_kind, restore_again, "Completed", timeout=900)
 
-        with Then("The refused restore left the data alone"):
-            check_rows(kept_rows_backed_up + kept_rows_added)
-
-        with And("The refused restore reports why its Job failed, and that it changed nothing"):
-            # The Job script writes its error to the termination message of its pod, which the status takes over,
-            # and tells by its exit code that it failed before it changed anything.
-            ready = backup_condition(restore_kind, restore_again, "Ready")
-            assert "refusing to restore over existing tables" in ready.get("message", ""), error(
-                f"{restore_again}: Ready condition {ready}"
-            )
-            assert ready.get("reason") == "JobFailedUnchanged", error(f"{restore_again}: Ready condition {ready}")
-            entry = backup_cluster_status(restore_kind, restore_again).get(cold) or {}
-            assert (entry.get("phase") == "Failed") and (entry.get("reason") == "JobFailedUnchanged"), error(
-                f"{restore_again}: cluster {cold} {entry}"
-            )
-
-        with And("The refused restore holds no schedule"):
-            # It left nothing partly restored; only a failed restore that changed something holds the schedules.
-            for attempt in retries(timeout=120, delay=5):
+        with Then("The restored tables hold the rows of the backup once, and the rest was left alone"):
+            check_restored(restore_again, cold)
+            for attempt in retries(timeout=180, delay=5):
                 with attempt:
-                    ready = backup_condition(schedule_kind, schedule, "Ready")
-                    assert ready.get("reason") == "Scheduled", error(f"{schedule}: Ready condition {ready}")
-            for name in cronjobs.values():
-                kubectl.wait_field("cronjob", name, ".spec.suspend", "false")
-            kubectl.delete_kind(restore_kind, restore_again)
+                    check_backup_rows_once(cold)
+            check_rows(kept_rows_backed_up + kept_rows_added, restored=True)
 
         with When(f"{replaced_rows} rows the backup does not hold are added to {local_table} of the {cold} cluster"):
-            query(f"INSERT INTO {local_table} SELECT number + {replaced_id_base} FROM numbers({replaced_rows})", cold, 0, 0)
-            for attempt in retries(timeout=120, delay=5):
-                with attempt:
-                    for cluster, shard, replica in cluster_hosts(cold):
-                        out = query(f"SELECT count() FROM {local_table}", cluster, shard, replica)
-                        expected = rows[(cluster, shard)] + replaced_rows
-                        assert out == str(expected), error(f"{cold} replica {replica}: expected {expected} rows, got {out}")
+            query(
+                f"INSERT INTO {local_table} SELECT {replaced_id_base} + number FROM numbers({replaced_rows})", cold, 0, 0
+            )
 
         with And(f"The {cold} cluster is restored once more, with overwrite, over these live tables"):
             kubectl.apply(util.get_full_path(restore_overwrite_manifest))
 
-        with Then(f"While it runs, it holds the CronJob of the {cold} cluster, never the one of the {hot} cluster"):
-            wait_restore_of(restore_overwrite, cold)
+        wait_backup_phase(restore_kind, restore_overwrite, "Completed", timeout=900)
 
-        with And(f"It restored the {cold} cluster in one Job, and reports that cluster alone"):
+        with Then(f"Every replica of the {cold} cluster holds the rows of the backup once, and none it replaced"):
             check_restored(restore_overwrite, cold)
-
-        with And(f"Every replica of the {cold} cluster holds the rows of the backup once, and none it replaced"):
-            # The shard has two replicas and the restore drops a live replicated table, so the restore first
-            # drops the tables ON CLUSTER: a replica that only dropped and recreated its own table would clone
-            # the replaced rows back from the other replica, and the restored data would come on top of them.
-            wait_rows(kept_rows_backed_up + kept_rows_added)
-            check_backup_rows_once(cold)
-
-        with And("The Distributed tables, which the schema restore ON CLUSTER recreated over the restored cluster, name the clusters they read again"):
-            check_engines()
-
-        with And(f"The schedule resumes the {cold} cluster"):
-            kubectl.wait_field("cronjob", cronjobs[cold], ".spec.suspend", "false")
+            for attempt in retries(timeout=180, delay=5):
+                with attempt:
+                    check_backup_rows_once(cold)
+            actions = (backup_cluster_status(restore_kind, restore_overwrite)[cold].get("run") or {}).get("actions") or []
+            schema = [a.get("command") or "" for a in actions if a.get("step") == "schema"]
+            # The restore names tables: it recreates those of the backup, never a whole database
+            assert schema and all(("--ignore-dependencies" in command) and ("--rm" not in command.split()) for command in schema), error(
+                f"{restore_overwrite}: an overwrite of some tables drops no database: {schema}"
+            )
+            data = [a.get("command") or "" for a in actions if a.get("step") == "data"]
+            assert data and all("--ignore-dependencies" in command for command in data), error(f"{restore_overwrite}: {data}")
+            assert "--env=RESTORE_SCHEMA_ON_CLUSTER={cluster}" in schema[0], error(f"{restore_overwrite}: {schema}")
 
         with When(f"{replaced_rows} rows the backup does not hold are added to {local_table} of every shard of the {hot} cluster"):
-            hot_engines = {}
-            for cluster, shard, replica in cluster_hosts(hot):
-                query(f"INSERT INTO {local_table} SELECT number + {replaced_id_base} FROM numbers({replaced_rows})", cluster, shard, replica)
-                out = query(f"SELECT count() FROM {local_table}", cluster, shard, replica)
-                expected = rows[(cluster, shard)] + replaced_rows
-                assert out == str(expected), error(f"{hot} shard {shard}: expected {expected} rows, got {out}")
-                engine = engine_full(distributed_table, cluster, shard, replica)
-                assert engine.startswith(f"Distributed('{hot}'"), error(f"{distributed_table} on {hot} shard {shard}: {engine}")
-                hot_engines[(cluster, shard, replica)] = engine
-            # The queries of the restore are told from earlier ones in the query log by the time they ran.
-            hot_restore_start = query("SELECT now()", hot, 0, 0)
+            shards, _ = layout[hot]
+            for shard in range(shards):
+                query(f"INSERT INTO {local_table} SELECT {replaced_id_base} + number FROM numbers({replaced_rows})", hot, shard, 0)
 
         with And(f"The {hot} cluster is restored with overwrite, the same tables of the same backup, over these live tables"):
             kubectl.apply(util.get_full_path(restore_hot_manifest))
 
-        with Then(f"While it runs, it holds the CronJob of the {hot} cluster, never the one of the {cold} cluster"):
-            wait_restore_of(restore_hot, hot)
+        wait_backup_phase(restore_kind, restore_hot, "Completed", timeout=900)
 
-        with And(f"It restored the {hot} cluster in one Job, and reports that cluster alone"):
+        with Then(f"Every shard of the {hot} cluster holds the rows of its backup once, and none it replaced"):
             check_restored(restore_hot, hot)
-
-        with And(f"Every host of the {hot} cluster dropped the tables of the backup on its own, and none ON CLUSTER"):
-            # Every shard of the cluster has one replica, with no other one to clone old parts back from, so the
-            # restore takes no drop ON CLUSTER. The query log of every host must show the drops the restore made
-            # there, or a log that missed the restore would show no query ON CLUSTER either.
-            for cluster, shard, replica in cluster_hosts(hot):
-                query("SYSTEM FLUSH LOGS", cluster, shard, replica)
-                out = query(
-                    "SELECT countIf(query ILIKE 'DROP %'), countIf(query ILIKE '% ON CLUSTER %') FROM system.query_log "
-                    f"WHERE (user = '{rotated_user}') AND (event_time >= '{hot_restore_start}')",
-                    cluster,
-                    shard,
-                    replica,
-                )
-                counts = out.split()
-                assert len(counts) == 2, error(f"{hot} shard {shard}: cannot read the query log: {out}")
-                drops, on_cluster_queries = counts
-                assert int(drops) > 0, error(f"{hot} shard {shard}: the query log shows no drop by {rotated_user} since {hot_restore_start}")
-                assert on_cluster_queries == "0", error(
-                    f"{hot} shard {shard}: {rotated_user} ran {on_cluster_queries} queries ON CLUSTER since {hot_restore_start}"
-                )
-
-        with And(f"Every shard of the {hot} cluster holds the rows of its backup once, and none it replaced; the {cold} cluster was left alone"):
-            wait_rows(kept_rows_backed_up + kept_rows_added)
-            check_backup_rows_once(hot)
-
-        with And("The Distributed tables of both clusters are unchanged"):
-            for (cluster, shard, replica), engine in hot_engines.items():
-                restored = engine_full(distributed_table, cluster, shard, replica)
-                assert restored == engine, error(f"{distributed_table} on {hot} shard {shard}: was {engine}, restored as {restored}")
-            check_engines()
-
-        with And(f"The schedule resumes the {hot} cluster"):
-            kubectl.wait_field("cronjob", cronjobs[hot], ".spec.suspend", "false")
+            for attempt in retries(timeout=180, delay=5):
+                with attempt:
+                    check_backup_rows_once(hot)
 
         with When("The targets of the restore and of the schedule, and the backup name prefix of the schedule, are edited"):
-            edits = (
-                (restore_kind, restore, {"spec": {"cluster": hot}}, backup_target_immutable_message),
-                (restore_kind, restore, {"spec": {"cluster": None}}, backup_target_immutable_message),
-                (schedule_kind, schedule, {"spec": {"cluster": hot}}, backup_target_immutable_message),
-                # Another prefix, or none, would leave the backups the schedule made under its prefix unpruned.
-                (schedule_kind, schedule, {"spec": {"backupNamePrefix": f"{schedule_prefix}-other"}}, backup_name_prefix_immutable_message),
-                (schedule_kind, schedule, {"spec": {"backupNamePrefix": None}}, backup_name_prefix_immutable_message),
-            )
-            outputs = [backup_patch(kind, name, patch, ok_to_fail=True) for kind, name, patch, _ in edits]
+            outs = [
+                backup_patch(restore_kind, restore, '{"spec":{"clickHouseInstallation":"other"}}', ok_to_fail=True),
+                backup_patch(schedule_kind, schedule, '{"spec":{"cluster":"' + hot + '"}}', ok_to_fail=True),
+                backup_patch(schedule_kind, schedule, '{"spec":{"backupNamePrefix":"other"}}', ok_to_fail=True),
+            ]
 
         with Then("The API server refuses every edit, and the targets and the prefix stay as they were"):
-            for (kind, name, patch, message), out in zip(edits, outputs):
-                assert message in out, error(f"{kind} {name}: {patch} was not refused: {out}")
-            target = kubectl.get(restore_kind, restore)["spec"].get("cluster")
-            assert target == cold, error(f"{restore}: spec.cluster is {target}")
-            schedule_spec = kubectl.get(schedule_kind, schedule)["spec"]
-            assert backup_unset(schedule_spec.get("cluster")), error(f"{schedule}: spec.cluster is {schedule_spec.get('cluster')}")
-            assert schedule_spec.get("backupNamePrefix") == schedule_prefix, error(
-                f"{schedule}: spec.backupNamePrefix is {schedule_spec.get('backupNamePrefix')}, expected {schedule_prefix}"
-            )
+            assert backup_name_prefix_immutable_message in outs[2], error(f"backupNamePrefix edit was not refused: {outs[2]}")
+            assert kubectl.get_field(restore_kind, restore, ".spec.clickHouseInstallation") == chi
+            assert backup_unset(kubectl.get_field(schedule_kind, schedule, ".spec.cluster"))
+            assert kubectl.get_field(schedule_kind, schedule, ".spec.backupNamePrefix") == schedule_prefix
 
-        with And("At least two scheduled backups succeed on every backup-enabled cluster"):
-            succeeded = {}
-            deadline = time.time() + 300
-            while time.time() < deadline:
-                for cluster, name in cronjobs.items():
-                    scheduled = backup_scheduled_jobs(name)
-                    failed = backup_job_names([job for job in scheduled if backup_job_state(job, "failed")])
-                    if failed:
-                        backup_dump(schedule_kind, schedule)
-                    assert not failed, error(f"scheduled backups of {cluster} failed: {failed}")
-                    succeeded[cluster] = backup_job_names([job for job in scheduled if backup_job_state(job, "succeeded")])
-                if all(len(names) >= 2 for names in succeeded.values()):
-                    break
-                time.sleep(10)
-            assert all(len(succeeded.get(cluster, [])) >= 2 for cluster in backup_clusters), error(
-                f"scheduled backups that succeeded within 5 minutes: {succeeded}"
-            )
-
-        with And("The schedule is suspended within a minute both clusters already ran, and no run is left in flight"):
-            # The CronJobs fire in the same minute, and the runs of one minute make one backup name. Suspended
-            # once both made this minute's run, and well before the next minute, they leave one name as the
-            # last backup of every cluster; a run still in flight would list its half-uploaded backup next to
-            # the kept one.
-            deadline = time.time() + 240
-            while True:
-                minute, second = divmod(int(time.time()), 60)
-                slots = {cluster: latest_slot(name) for cluster, name in cronjobs.items()}
-                if (second <= 40) and all(slot == minute for slot in slots.values()):
-                    break
-                assert time.time() < deadline, error(f"the CronJobs never both ran within one minute: {slots}")
-                time.sleep(5)
-            backup_patch(schedule_kind, schedule, {"spec": {"suspend": True}})
-            for name in cronjobs.values():
-                kubectl.wait_field("cronjob", name, ".spec.suspend", "true")
-            scheduled = []
-            for attempt in retries(timeout=180, delay=10):
-                with attempt:
-                    scheduled = [job for name in cronjobs.values() for job in backup_scheduled_jobs(name)]
-                    running = backup_job_names([job for job in scheduled if not backup_job_finished(job)])
-                    assert running == [], error(f"scheduled backups still running: {running}")
-            failed = backup_job_names([job for job in scheduled if backup_job_state(job, "failed")])
-            if failed:
-                backup_dump(schedule_kind, schedule)
-            assert not failed, error(f"scheduled backups failed: {failed}")
-
-        with Then("The schedule reports the last successful run of every cluster, and the one backup name of their last minute"):
-            last_backup = ""
-            for attempt in retries(timeout=120, delay=5):
+        with And("The schedule is suspended, and no run is left in flight"):
+            backup_patch(schedule_kind, schedule, '{"spec":{"suspend":true}}')
+            for attempt in retries(timeout=600, delay=10):
                 with attempt:
                     status = backup_status(schedule_kind, schedule)
-                    entries = {item.get("name"): item for item in status.get("clusters") or []}
-                    names, times = set(), []
-                    for cluster in backup_clusters:
-                        entry = entries.get(cluster) or {}
-                        assert entry.get("cronJobName") == cronjobs[cluster], error(f"{schedule}: cluster {cluster} {entry}")
-                        assert not backup_unset(entry.get("lastSuccessfulTime")), error(f"{schedule}: cluster {cluster} {entry}")
-                        # Each run names its backup after the minute it was due, so the operator knows the name.
-                        assert (entry.get("lastBackupName") or "").startswith(f"{schedule_prefix}-"), error(
-                            f"{schedule}: cluster {cluster} {entry}"
-                        )
-                        names.add(entry["lastBackupName"])
-                        times.append(entry["lastSuccessfulTime"])
-                    assert len(names) == 1, error(f"{schedule}: the clusters report different last backups {entries}")
-                    # The newest backup every cluster completed: the one to recover the installation from.
-                    last_backup = status.get("lastBackupName")
-                    assert last_backup in names, error(f"{schedule}: status.lastBackupName {last_backup}, clusters {names}")
-                    # The last success of the cluster that succeeded least recently.
-                    assert status.get("lastSuccessfulTime") == min(times), error(
-                        f"{schedule}: status.lastSuccessfulTime {status.get('lastSuccessfulTime')}, clusters {times}"
-                    )
-                    last_run = backup_condition(schedule_kind, schedule, "LastBackupSucceeded")
-                    assert last_run.get("status") == "True", error(f"{schedule}: LastBackupSucceeded condition {last_run}")
-                    assert last_run.get("reason") == "Completed", error(f"{schedule}: LastBackupSucceeded condition {last_run}")
-
-        with And(f"Every (cluster, shard) path keeps {keep_last} scheduled backup, the last one, and the one-off backups survive"):
-            # The last scheduled run pruned after the backup that ran the schedule once was made
-            last_due = re.sub(r"\D", "", last_backup[len(schedule_prefix) :])
-            from_schedule_due = re.sub(r"\D", "", from_schedule_name[len(schedule_prefix) :])
-            assert last_due > from_schedule_due, error(
-                f"the last scheduled backup {last_backup} is not newer than {from_schedule_name}"
-            )
-            # Retention runs per cluster, on the hosts of that cluster.
-            for cluster in backup_clusters:
-                shards, _ = layout[cluster]
-                for shard in range(shards):
-                    names = backup_remote_names(pod(cluster, shard, 0), api_auth)
-                    kept = [name for name in names if re.fullmatch(re.escape(schedule_prefix) + r"-\d{8}-\d{6}", name)]
-                    assert (len(kept) == keep_last) and (last_backup in kept), error(
-                        f"{cluster} shard {shard}: scheduled backups {kept}, the last backup is {last_backup}"
-                    )
-                    assert backup_name in names, error(f"{cluster} shard {shard}: retention removed {backup_name}, left {names}")
-                    assert from_schedule_name in names, error(
-                        f"{cluster} shard {shard}: retention removed {from_schedule_name}, left {names}"
-                    )
+                    assert status.get("phase") == "Suspended", error(f"{schedule}: status {status}")
+                    assert not status.get("active"), error(f"{schedule}: status.active {status.get('active')}")
 
         with When("The storage path loses its {cluster} macro, and the whole installation is backed up"):
-            # The operator regenerates the configuration files of the sidecars within a minute, without restarting
-            # them; the Jobs take the path from the configuration file Secret of each cluster.
+            # The operator regenerates the configuration files of the sidecars within a minute, without restarting them.
             # Applied from a file: the whole configuration on a command line is longer than the shell takes.
             def share_path(data):
                 storage_config = yaml.safe_load(data["stringData"]["config.yml"])
@@ -9829,26 +9717,22 @@ def test_010087(self):
             wait_backup_config_setting(chi, backup_clusters, "S3_PATH", shared_path)
             kubectl.apply(util.get_full_path(shared_path_backup_manifest))
 
-        wait_backup_phase(backup_kind, shared_path_backup, "Failed")
+        wait_backup_phase(backup_kind, shared_path_backup, "Aborted")
 
-        with Then("The Job of every cluster refused the backup before changing anything, naming the cluster it collides with"):
+        with Then("Every cluster refused the backup before any run, naming the cluster it collides with"):
             clusters = backup_cluster_status(backup_kind, shared_path_backup)
             assert sorted(clusters) == backup_clusters, error(f"{shared_path_backup}: status.clusters {clusters}")
             for cluster, entry in clusters.items():
                 other = [name for name in backup_clusters if name != cluster][0]
-                assert entry.get("phase") == "Failed", error(f"{shared_path_backup}: cluster {cluster} {entry}")
-                # A failed backup leaves nothing to hold schedules for, so its status does not tell whether its
-                # Job changed anything: the exit code of the Job does.
-                assert entry.get("reason") == "JobFailed", error(f"{shared_path_backup}: cluster {cluster} {entry}")
-                assert other in (entry.get("message") or ""), error(
+                assert entry.get("phase") == "Aborted", error(f"{shared_path_backup}: cluster {cluster} {entry}")
+                assert entry.get("reason") == "StoragePathConflict", error(f"{shared_path_backup}: cluster {cluster} {entry}")
+                assert "is not unique" in (entry.get("message") or ""), error(
+                    f"{shared_path_backup}: cluster {cluster} does not tell the path is not unique: {entry}"
+                )
+                assert f"cluster {other}" in (entry.get("message") or ""), error(
                     f"{shared_path_backup}: cluster {cluster} does not name {other}: {entry}"
                 )
-                job = f"{shared_path_backup}-{cluster}-backup"
-                assert entry.get("jobName") == job, error(f"{shared_path_backup}: cluster {cluster} {entry}")
-                codes = backup_job_exit_codes(job)
-                assert codes == [backup_unchanged_exit_code], error(
-                    f"Job {job} exited with {codes}, expected {backup_unchanged_exit_code}: it failed before changing anything"
-                )
+                assert not (entry.get("run") or {}).get("mutated"), error(f"{shared_path_backup}: cluster {cluster} {entry}")
     finally:
         with Finally("I clean up"):
             if not settings.no_cleanup:
@@ -9892,7 +9776,7 @@ def test_010088(self):
     annotation: the rows of every shard come back, and the SQL user logs in on every host and sees through
     its row policy what it saw in the source. The clickhouse-backup container of the new installation's
     pod template sets the restart command of clickhouse-backup's own default configuration, which a
-    sidecar cannot run, and a REST API address and credentials the Jobs do not use: the operator pins
+    sidecar cannot run, and a REST API address and credentials the integration tables do not use: the operator pins
     the command that loads the restored access objects, and its own address and credentials.
 
     The backup recovered from carries the default backup name prefix of schedule nightly of the new
@@ -9974,26 +9858,23 @@ def test_010088(self):
                         f"{chi} shard {shard}: {reader} should see {visible_secret_rows} rows of {secrets_table}, got {out}"
                     )
 
-    def suspended_clusters(cronjobs):
-        return sorted(cluster for cluster, cronjob in cronjobs.items() if backup_cronjob_suspended(cronjob))
-
     def default_prefix(schedule):
         # The default backup name prefix of a schedule of the new installation, see BackupNamePrefix in
         # pkg/model/chbackup/builder.go.
         return f"{current().context.test_namespace}-{recovered_chi}-{schedule}"
 
     def check_held_for_prefix(schedule):
-        """Checks that a schedule is held on every cluster for the backup name prefix its CronJobs default to,
-        and returns its CronJobs by cluster."""
-        cronjobs = backup_schedule_cronjobs(schedule)
-        assert sorted(cronjobs) == recovered_clusters, error(f"{schedule}: CronJobs of {sorted(cronjobs)}")
-        assert suspended_clusters(cronjobs) == recovered_clusters, error(f"{schedule}: held on {suspended_clusters(cronjobs)} only")
+        """Checks that a schedule is held for the backup name prefix it defaults to: it runs nothing."""
+        assert not backup_status(schedule_kind, schedule).get("active"), error(f"{schedule} runs while held")
         ready = backup_condition(schedule_kind, schedule, "Ready")
         assert (ready.get("status") == "False") and (ready.get("reason") == "SharesSourcePrefix"), error(
             f"{schedule}: Ready condition {ready}"
         )
         assert source_backup_name in (ready.get("message") or ""), error(f"{schedule}: Ready condition {ready} does not name the backup")
-        return cronjobs
+        status = backup_status(schedule_kind, schedule)
+        assert (status.get("phase") == "Aborted") and (status.get("reason") == "SharesSourcePrefix"), error(
+            f"{schedule}: phase {status.get('phase')}, reason {status.get('reason')}"
+        )
 
     archive_prefix = yaml_manifest.get_manifest_data(util.get_full_path(archive_manifest))["spec"]["backupNamePrefix"]
     assert archive_prefix, error(f"{archive_manifest} must give schedule {archive} a backup name prefix of its own")
@@ -10069,7 +9950,7 @@ def test_010088(self):
 
         with Then("Every shard of the source holds the backup, with the access objects of its host"):
             source_backup_name = kubectl.get_field(backup_kind, source_backup, ".status.backupName")
-            assert re.fullmatch(re.escape(nightly_default_prefix) + r"-\d{8}T\d{6}", source_backup_name), error(
+            assert re.fullmatch(re.escape(nightly_default_prefix) + r"-[0-9]{8}T[0-9]{6}", source_backup_name), error(
                 f"{source_backup}: backup name {source_backup_name}"
             )
             clusters = backup_cluster_status(backup_kind, source_backup)
@@ -10081,6 +9962,20 @@ def test_010088(self):
                 assert source_backup_name in items, error(f"shard {shard}: remote backups {sorted(items)}")
                 rbac_size = int(items[source_backup_name].get("rbac_size") or 0)
                 assert rbac_size > 0, error(f"shard {shard}: {source_backup_name} holds no access objects: {items[source_backup_name]}")
+
+        with And("The operator made it through system.backup_actions of every shard, and runs no Job"):
+            for shard in range(shards):
+                actions = backup_actions(source_chi, pod(source_chi, main_cluster, shard))
+                made = [a for a in actions if a.get("command") == f"create_remote --rbac {source_backup_name}"]
+                assert made and made[-1].get("status") == "success", error(f"shard {shard}: system.backup_actions {actions}")
+            check_no_backup_workloads()
+
+        check_backup_events(
+            backup_kind,
+            source_backup,
+            ("BackupRunning", "BackupCompleted"),
+            ("OrchestratorBackupStarted", "OrchestratorBackupCompleted"),
+        )
 
         with When("A new installation to be recovered from that backup is created, with three schedules due once a year"):
             def recover(data):
@@ -10098,77 +9993,34 @@ def test_010088(self):
             def restore_validated():
                 return backup_condition(restore_kind, recovery_restore, "Validated").get("status") == "True"
 
-            seen = {schedule: set() for schedule in schedules}
-            # archive on the cluster that opted out, as seen while the recovery restore was validated, and before
-            held_while_validated = []
-            running_before_validated = []
-            # source_schedule as seen while the recovery restore was validated, its Ready condition included, and before
-            source_held_while_validated = []
-            source_running_before_validated = []
+            # The Ready condition of a schedule tells its holds, the one of the cluster that needs action first
+            archive_held, source_held = [], []
             phase = ""
             deadline = time.time() + 900
             while time.time() < deadline:
-                validated_before = restore_validated()
-                observed = {schedule: backup_schedule_cronjobs(schedule) for schedule in schedules}
-                source_cronjobs = backup_schedule_cronjobs(source_schedule)
-                source_ready = backup_condition(schedule_kind, source_schedule, "Ready")
-                # Read after the CronJobs: a recovery restore that has not ended now had not when they were read.
                 phase = kubectl.get_field(restore_kind, recovery_restore, ".status.phase")
-                validated_after = restore_validated()
                 if phase in backup_terminal_phases:
                     break
-                if not source_cronjobs:
-                    # A read that failed, which backup_schedule_cronjobs tolerates: the next poll tells
-                    time.sleep(3)
-                    continue
-                assert sorted(source_cronjobs) == [main_cluster], error(f"{source_schedule}: CronJobs of {sorted(source_cronjobs)}")
-                source_suspended = backup_cronjob_suspended(source_cronjobs[main_cluster])
-                if validated_before and validated_after:
-                    source_held_while_validated.append(
-                        source_suspended
-                        and (source_ready.get("reason") == "SuspendedForRestore")
-                        and (recovery_restore in (source_ready.get("message") or ""))
+                for schedule in default_prefixed:
+                    ready = backup_condition(schedule_kind, schedule, "Ready")
+                    assert ready.get("reason") in (None, "SharesSourcePrefix", "CHINotReady", "CHINotFound"), error(
+                        f"{schedule}: Ready condition {ready} before {main_cluster} is recovered"
                     )
-                elif not (validated_before or validated_after):
-                    source_running_before_validated.append(not source_suspended)
-                for schedule, cronjobs in observed.items():
-                    for cluster, cronjob in cronjobs.items():
-                        seen[schedule].add(cluster)
-                        suspended = backup_cronjob_suspended(cronjob)
-                        if (schedule == archive) and (cluster == extra_cluster):
-                            # Held only while a restore of access objects is validated: the hold follows the
-                            # validation with the delay of a reconcile, so only a state both reads agree on counts.
-                            if validated_before and validated_after:
-                                held_while_validated.append(suspended)
-                            elif not (validated_before or validated_after):
-                                running_before_validated.append(not suspended)
-                            continue
-                        held = (schedule in default_prefixed) or (cluster == main_cluster)
-                        assert suspended == held, error(
-                            f"{schedule}: CronJob {cronjob['metadata']['name']} of {cluster} is "
-                            f"{'running' if held else 'held'} before {main_cluster} is recovered"
-                        )
+                    assert not backup_status(schedule_kind, schedule).get("active"), error(f"{schedule} runs before the recovery")
+                archive_ready = backup_condition(schedule_kind, archive, "Ready")
+                archive_held.append(archive_ready.get("reason") == "SuspendedForRestore")
+                assert not backup_status(schedule_kind, archive).get("active"), error(f"{archive} runs before the recovery")
+                source_ready = backup_condition(schedule_kind, source_schedule, "Ready")
+                source_held.append(
+                    (source_ready.get("reason") == "SuspendedForRestore") and (recovery_restore in (source_ready.get("message") or ""))
+                )
                 time.sleep(3)
-            # The restore Job starts only once every CronJob of every cluster was seen suspended for the gate's
-            # interval, so the validated window spans several polls and its last ones see the hold.
-            assert any(held_while_validated), error(
-                f"{archive} on {extra_cluster} was never held while {recovery_restore} was validated: {held_while_validated}"
-            )
-            assert all(running_before_validated), error(
-                f"{archive} on {extra_cluster} was held before {recovery_restore} was validated: {running_before_validated}"
-            )
-            assert any(source_held_while_validated), error(
-                f"{source_schedule} was never held for {recovery_restore} while it was validated: {source_held_while_validated}"
-            )
-            assert all(source_running_before_validated), error(
-                f"{source_schedule} was held before {recovery_restore} was validated: {source_running_before_validated}"
-            )
+            assert any(archive_held), error(f"{archive} was never held before {main_cluster} was recovered")
+            assert any(source_held), error(f"{source_schedule} was never held for {recovery_restore}")
             if phase != "Completed":
                 note(kubectl.launch(f"get chi {recovered_chi} -o yaml", ok_to_fail=True))
                 backup_dump(restore_kind, recovery_restore)
             assert phase == "Completed", error(f"{recovery_restore}: expected phase Completed, got {phase}")
-            unseen = {schedule: sorted(set(recovered_clusters) - clusters) for schedule, clusters in seen.items()}
-            assert not any(unseen.values()), error(f"CronJobs never seen before the recovery, by schedule: {unseen}")
 
         with And("The new installation completed its reconcile with every host"):
             kubectl.wait_chi_status(recovered_chi, "Completed")
@@ -10206,6 +10058,17 @@ def test_010088(self):
             # Completed rather than RBACNotRestored: the access objects of the backup were restored.
             ready = [c for c in status.get("conditions") or [] if c.get("type") == "Ready"]
             assert ready and (ready[0].get("reason") == "Completed"), error(f"{recovery_restore}: Ready condition {ready}")
+            assert (clusters[main_cluster].get("run") or {}).get("operation") == "restore", error(
+                f"{recovery_restore}: status.clusters {clusters}"
+            )
+            check_no_backup_workloads()
+
+        check_backup_events(
+            restore_kind,
+            recovery_restore,
+            ("RestoreRunning", "RestoreCompleted"),
+            ("OrchestratorRestoreStarted", "OrchestratorRestoreCompleted"),
+        )
 
         with And(f"It recorded the backup in annotation {backup_annotation_recovered_from}"):
             # Once the recovery restore completed.
@@ -10227,23 +10090,18 @@ def test_010088(self):
         with And(f"Schedule {source_schedule} of the source, whose backup the recovery read, is released"):
             for attempt in retries(timeout=120, delay=5):
                 with attempt:
-                    cronjobs = backup_schedule_cronjobs(source_schedule)
-                    assert sorted(cronjobs) == [main_cluster], error(f"{source_schedule}: CronJobs of {sorted(cronjobs)}")
-                    assert suspended_clusters(cronjobs) == [], error(f"{source_schedule}: held on {suspended_clusters(cronjobs)}")
                     ready = backup_condition(schedule_kind, source_schedule, "Ready")
                     assert ready.get("reason") == "Scheduled", error(f"{source_schedule}: Ready condition {ready}")
+                    phase = backup_status(schedule_kind, source_schedule).get("phase")
+                    assert phase == "Active", error(f"{source_schedule}: phase {phase}")
 
         with And(f"Schedule {archive}, with a backup name prefix of its own, is released"):
             for attempt in retries(timeout=120, delay=5):
                 with attempt:
-                    cronjobs = backup_schedule_cronjobs(archive)
-                    assert sorted(cronjobs) == recovered_clusters, error(f"{archive}: CronJobs of {sorted(cronjobs)}")
-                    assert suspended_clusters(cronjobs) == [], error(f"{archive}: held on {suspended_clusters(cronjobs)}")
                     ready = backup_condition(schedule_kind, archive, "Ready")
                     assert ready.get("reason") == "Scheduled", error(f"{archive}: Ready condition {ready}")
-            for cluster, cronjob in cronjobs.items():
-                prefix = backup_cronjob_env(cronjob).get("BACKUP_NAME_PREFIX")
-                assert prefix == archive_prefix, error(f"{archive} on {cluster}: backup name prefix {prefix}")
+                    phase = backup_status(schedule_kind, archive).get("phase")
+                    assert phase == "Active", error(f"{archive}: phase {phase}")
             validated = backup_condition(schedule_kind, archive, "Validated")
             assert validated.get("reason") == "CHIRecovered", error(f"{archive}: Validated condition {validated}")
 
@@ -10252,23 +10110,19 @@ def test_010088(self):
             "only starts like it, stay held on every cluster"
         ):
             for schedule in default_prefixed:
-                cronjobs = {}
                 for attempt in retries(timeout=120, delay=5):
                     with attempt:
-                        cronjobs = check_held_for_prefix(schedule)
-                for cluster, cronjob in cronjobs.items():
-                    prefix = backup_cronjob_env(cronjob).get("BACKUP_NAME_PREFIX")
-                    assert prefix == default_prefix(schedule), error(f"{schedule} on {cluster}: backup name prefix {prefix}")
+                        check_held_for_prefix(schedule)
 
         with When(f"Schedule {nightly} is edited without giving it a prefix"):
-            backup_patch(schedule_kind, nightly, {"spec": {"failedJobsHistoryLimit": 2}})
+            backup_patch(schedule_kind, nightly, {"spec": {"failedRunsHistoryLimit": 2}})
 
         with Then("It stays held"):
             for attempt in retries(timeout=120, delay=5):
                 with attempt:
-                    nightly_cronjobs = check_held_for_prefix(nightly)
-                    limits = {cluster: cronjob["spec"].get("failedJobsHistoryLimit") for cluster, cronjob in nightly_cronjobs.items()}
-                    assert set(limits.values()) == {2}, error(f"{nightly}: failedJobsHistoryLimit of the CronJobs {limits}")
+                    check_held_for_prefix(nightly)
+                    generation = backup_status(schedule_kind, nightly)
+                    assert kubectl.get_field(schedule_kind, nightly, ".spec.failedRunsHistoryLimit") == "2", error(f"{nightly}: {generation}")
 
         with When(f"Schedule {nightly} is given its prefix explicitly, even the default one"):
             # A schedule without a prefix can be given one, once: the API server refuses any change of it after.
@@ -10277,11 +10131,10 @@ def test_010088(self):
         with Then(f"That informed choice releases it, and it alone: {hourly} stays held"):
             for attempt in retries(timeout=120, delay=5):
                 with attempt:
-                    nightly_cronjobs = backup_schedule_cronjobs(nightly)
-                    assert sorted(nightly_cronjobs) == recovered_clusters, error(f"{nightly}: CronJobs of {sorted(nightly_cronjobs)}")
-                    assert suspended_clusters(nightly_cronjobs) == [], error(f"{nightly}: held on {suspended_clusters(nightly_cronjobs)}")
                     ready = backup_condition(schedule_kind, nightly, "Ready")
                     assert ready.get("reason") == "Scheduled", error(f"{nightly}: Ready condition {ready}")
+                    phase = backup_status(schedule_kind, nightly).get("phase")
+                    assert phase == "Active", error(f"{nightly}: phase {phase}")
             check_held_for_prefix(hourly)
 
         with And("Each hold was announced once, by one warning event"):
@@ -10317,9 +10170,394 @@ def test_010088(self):
             delete_test_namespace()
 
 
-#
-# Keeper tests section
-#
+@TestScenario
+@Name("test_010089. Operator-managed backup: retention of a schedule across a change, held backups and keepBackups pins")
+@Tags("HEAVY")
+def test_010089(self):
+    """The retention of a schedule across a change of its entries, with spec.retention.onScheduleChange Hold and pins of
+    spec.retention.keepBackups, against an S3 store started inside the test namespace.
+
+    A schedule running every minute keeps its five newest backups. A backup run now from it is pinned without until.
+    Once it has made a few backups, its keep is lowered to 1, which retention holds: status.retention.previous records
+    the entries before, with when every backup they kept has expired, and the runs list in
+    status.clusters[].heldBackups the backups the schedule as it is would delete, each until five minutes after it was
+    made, when the schedule before would have deleted it. In the same change, the newest backup made before it is
+    pinned without until, and two backups the schedule is yet to make with until an hour on.
+
+    Every held backup stays until it expires and is deleted after; the backup pinned without until is never listed as
+    held, and is deleted once its hold expired as well: a pin without until of a scheduled backup lasts as long as the
+    hold, not for good. While that pin is listed, the change stays in status.retention.previous past its expiry. The
+    run-now backup, pinned without until, stays past every hold. The two later backups stay past the retention of keep
+    1 while pinned; the until of one of them set to the time of the edit makes the next run delete it, the other stays.
+    Once the pins without until are removed, the change leaves status.retention.previous, and the next run deletes the
+    run-now backup.
+    """
+    from datetime import timezone, timedelta
+
+    chi_manifest = "manifests/chi/test-010089-backup.yaml"
+    storage_manifest = "manifests/secret/test-010087-backup-storage.yaml"
+    minio_manifest = "manifests/minio/test-010087-minio.yaml"
+    schedule_manifest = "manifests/chbs/test-010089-schedule.yaml"
+    run_now_manifest = "manifests/chb/test-010089-run-now.yaml"
+
+    def manifest_data(manifest):
+        return yaml_manifest.get_manifest_data(util.get_full_path(manifest))
+
+    chi = manifest_data(chi_manifest)["metadata"]["name"]
+    schedule_data = manifest_data(schedule_manifest)
+    schedule = schedule_data["metadata"]["name"]
+    run_now = manifest_data(run_now_manifest)["metadata"]["name"]
+    prefix = schedule_data["spec"]["backupNamePrefix"]
+    assert len(schedule_data["spec"]["schedules"]) == 1, error(f"{schedule_manifest} must have one entry")
+    old_entry = schedule_data["spec"]["schedules"][0]
+    assert old_entry["period"] == "minute", error(f"{schedule_manifest} must have an entry of period minute")
+    old_keep = old_entry["keep"]
+    # Scheduled backups made before the change, all of which the schedule before it keeps
+    old_count = 3
+    new_keep = 1
+    assert old_keep > old_count > new_keep, error(f"{schedule_manifest}: keep {old_keep}")
+    old_span = timedelta(minutes=old_keep)
+
+    cluster = "main"
+    pod_name = f"chi-{chi}-{cluster}-0-0-0"
+    database = "test_089"
+    rows = 100
+    # The backups of the series: <prefix>-YYYYMMDDHHMMSS, the slot in UTC; a backup run now adds a T.
+    scheduled_name = re.compile(re.escape(prefix) + r"-([0-9]{14})")
+    run_now_name_pattern = re.escape(prefix) + r"-[0-9]{8}T[0-9]{6}"
+    tag_format = "%Y%m%d%H%M%S"
+    rfc3339_format = "%Y-%m-%dT%H:%M:%SZ"
+    # The operator and the test read the clock of one machine; a sample this close to an expiry tells nothing.
+    margin = timedelta(seconds=15)
+
+    def utcnow():
+        return datetime.now(timezone.utc)
+
+    def rfc3339(t):
+        return t.astimezone(timezone.utc).strftime(rfc3339_format)
+
+    def parse_rfc3339(value):
+        return datetime.strptime(value, rfc3339_format).replace(tzinfo=timezone.utc)
+
+    def tag_of(name):
+        found = scheduled_name.fullmatch(name)
+        return found.group(1) if found else None
+
+    def made_at(name):
+        return datetime.strptime(tag_of(name), tag_format).replace(tzinfo=timezone.utc)
+
+    def series(names):
+        return sorted(name for name in names if tag_of(name))
+
+    def slot_name(t):
+        return f"{prefix}-{t.strftime(tag_format)}"
+
+    # Every sample of the remote backups and of the status of the schedule: (time, names, status)
+    history = []
+
+    def observe():
+        names = set(backup_remote_names(pod_name, api_auth))
+        status = backup_status(schedule_kind, schedule)
+        history.append((utcnow(), names, status))
+        return names, status
+
+    def held_backups(status):
+        return {
+            item["name"]: item.get("expires")
+            for entry in status.get("clusters") or []
+            for item in entry.get("heldBackups") or []
+        }
+
+    def previous(status):
+        return (status.get("retention") or {}).get("previous") or []
+
+    def events_naming(reason, name):
+        return [
+            event for event in backup_events(schedule_kind, schedule)
+            if (event.get("reason") == reason) and (name in (event.get("message") or ""))
+        ]
+
+    def check_event_naming(reason, name, timeout=120):
+        with Then(f"{schedule} carries an Event {reason} naming {name}"):
+            for attempt in retries(timeout=timeout, delay=5):
+                with attempt:
+                    assert events_naming(reason, name), error(
+                        f"{schedule}: no {reason} naming {name}: "
+                        f"{[(e.get('reason'), e.get('message')) for e in backup_events(schedule_kind, schedule)]}"
+                    )
+
+    def set_pins(pins):
+        backup_patch(schedule_kind, schedule, {"spec": {"retention": {"keepBackups": pins}}})
+
+    def wait_for(description, condition, timeout):
+        """Samples every 10 seconds until condition(names, status) holds."""
+        with Then(description):
+            deadline = time.time() + timeout
+            while True:
+                names, status = observe()
+                if condition(names, status):
+                    return names, status
+                if time.time() > deadline:
+                    backup_dump(schedule_kind, schedule)
+                    assert False, error(f"{description}: backups {sorted(names)}, status {status}")
+                time.sleep(10)
+
+    api_auth = None
+    try:
+        create_shell_namespace_clickhouse_template()
+
+        with Given("The storage Secret and an S3 store in the test namespace"):
+            kubectl.apply(util.get_full_path(storage_manifest))
+            kubectl.apply(util.get_full_path(minio_manifest))
+
+        with Given("A CHI of one host with backup enabled"):
+            kubectl.create_and_check(
+                manifest=chi_manifest,
+                check={
+                    "apply_templates": {current().context.clickhouse_template},
+                    "pod_count": 1,
+                    "do_not_delete": 1,
+                },
+            )
+
+        with And("The S3 store is ready with its bucket"):
+            kubectl.launch("rollout status deployment/minio --timeout=300s", timeout=330)
+
+        with And("The sidecar created the integration tables"):
+            check_integration_tables(chi, pod_name)
+            api_auth = backup_api_auth(chi)
+
+        backup_password = f"backup-{os.urandom(8).hex()}"
+        with When(f"The ClickHouse username and password are set in {backup_auto_secret(chi)}"):
+            kubectl.launch(
+                f"patch secret {backup_auto_secret(chi)} --type merge "
+                f"-p '{{\"stringData\":{{\"CLICKHOUSE_USERNAME\":\"{backup_user}\",\"CLICKHOUSE_PASSWORD\":\"{backup_password}\"}}}}'"
+            )
+
+        with Then(f"The sidecar reads them, ClickHouse lets {backup_user} in, and the sidecar API reaches ClickHouse"):
+            for attempt in retries(timeout=420, delay=10):
+                with attempt:
+                    mounted = kubectl.launch(
+                        f"exec {pod_name} -c {backup_sidecar} -- cat {backup_config_dir}/config.yml", ok_to_fail=True
+                    )
+                    section = (yaml.safe_load(mounted) or {}).get("clickhouse") or {}
+                    assert section.get("username") == backup_user, error(
+                        f"{pod_name}: the sidecar reads ClickHouse username {section.get('username')!r}"
+                    )
+                    assert section.get("password") == backup_password, error(f"{pod_name}: the sidecar reads another password")
+                    out = clickhouse.query_with_error(
+                        chi, "SELECT 1", user=backup_user, pwd=shlex.quote(backup_password), pod=pod_name
+                    )
+                    assert out == "1", error(f"{pod_name}: ClickHouse does not let {backup_user} in yet: {out}")
+            for attempt in retries(timeout=120, delay=5):
+                with attempt:
+                    code, body = backup_api_get(pod_name, "/backup/tables", api_auth)
+                    assert code == "200", error(f"{pod_name}: /backup/tables answered {code}: {body}")
+
+        with And(f"A table with {rows} rows to back up: retention leaves alone a backup that holds no data"):
+            clickhouse.query(chi, f"CREATE DATABASE IF NOT EXISTS {database}", pod=pod_name)
+            clickhouse.query(chi, f"CREATE TABLE {database}.events (id UInt64) ENGINE = MergeTree ORDER BY id", pod=pod_name)
+            clickhouse.query(chi, f"INSERT INTO {database}.events SELECT number FROM numbers({rows})", pod=pod_name)
+
+        with When(f"A schedule running every minute and keeping {old_keep} backups, holding its changes, is created"):
+            kubectl.apply(util.get_full_path(schedule_manifest))
+
+        with Then("The schedule is Active"):
+            for attempt in retries(timeout=120, delay=5):
+                with attempt:
+                    status = backup_status(schedule_kind, schedule)
+                    assert status.get("phase") == "Active", error(f"{schedule}: status {status}")
+
+        wait_for("The schedule made its first backup", lambda names, status: len(series(names)) >= 1, timeout=300)
+
+        with When("The schedule's backup is made once now, by a backup that names the schedule"):
+            kubectl.apply(util.get_full_path(run_now_manifest))
+
+        wait_backup_phase(backup_kind, run_now, "Completed", timeout=600)
+
+        run_now_name = kubectl.get_field(backup_kind, run_now, ".status.backupName")
+        with Then("It made a run-now backup of the schedule, named with the time it was due as YYYYMMDDTHHMMSS"):
+            assert re.fullmatch(run_now_name_pattern, run_now_name), error(f"{run_now}: status.backupName {run_now_name}")
+
+        with And(f"Pinned without until in spec.retention.keepBackups: retention keeps {run_now_name} while it is listed"):
+            set_pins([{"name": run_now_name}])
+
+        names, _ = wait_for(
+            f"The schedule made at least {old_count} backups, all of which keep {old_keep} keeps, and the run-now backup stays",
+            lambda names, status: (len(series(names)) >= old_count) and (run_now_name in names),
+            timeout=600,
+        )
+
+        # The newest backup made before the change, pinned without until; and two slots the schedule as it is runs
+        # after the change, pinned until an hour on: one stays, the until of the other is set to the time of an edit.
+        held_pin = series(names)[-1]
+        now = utcnow()
+        first_after = now.replace(second=0, microsecond=0) + timedelta(minutes=2)
+        control_pin, expiring_pin = slot_name(first_after), slot_name(first_after + timedelta(minutes=1))
+        hour_on = rfc3339(now + timedelta(hours=1))
+        pins = [
+            {"name": run_now_name},
+            {"name": held_pin},
+            {"name": control_pin, "until": hour_on},
+            {"name": expiring_pin, "until": hour_on},
+        ]
+        with When(
+            f"keep is lowered from {old_keep} to {new_keep}; {held_pin}, made before, is pinned without until, and "
+            f"{control_pin} and {expiring_pin}, to be made after, until {hour_on}"
+        ):
+            backup_patch(
+                schedule_kind,
+                schedule,
+                {"spec": {"schedules": [{"period": "minute", "keep": new_keep}], "retention": {"keepBackups": pins}}},
+            )
+
+        check_backup_events(schedule_kind, schedule, ("RetentionHeld",), ())
+
+        change_id, change_time, change_expires = "", None, None
+        with Then(f"status.retention.previous records the entries before the change, expiring {old_keep} minutes after it"):
+            for attempt in retries(timeout=60, delay=5):
+                with attempt:
+                    changes = previous(backup_status(schedule_kind, schedule))
+                    assert len(changes) == 1, error(f"{schedule}: status.retention.previous {changes}")
+            change = changes[0]
+            change_id = change.get("changeID") or ""
+            change_time = parse_rfc3339(change_id)
+            assert now - margin <= change_time <= utcnow() + margin, error(f"{schedule}: changeID {change_id}, the change at {rfc3339(now)}")
+            entries = [(entry.get("period"), entry.get("keep")) for entry in change.get("schedules") or []]
+            assert entries == [("minute", old_keep)], error(f"{schedule}: the entries before the change {change.get('schedules')}")
+            change_expires = parse_rfc3339(change.get("expires") or "")
+            assert change_expires == change_time + old_span, error(
+                f"{schedule}: the change {change_id} expires {change.get('expires')}, expected {rfc3339(change_time + old_span)}"
+            )
+        change_tag = change_time.strftime(tag_format)
+
+        def made_before(names):
+            return [name for name in series(names) if tag_of(name) < change_tag]
+
+        def made_after(names):
+            return [name for name in series(names) if tag_of(name) >= change_tag]
+
+        def all_old():
+            return sorted({name for _, names, _ in history for name in made_before(names)})
+
+        held_pin_expires = made_at(held_pin) + old_span
+        wait_for(
+            "Every backup made before the change expired and is deleted, the pinned one included; the schedule as it is "
+            f"made {control_pin} and {expiring_pin}, and a newer backup",
+            lambda names, status: (
+                (utcnow() > held_pin_expires)
+                and not made_before(names)
+                and ({control_pin, expiring_pin} <= names)
+                and any(tag_of(name) > tag_of(expiring_pin) for name in made_after(names))
+            ),
+            timeout=(old_keep + 6) * 60,
+        )
+        old_backups = all_old()
+        after_change = [(t, names, status) for t, names, status in history if t >= change_time]
+        note(f"backups made before the change {change_id}: {old_backups}, pinned {held_pin}, run now {run_now_name}")
+
+        with Then(
+            "status.clusters[].heldBackups listed the backups made before the change that the schedule as it is would delete, "
+            f"each expiring {old_keep} minutes after it was made, neither of the pinned ones"
+        ):
+            listed = [held_backups(status) for _, _, status in after_change if held_backups(status)]
+            assert listed, error(f"{schedule}: no sample listed held backups: {[status for _, _, status in after_change]}")
+            for held in listed:
+                for name, expires in held.items():
+                    assert name in old_backups, error(f"{schedule}: held {name} was not made before the change: {held}")
+                    assert name != held_pin, error(f"{schedule}: the pinned {held_pin} is listed as held: {held}")
+                    assert expires == rfc3339(made_at(name) + old_span), error(
+                        f"{schedule}: held {name} expires {expires}, expected {rfc3339(made_at(name) + old_span)}"
+                    )
+            assert run_now_name not in {name for held in listed for name in held}, error(
+                f"{schedule}: the pinned run-now backup {run_now_name} is listed as held"
+            )
+
+        check_backup_events(schedule_kind, schedule, (), ("OrchestratorRetentionHeld", "OrchestratorRetentionHeldExpired"))
+
+        with And("Every backup made before the change stayed until it expired, as the schedule before would have deleted it"):
+            for name in old_backups:
+                expires = made_at(name) + old_span
+                for t, names, _ in after_change:
+                    if t < expires - margin:
+                        assert name in names, error(f"{name}, held until {rfc3339(expires)}, was gone at {rfc3339(t)}")
+                    if t > expires + timedelta(minutes=3):
+                        assert name not in names, error(f"{name}, held until {rfc3339(expires)}, is left at {rfc3339(t)}")
+
+        with And(f"{held_pin}, pinned without until, outlived the retention of keep {new_keep}, and was deleted once its hold expired"):
+            past_retention = [
+                t for t, names, _ in after_change
+                if (held_pin in names) and any(tag_of(name) > tag_of(held_pin) for name in made_after(names))
+            ]
+            assert past_retention, error(f"{held_pin} was not seen next to a backup made after the change")
+            assert held_pin not in history[-1][1], error(f"{held_pin} is left after its hold expired")
+        check_event_naming("OrchestratorRetentionHeldExpired", held_pin)
+
+        with And(f"{control_pin} and {expiring_pin}, pinned until {hour_on}, outlived the retention of keep {new_keep}"):
+            names = history[-1][1]
+            assert {control_pin, expiring_pin} <= names, error(f"pinned backups gone: {sorted(names)}")
+            assert run_now_name in names, error(f"{run_now_name}, pinned without until, is gone: {sorted(names)}")
+
+        until_now = rfc3339(utcnow())
+        pins = [pin if pin["name"] != expiring_pin else {"name": expiring_pin, "until": until_now} for pin in pins]
+        with When(f"The pin of {expiring_pin} is set to end now, {until_now}"):
+            set_pins(pins)
+
+        wait_for(
+            f"The next run deletes {expiring_pin}; {control_pin}, pinned until {hour_on}, stays",
+            lambda names, status: expiring_pin not in names,
+            timeout=240,
+        )
+        with Then(f"{control_pin} stays"):
+            assert control_pin in history[-1][1], error(f"{control_pin}, pinned until {hour_on}, is gone")
+        check_event_naming("OrchestratorRetentionHeldExpired", expiring_pin)
+
+        wait_for(
+            f"The change {change_id} is past its expiry {rfc3339(change_expires)}",
+            lambda names, status: utcnow() > change_expires + timedelta(seconds=70),
+            timeout=(old_keep + 3) * 60,
+        )
+        with Then(f"While {held_pin} is pinned without until, the change stays in status.retention.previous"):
+            changes = previous(backup_status(schedule_kind, schedule))
+            assert [change.get("changeID") for change in changes] == [change_id], error(
+                f"{schedule}: status.retention.previous {changes}"
+            )
+            reasons = {event.get("reason") for event in backup_events(schedule_kind, schedule)}
+            assert "RetentionHeldExpired" not in reasons, error(f"{schedule}: the change expired while pinned: {sorted(reasons)}")
+            assert run_now_name in history[-1][1], error(f"{run_now_name}, pinned without until, is gone")
+            assert held_backups(backup_status(schedule_kind, schedule)) == {}, error(
+                f"{schedule}: heldBackups past every expiry {held_backups(backup_status(schedule_kind, schedule))}"
+            )
+
+        pins = [pin for pin in pins if pin["name"] not in (held_pin, run_now_name)]
+        with When(f"The pins without until, of {held_pin} and {run_now_name}, are removed"):
+            set_pins(pins)
+
+        check_backup_events(schedule_kind, schedule, ("RetentionHeldExpired",), ())
+        with Then("The change leaves status.retention.previous"):
+            for attempt in retries(timeout=60, delay=5):
+                with attempt:
+                    changes = previous(backup_status(schedule_kind, schedule))
+                    assert changes == [], error(f"{schedule}: status.retention.previous {changes}")
+
+        wait_for(
+            f"The next run deletes the run-now backup {run_now_name}, listed no more; {control_pin} stays",
+            lambda names, status: run_now_name not in names,
+            timeout=240,
+        )
+        with Then(f"{control_pin} stays"):
+            assert control_pin in history[-1][1], error(f"{control_pin}, pinned until {hour_on}, is gone")
+        check_event_naming("OrchestratorRetentionDeleted", run_now_name)
+    finally:
+        with Finally("I clean up"):
+            if not settings.no_cleanup:
+                with By("deleting the backup resources while the operator still runs"):
+                    backup_delete_resources(((schedule_kind, schedule), (backup_kind, run_now)))
+                with And("deleting the S3 store and the storage Secret"):
+                    kubectl.delete(util.get_full_path(minio_manifest), ok_to_fail=True)
+                    kubectl.delete(util.get_full_path(storage_manifest), ok_to_fail=True)
+            delete_test_namespace()
+
 
 @TestScenario
 @Name("test_020000. Test Basic CHK functions")
@@ -11868,7 +12106,6 @@ def test_030007(self):
         )
 
 
-
 @TestScenario
 @Tags("HEAVY")
 @Name("test_030008. FIPS image policy: Required admission/runtime checks and Permissive default")
@@ -12471,7 +12708,6 @@ def cleanup_chis(self):
                 if ns_name.startswith("test") and ns_name != self.context.test_namespace:
                     with Then(f"Delete ns {ns_name}"):
                         util.delete_namespace(namespace = ns_name, delete_chi=True)
-
 
 
 @TestModule

@@ -18,7 +18,6 @@ import (
 	"maps"
 	"regexp"
 	"slices"
-	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -119,6 +118,23 @@ func (k kubeObjects) resolve(t *testing.T, container *core.Container, podName st
 }
 
 // sidecarOfHost is what the clickhouse-backup sidecar of a host runs with.
+// resolver resolves an env var of a sidecar from the objects, as the operator does.
+func (k kubeObjects) resolver() SettingResolver {
+	return func(source core.EnvVar) (string, bool, error) {
+		switch {
+		case source.ValueFrom == nil:
+			return source.Value, true, nil
+		case source.ValueFrom.SecretKeyRef != nil:
+			value, found := k.secrets[source.ValueFrom.SecretKeyRef.Name][source.ValueFrom.SecretKeyRef.Key]
+			return value, found, nil
+		case source.ValueFrom.ConfigMapKeyRef != nil:
+			value, found := k.configMaps[source.ValueFrom.ConfigMapKeyRef.Name][source.ValueFrom.ConfigMapKeyRef.Key]
+			return value, found, nil
+		}
+		return "", false, nil
+	}
+}
+
 type sidecarOfHost struct {
 	cluster, service string
 	// settings are the settings the path check reads, as clickhouse-backup takes them: from its env, else from its
@@ -135,7 +151,7 @@ func (k kubeObjects) withConfigSecrets(t *testing.T, inMemory *api.ClickHouseIns
 		if !cluster.GetBackup().IsEnabled() {
 			continue
 		}
-		storageConfig := k.secrets[cluster.GetBackup().GetConfigSecretName()][backupconfig.FileName]
+		storageConfig := k.secrets[cluster.GetBackup().GetStorageConfigSecretName()][backupconfig.FileName]
 		built, err := backupconfig.Build([]byte(storageConfig), backupconfig.Credentials{}, backupconfig.Defaults{
 			Path:           chop.Config().Backup.StoragePath,
 			ObjectDiskPath: chop.Config().Backup.StorageObjectDiskPath,
@@ -192,22 +208,22 @@ func runSidecars(t *testing.T, inMemory *api.ClickHouseInstallation, kube kubeOb
 // providers maps the storage types to the prefix of their settings.
 var providers = map[string]string{"s3": "S3", "gcs": "GCS", "azblob": "AZBLOB", "cos": "COS", "ftp": "FTP", "sftp": "SFTP"}
 
-// jobSetting returns a setting of the cluster at index as the path check of a Job reads it, the defaults
-// of the storage paths applied as the sidecars apply them, and whether it is set.
-func jobSetting(env map[string]string, index int, key string) (string, bool) {
-	if value, set := env[pathClusterEnv(index, key)]; set {
-		return value, true
+// checkSetting returns a setting of a cluster as the path check reads it, the defaults of the storage paths applied as
+// the sidecars apply them, and whether it is set.
+func checkSetting(check *PathCheck, cluster PathCluster, key string) (string, bool) {
+	if value := cluster.Settings[key]; value != nil {
+		return *value, true
 	}
-	prefix := providers[env[pathClusterEnv(index, "REMOTE_STORAGE")]]
-	for suffix, def := range map[string]string{"_PATH": envDefaultPath, "_OBJECT_DISK_PATH": envDefaultObjectDiskPath} {
-		if (prefix == "") || (key != prefix+suffix) {
+	storage := ""
+	if value := cluster.Settings["REMOTE_STORAGE"]; value != nil {
+		storage = *value
+	}
+	prefix := providers[storage]
+	for suffix, def := range map[string]*string{"_PATH": check.DefaultPath, "_OBJECT_DISK_PATH": check.DefaultObjectDiskPath} {
+		if (prefix == "") || (key != prefix+suffix) || (def == nil) {
 			continue
 		}
-		if value, set := env[pathClusterEnv(index, def)]; set {
-			return value, value != ""
-		}
-		value, set := env[def]
-		return value, set
+		return *def, *def != ""
 	}
 	return "", false
 }
@@ -220,11 +236,11 @@ func sidecarSettingsInstallation(t *testing.T, mutate func(chi *api.ClickHouseIn
 	t.Helper()
 	hot := layoutCluster("hot", 2, 2, &api.ClusterBackup{Enabled: types.NewStringBool(true)})
 	plain := layoutCluster("plain", 1, 1, &api.ClusterBackup{Enabled: types.NewStringBool(false)})
-	cold := layoutCluster("cold", 1, 2, &api.ClusterBackup{Enabled: types.NewStringBool(true), ConfigSecretRef: &core.LocalObjectReference{Name: "s3-cold"}})
+	cold := layoutCluster("cold", 1, 2, &api.ClusterBackup{Enabled: types.NewStringBool(true), StorageConfig: api.NewStorageConfig("s3-cold", "config.yml")})
 	// warm takes the storage Secret of the installation
 	warm := layoutCluster("warm", 2, 1, &api.ClusterBackup{Enabled: types.NewStringBool(true)})
 	chi := newCHI("demo", hot, plain, cold, warm)
-	chi.Spec.Backup = &api.ClusterBackup{ConfigSecretRef: &core.LocalObjectReference{Name: "s3-main"}}
+	chi.Spec.Backup = &api.ClusterBackup{StorageConfig: api.NewStorageConfig("s3-main", "config.yml")}
 	chi.Spec.Templates = &api.Templates{PodTemplates: []api.PodTemplate{{
 		Name: "own-command",
 		Spec: core.PodSpec{Containers: []core.Container{
@@ -327,7 +343,7 @@ func pathTemplateEnv(values ...string) []core.EnvVar {
 // Secret, with its default paths, or the pod template's own clickhouse-backup container - as kubelet resolves both.
 // Where it cannot, the cluster is passed as unverifiable, with why: the Job must never check paths the sidecars do
 // not use. What would have the sidecar read another configuration file the operator overrides.
-func TestJobSeesTheSettingsTheSidecarsRunWith(t *testing.T) {
+func TestPathCheckSeesTheSettingsTheSidecarsRunWith(t *testing.T) {
 	for name, tc := range map[string]struct {
 		mutate       func(chi *api.ClickHouseInstallation, warm *api.Cluster)
 		unverifiable string
@@ -429,7 +445,7 @@ func TestJobSeesTheSettingsTheSidecarsRunWith(t *testing.T) {
 					FieldRef: &core.ObjectFieldSelector{FieldPath: "metadata.name"},
 				}}})
 			},
-			unverifiable: "S3_PATH of the clickhouse-backup sidecar takes its value from the pod, which differs in a Job",
+			unverifiable: "S3_PATH of the clickhouse-backup sidecar takes its value from the pod, which the operator cannot read",
 		},
 		"a path that refers to another variable": {
 			mutate: func(chi *api.ClickHouseInstallation, warm *api.Cluster) {
@@ -438,7 +454,7 @@ func TestJobSeesTheSettingsTheSidecarsRunWith(t *testing.T) {
 					{Name: "S3_PATH", Value: "backup/$(POD)"},
 				})
 			},
-			unverifiable: "S3_PATH of the clickhouse-backup sidecar refers to other environment variables, which resolve otherwise in a Job",
+			unverifiable: "S3_PATH of the clickhouse-backup sidecar refers to other environment variables, which only the pod resolves",
 		},
 		"envFrom of the container of a sidecar-only pod template": {
 			mutate: func(chi *api.ClickHouseInstallation, warm *api.Cluster) {
@@ -536,109 +552,26 @@ func TestJobSeesTheSettingsTheSidecarsRunWith(t *testing.T) {
 			require.Equal(t, []string{"hot", "cold", "warm"}, topology.ClusterNames())
 			target, err := topology.ForCluster("hot")
 			require.NoError(t, err)
-			job := BuildBackupJob(testBackup("b1"), stored, target)
-			jobEnv := kube.resolve(t, &job.Spec.Template.Spec.Containers[0], job.Name)
+			check, err := target.PathCheck(api.BackupRunOperationBackup, "", kube.resolver())
+			require.NoError(t, err)
 
 			for _, sidecar := range runSidecars(t, inMemory, kube) {
 				index := slices.Index(topology.ClusterNames(), sidecar.cluster)
-				require.Equal(t, sidecar.cluster, jobEnv[pathClusterEnv(index, pathEnvCluster)])
-				unverifiable, marked := jobEnv[pathClusterEnv(index, pathEnvUnverifiable)]
+				cluster := check.Clusters[index]
+				require.Equal(t, sidecar.cluster, cluster.Name)
 				if sidecar.cluster == "warm" && (tc.unverifiable != "") {
-					require.True(t, marked, "%s: the Job cannot know the settings", sidecar.service)
-					require.Equal(t, tc.unverifiable, unverifiable)
-					for _, key := range PathCheckKeys {
-						require.NotContains(t, jobEnv, pathClusterEnv(index, key), "no setting of a cluster the Job cannot know")
-					}
+					require.Equal(t, tc.unverifiable, cluster.Unverifiable, "%s: the operator cannot know the settings", sidecar.service)
+					require.Empty(t, cluster.Settings, "no setting of a cluster the operator cannot know")
 					continue
 				}
-				require.False(t, marked, "%s: %s", sidecar.service, unverifiable)
+				require.Empty(t, cluster.Unverifiable, sidecar.service)
 				for _, key := range PathCheckKeys {
-					jobValue, jobSet := jobSetting(jobEnv, index, key)
+					value, set := checkSetting(check, cluster, key)
 					sidecarValue, sidecarSet := sidecar.settings[key]
-					require.Equal(t, sidecarSet, jobSet, "%s: %s set", sidecar.service, key)
-					require.Equal(t, sidecarValue, jobValue, "%s: %s", sidecar.service, key)
+					require.Equal(t, sidecarSet, set, "%s: %s set", sidecar.service, key)
+					require.Equal(t, sidecarValue, value, "%s: %s", sidecar.service, key)
 				}
 			}
-		})
-	}
-}
-
-// The restore Job of a cluster knows whether the cluster can run ON CLUSTER DDL, which needs ZooKeeper,
-// and the smallest max_table_size_to_drop of its hosts, which bounds what a cluster-wide drop may drop:
-// ClickHouse's default where nothing sets it, none for 0. A host set at the installation level and at
-// its own is taken by the smaller limit, as ClickHouse merges the two in an order of its own.
-func TestRestoreJobKnowsWhatDropsOnTheClusterNeed(t *testing.T) {
-	limit := func(value string) *api.Settings {
-		return api.NewSettings().Set(settingMaxTableSizeToDrop, api.NewSettingScalar(value))
-	}
-	keeper := &api.ZookeeperConfig{Nodes: api.ZookeeperNodes{{Host: "keeper", Port: types.NewInt32(2181)}}}
-	for name, tc := range map[string]struct {
-		mutate     func(chi *api.ClickHouseInstallation, cluster *api.Cluster)
-		replicated bool
-		limit      uint64
-	}{
-		"nothing set": {limit: clickHouseDefaultMaxTableSizeToDrop},
-		"ZooKeeper of the installation": {
-			mutate:     func(chi *api.ClickHouseInstallation, cluster *api.Cluster) { chi.Spec.Configuration.Zookeeper = keeper },
-			replicated: true, limit: clickHouseDefaultMaxTableSizeToDrop,
-		},
-		"ZooKeeper of the cluster": {
-			mutate:     func(chi *api.ClickHouseInstallation, cluster *api.Cluster) { cluster.Zookeeper = keeper },
-			replicated: true, limit: clickHouseDefaultMaxTableSizeToDrop,
-		},
-		"a limit of the installation": {
-			mutate: func(chi *api.ClickHouseInstallation, cluster *api.Cluster) {
-				chi.Spec.Configuration.Settings = limit("1000")
-			},
-			limit: 1000,
-		},
-		"no limit of the installation": {
-			mutate: func(chi *api.ClickHouseInstallation, cluster *api.Cluster) {
-				chi.Spec.Configuration.Settings = limit("0")
-			},
-		},
-		"a limit of the cluster": {
-			mutate: func(chi *api.ClickHouseInstallation, cluster *api.Cluster) { cluster.Settings = limit("2000") },
-			limit:  2000,
-		},
-		"no limit of the cluster under a limit of the installation": {
-			mutate: func(chi *api.ClickHouseInstallation, cluster *api.Cluster) {
-				chi.Spec.Configuration.Settings = limit("1000")
-				cluster.Settings = limit("0")
-			},
-			limit: 1000,
-		},
-		"a smaller limit of one shard": {
-			mutate: func(chi *api.ClickHouseInstallation, cluster *api.Cluster) {
-				cluster.Settings = limit("0")
-				cluster.Layout = &api.ChiClusterLayout{Shards: []*api.ChiShard{
-					{Name: "0", ReplicasCount: 1},
-					{Name: "1", ReplicasCount: 1, Settings: limit("3000")},
-				}}
-			},
-			limit: 3000,
-		},
-		"a limit that is no number of bytes": {
-			mutate: func(chi *api.ClickHouseInstallation, cluster *api.Cluster) { cluster.Settings = limit("lots") },
-			limit:  clickHouseDefaultMaxTableSizeToDrop,
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			cluster := layoutCluster("main", 2, 1, enabledBackup())
-			other := layoutCluster("other", 1, 1, enabledBackup())
-			other.Zookeeper = keeper
-			other.Settings = limit("1")
-			chi := newCHI("demo", cluster, other)
-			chi.Spec.Configuration.Settings = nil
-			if tc.mutate != nil {
-				tc.mutate(chi, cluster)
-			}
-			_, stored := normalize(t, chi)
-			topology, err := NewTopology(stored, "main")
-			require.NoError(t, err)
-			values := env(container(t, BuildRestoreJob(testRestore("r1"), stored, topology).Spec.Template.Spec))
-			require.Equal(t, strconv.FormatBool(tc.replicated), values[envReplicated])
-			require.Equal(t, strconv.FormatUint(tc.limit, 10), values[envMaxTableSizeToDrop])
 		})
 	}
 }

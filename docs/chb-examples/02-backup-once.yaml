@@ -1,11 +1,12 @@
 # EXPERIMENTAL: operator-managed backup, see docs/backup.md
 #
-# One-off backup of every backup-enabled cluster of the "backup-demo" ClickHouseInstallation
-# (docs/chb-examples/01-chi-with-backup.yaml), one Job per cluster, all under one backup name. It
-# runs once, as soon as the installation can run it; to run it once at a later time, see
-# docs/chb-examples/03-backup-later.yaml, and to make the backup a schedule makes, 05. No schedule's
-# retention ever deletes it: delete it by hand when no longer needed.
-# Progress: kubectl describe chb backup-demo-once; per cluster in status.clusters.
+# A one-off backup of all backup-enabled clusters of the "backup-demo" ClickHouseInstallation
+# (01-chi-with-backup.yaml). It makes one run per cluster, all with one backup name.
+# It runs once, as soon as the installation is ready.
+# - To run it later, see 03-backup-later.yaml.
+# - To make the backup that a schedule makes, see 05-backup-from-schedule.yaml.
+# Schedule retention never deletes this backup. Delete it by hand when you do not need it.
+# Progress: kubectl describe chb backup-demo-once, and status.clusters for each cluster.
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseBackup"
 metadata:
@@ -17,16 +18,18 @@ spec:
   # installation.
   # cluster: main
 
-  # The name of the backup in the storage, the same on every cluster: a restore, or an incremental
-  # backup through its spec.diffFromRemote, refers to the backup by this name.
-  # Left empty, the operator generates it from its metadata.name and the Unix time the backup is due
-  # (its creation, or spec.scheduledTime), here backup-demo-once-<Unix time>, and shows it in
-  # status.backupName. Creating this resource again later makes another backup only with neither
-  # spec.backupName nor spec.scheduledTime; otherwise that run fails before changing anything, as a
-  # backup of that name is in the storage already. An explicit name holds letters, digits, "_", "-"
-  # and "." (starting with a letter or digit, no "..", at most 128 characters) and must not end like
-  # the backups of a schedule, -YYYYMMDD-HHMMSS: the retention of a schedule whose prefix it carries
-  # would take it for one of its own and delete it.
+  # The name of the backup in the storage, the same on every cluster. A restore, or the
+  # spec.diffFromRemote of an incremental backup, uses this name.
+  # If empty, the operator makes the name from metadata.name and the Unix time when the backup is due
+  # (its creation, or spec.scheduledTime), here backup-demo-once-<Unix time>.
+  # It shows the name in status.backupName.
+  # If you create this resource again later, it makes a new backup only without spec.backupName and
+  # spec.scheduledTime. If not, the run fails before it changes anything, because a backup with that
+  # name is in the storage already.
+  # Rules for a name you set:
+  # - letters, digits, "_", "-" and "."; it starts with a letter or digit; no ".."; 128 characters max
+  # - it must not end like the backups of a schedule, -YYYYMMDDHHMMSS. If it also has the prefix of a
+  #   schedule, the retention of that schedule takes it as its own backup and deletes it.
   # backupName: demo-before-upgrade
 
   # Run the backup at this later time rather than when it is created, for instance before a
@@ -38,33 +41,26 @@ spec:
   # be created again later. See 03-backup-later.yaml.
   # scheduledTime: "2026-10-20T02:00:00+02:00"
 
-  # How many seconds after it is due (its creation, or spec.scheduledTime) the backup may still
-  # start. It starts on a cluster when the operator creates the cluster's Job, which waits, for
-  # instance, until the installation has completed its reconcile and no other backup or restore runs
-  # on the cluster. Past the deadline, a backup still not validated (an invalid spec, say) fails, as
-  # does each cluster whose Job is not created yet, with the reason StartingDeadlineExceeded and
-  # what it waited for; clusters already running finish. Unset, the backup waits as long as it
-  # takes. The operator checks a second after the backup is due, so keep it a minute or more. How
-  # long a Job may run once started is spec.activeDeadlineSeconds: the backup's own, or with
-  # spec.scheduleRef the schedule's.
+  # The maximum delay, in seconds, from the due time (creation, or spec.scheduledTime) to the start.
+  # The run of a cluster can wait, for example until the installation completes its reconcile and no
+  # other backup or restore runs on the cluster.
+  # After the deadline, these fail with the reason StartingDeadlineExceeded, which tells what they
+  # waited for:
+  # - a backup that is not validated yet (for example, with an invalid spec)
+  # - each cluster whose run did not start yet
+  # Runs that started continue. If unset, the backup waits with no limit. The operator checks one
+  # second after the due time, so set 60 or more. The run time limit is spec.activeDeadlineSeconds:
+  # of the backup, or of the schedule with spec.scheduleRef.
   # startingDeadlineSeconds: 3600
 
-  # Make this an incremental backup on top of the existing backup of this name: only the data parts
-  # not in that base yet are uploaded, which takes less storage and less time. The base must be in
-  # the storage of every host the backup runs on, or the Job fails before changing anything. A
-  # restore of this backup needs its whole chain of bases in the storage. The retention of a
-  # schedule never deletes a base that a backup it keeps still needs, but deleting a base any other
-  # way (BACKUPS_TO_KEEP_REMOTE, a bucket lifecycle rule, by hand) breaks every backup built on it.
-  # The runs of a schedule always make full backups, which can serve as bases.
+  # Make an incremental backup on top of the existing backup with this name (the base). Only the
+  # data parts that are not in the base are uploaded. This uses less storage and less time.
+  # - The base must be in the storage of each host of the backup. If not, the run fails before it
+  #   changes anything.
+  # - A restore of this backup needs all bases of its chain in the storage.
+  # - Schedule retention never deletes a base that a kept backup needs. Other deletes
+  #   (BACKUPS_TO_KEEP_REMOTE, a bucket lifecycle rule, by hand) break all backups on that base.
   # diffFromRemote: demo-base
-
-  # Check that the backup can be read back. Once it has completed on every cluster, a second Job
-  # per cluster downloads it from the storage on the first replica of each shard, checks that
-  # clickhouse-backup lists the download as complete, and deletes it again, touching no table.
-  # The data disk needs room for one copy of the backup meanwhile, and with AllReplicas the copies
-  # of the other replicas are not downloaded. The outcome is the Verified condition, Verified or
-  # VerificationFailed; a backup that failed on any cluster is not verified. Off by default.
-  verify: true
 
   # Table and database definitions only, no data
   # schemaOnly: true
@@ -79,21 +75,24 @@ spec:
   # the other replicas hold in tables that are not replicated is backed up, but not restored.
   # replicaSelection: FirstPerShard
 
-  # Only the matching tables: a clickhouse-backup pattern such as db.table or db.*, comma-separated
-  # tables: "mydb.*"
+  # Only the matching tables. One clickhouse-backup pattern per item, such as db.table or db.*
+  # tables: ["mydb.*"]
 
-  # Back up the data of these partitions only, in every table the backup takes (all of them, or
-  # those the spec.tables pattern matches). A partition is named by its partition_id in
-  # system.parts, such as 202610 for PARTITION BY toYYYYMM(date), or all for a table without
-  # PARTITION BY. Every table keeps its schema in the backup; one without any of these partitions
-  # keeps only that. A backup left without any data succeeds with the reason CompletedWithoutData.
-  # Restoring it over the tables it holds (a ClickHouseRestore's spec.overwrite) drops them whole
-  # and brings back only these partitions.
+  # Leave out the matching tables, and the tables of these engines. System databases are always left out.
+  # skipTables: ["mydb.tmp_*"]
+  # skipTableEngines: ["Kafka"]
+
+  # Back up only the data of these partitions, in each table of the backup.
+  # - Use the partition_id from system.parts: for example 202610 for PARTITION BY toYYYYMM(date),
+  #   or all for a table without PARTITION BY.
+  # - The schema of each table is always in the backup. A table without these partitions has only
+  #   its schema.
+  # - A backup with no data completes with the reason CompletedWithoutData.
+  # - A ClickHouseRestore with the same spec.partitions replaces only these partitions in the existing
+  #   tables, as the Altinity usual backup workflow does.
   # partitions: ["202610"]
 
-  # How long each Job may run, in seconds counted from its start, before Kubernetes stops it, as the
-  # spec.activeDeadlineSeconds of a Kubernetes Job: 24 hours by default. Each Job gets this long:
-  # the backup Job of each cluster, and its verification Job, if any. A Job stopped at the deadline
-  # fails the backup, or the verification, of its cluster with the reason DeadlineExceeded, as each
-  # Job makes a single attempt. Raise it for a backup too large to upload in a day.
+  # The maximum time, in seconds from its start, for the run of each cluster. Default: 24 hours.
+  # Then the operator stops the run, and the backup of that cluster fails with the reason
+  # DeadlineExceeded. There is no retry. Increase it for a backup that needs more than a day to upload.
   # activeDeadlineSeconds: 7200

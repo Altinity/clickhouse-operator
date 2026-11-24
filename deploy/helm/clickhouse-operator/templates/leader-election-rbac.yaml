@@ -1,0 +1,37 @@
+{{- if (and .Values.rbac.create (not .Values.rbac.namespaceScoped)) -}}
+# The backup controllers of the operator are leader-elected by a Lease in the namespace of the operator, and nowhere
+# else: a Role of that namespace grants it, where the ClusterRole would grant it in every namespace.
+# A namespaced install has it in its Role. Not generated: the generator knows no other Role than the operator's.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "altinity-clickhouse-operator.fullname" . }}-leader-election
+  namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
+  labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 4 }}
+  annotations: {{ include "altinity-clickhouse-operator.annotations" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - create
+      - get
+      - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "altinity-clickhouse-operator.fullname" . }}-leader-election
+  namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
+  labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 4 }}
+  annotations: {{ include "altinity-clickhouse-operator.annotations" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "altinity-clickhouse-operator.fullname" . }}-leader-election
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "altinity-clickhouse-operator.serviceAccountName" . }}
+    namespace: {{ include "altinity-clickhouse-operator.namespace" . }}
+{{- end }}

@@ -58,6 +58,10 @@ func (cm *ContainerManager) NewBackupContainer(host *chi.Host) (core.Container, 
 	return core.Container{}, false
 }
 
+func (cm *ContainerManager) NewBackupServerContainer(host *chi.Host) (core.Container, bool) {
+	return core.Container{}, false
+}
+
 func (cm *ContainerManager) EnsureBackupContainer(statefulSet *apps.StatefulSet, host *chi.Host) {
 }
 

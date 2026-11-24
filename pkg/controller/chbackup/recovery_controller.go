@@ -24,6 +24,7 @@ import (
 	apiMeta "k8s.io/apimachinery/pkg/api/meta"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiMachinery "k8s.io/apimachinery/pkg/runtime"
+	kubeSchema "k8s.io/apimachinery/pkg/runtime/schema"
 	kubeTypes "k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -176,7 +177,7 @@ func (c *RecoveryController) recoverCluster(
 	}
 
 	recovery.BackupName = restoredBackupName(restore)
-	if restore.Status.Phase == api.OperationPhaseFailed {
+	if failedPhase(restore.Status.Phase) {
 		c.recoveryFailed(chi, restore)
 	}
 	return restore, ctrl.Result{}, nil
@@ -246,7 +247,7 @@ func (c *RecoveryController) startRecovery(ctx context.Context, chi *api.ClickHo
 		}
 		return ctrl.Result{}, err
 	}
-	c.info(chi, a.EventActionCreate, api.BackupReasonJobCreated,
+	c.info(chi, a.EventActionCreate, api.BackupReasonStarted,
 		"recovery of cluster %s from backup %s started in ClickHouseRestore %s", recovery.Cluster, recovery.BackupName, restore.GetName())()
 	return ctrl.Result{}, nil
 }
@@ -259,10 +260,7 @@ func (c *RecoveryController) recovered(ctx context.Context, chi *api.ClickHouseI
 	base := chi.DeepCopy()
 	meta.SetMetaDataAnnotation(&chi.ObjectMeta, api.AnnotationRecoveredFrom, recoveredFrom)
 	if err := c.Patch(ctx, chi, client.MergeFromWithOptions(base, client.MergeFromWithOptimisticLock{})); err != nil {
-		if apiErrors.IsConflict(err) {
-			return ctrl.Result{Requeue: true}, nil
-		}
-		return ctrl.Result{}, err
+		return ignoreConflict(err)
 	}
 	c.info(chi, a.EventActionReconcile, api.BackupReasonCompleted, "recovery from backup %s completed", recoveredFrom)()
 	return ctrl.Result{}, nil
@@ -273,18 +271,42 @@ func (c *RecoveryController) recovered(ctx context.Context, chi *api.ClickHouseI
 // recovery of the cluster anew, while one that failed before it changed anything holds nothing, but for
 // the schedules sharesSourcePrefix holds as long as the installation recovers from the backup.
 func (c *RecoveryController) recoveryFailed(chi *api.ClickHouseInstallation, restore *api.ClickHouseRestore) {
-	reason, message := api.BackupReasonJobFailed, ""
+	reason, message := api.BackupReasonFailed, ""
 	if ready := apiMeta.FindStatusCondition(restore.Status.Conditions, api.BackupConditionReady); ready != nil {
 		reason, message = ready.Reason, ready.Message
 	}
 	schedules := fmt.Sprintf("Scheduled backups of the cluster run on, except those of schedules that leave their backup name "+
 		"prefix to default, which stay held as %s tells", api.BackupReasonSharesSourcePrefix)
 	if holdsSchedules(restore) {
-		schedules = fmt.Sprintf("Scheduled backups of %s stay suspended until that ClickHouseRestore is deleted", restoredScope(restore))
+		schedules = fmt.Sprintf("Scheduled backups of %s stay held until that ClickHouseRestore is deleted", restoredScope(restore))
 	}
 	c.warning(chi, a.EventActionReconcile, reason,
 		"recovery of cluster %s from backup %s failed in ClickHouseRestore %s: %s. %s; deleting that ClickHouseRestore starts "+
 			"the recovery of the cluster anew, unless the %s annotation records a recovery or spec.backup.recovery no longer "+
 			"names a backup for the cluster",
 		restore.Spec.Cluster, restoredBackupName(restore), restore.GetName(), message, schedules, api.AnnotationRecoveredFrom)()
+}
+
+// awaitsGarbageCollection treats a controller it may not read as live.
+func (r *reconciler) awaitsGarbageCollection(ctx context.Context, owner, obj client.Object) (bool, error) {
+	controller := meta.GetControllerOf(obj)
+	switch {
+	case obj.GetDeletionTimestamp() != nil:
+		return true, nil
+	case controller == nil:
+		return false, nil
+	}
+	controllerObject := &meta.PartialObjectMetadata{}
+	controllerObject.SetGroupVersionKind(kubeSchema.FromAPIVersionAndKind(controller.APIVersion, controller.Kind))
+	err := r.apiReader.Get(ctx, kubeTypes.NamespacedName{Namespace: obj.GetNamespace(), Name: controller.Name}, controllerObject)
+	switch {
+	case apiErrors.IsNotFound(err):
+		return true, nil
+	case apiMeta.IsNoMatchError(err) || apiErrors.IsForbidden(err):
+		log.V(1).M(r.meta(owner)).F().Info("unable to read %s %s, which controls %s: %v", controller.Kind, controller.Name, obj.GetName(), err)
+		return false, nil
+	case err != nil:
+		return false, err
+	}
+	return (controllerObject.GetUID() != controller.UID) || (controllerObject.GetDeletionTimestamp() != nil), nil
 }

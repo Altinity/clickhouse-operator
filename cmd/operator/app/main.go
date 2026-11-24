@@ -167,7 +167,8 @@ func launchBackup(ctx context.Context, wg *sync.WaitGroup) {
 	go func() {
 		defer wg.Done()
 
-		if err := initWithRetry(ctx, backupComponent, newBackupInitializer()); err != nil {
+		initializer := newBackupInitializer()
+		if err := initWithRetry(ctx, backupComponent, initializer); err != nil {
 			if util.IsContextDone(ctx) {
 				log.Warning("Starting backup ABORTED - shutting down, err: %v", err)
 				return
@@ -179,8 +180,10 @@ func launchBackup(ctx context.Context, wg *sync.WaitGroup) {
 		}
 
 		log.Info("Starting backup")
-		if err := runBackup(ctx); err != nil {
-			log.Warning("Starting backup FAILED with err: %v", err)
+		// A manager that loses the Lease is built again and rejoins the election
+		if err := runBackup(ctx, initializer); err != nil {
+			log.Warning("Starting backup FAILED - backup reconciliation is DISABLED for the lifetime of this process, "+
+				"err: %v", err)
 		}
 	}()
 }

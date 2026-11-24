@@ -118,12 +118,6 @@ const (
 	// when both are set, so there is none, and the sidecars connect to ClickHouse with what is set alone.
 	EventReasonBackupCredentialsIncomplete = "BackupCredentialsIncomplete"
 
-	// EventReasonBackupNoStorage fires on every reconcile while a cluster turns backup on without the
-	// settings of a storage - neither a storage Secret nor a pod template of its sidecar. Its sidecar
-	// would have no storage to back up to, so backup stays off there - no sidecar, and backups and
-	// restores of the cluster are refused - until the spec gives the cluster one or the other.
-	EventReasonBackupNoStorage = "BackupNoStorage"
-
 	// EventReasonBackupAPIUnpublished fires on every reconcile while hosts of a backup-enabled
 	// cluster have a host Service reachable from outside the cluster. Such a Service does not
 	// publish the plain-HTTP clickhouse-backup API, so backups and restores cannot reach these hosts
