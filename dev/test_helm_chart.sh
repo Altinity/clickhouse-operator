@@ -158,6 +158,34 @@ else
 fi
 
 echo
+echo "security context"
+# The defaults meet the restricted Pod Security Standard. Both images run as `nobody`, a non-numeric
+# user, so runAsNonRoot is only verifiable by the kubelet when runAsUser is set by number.
+expect_contains "pod runs as non-root uid 65534 by default" "runAsUser: 65534"
+expect_contains "pod uses the RuntimeDefault seccomp profile" "type: RuntimeDefault"
+restricted_containers="$(render | grep -c "readOnlyRootFilesystem: true")"
+if [[ "${restricted_containers}" == "2" ]]; then
+    report "both containers get the restricted container defaults" yes
+else
+    report "both containers get the restricted container defaults" no "expected 2 containers with readOnlyRootFilesystem, got ${restricted_containers}"
+fi
+# A user with an image that needs another uid drops a single default by nulling it.
+if render --set podSecurityContext.runAsUser=null | awk '/Deployment-clickhouse-operator.yaml/{f=1} /^---/{f=0} f' | grep -qF "runAsUser: 65534"; then
+    report "podSecurityContext.runAsUser=null drops the uid" no "operator Deployment still sets runAsUser: 65534"
+else
+    report "podSecurityContext.runAsUser=null drops the uid" yes
+fi
+expect_renders "an empty podSecurityContext still renders" --set-json 'podSecurityContext={}'
+# The CRD hook runs at pre-install in the release namespace, so a hook pod the namespace rejects
+# fails the whole install. The kubectl image runs as root, so the non-root uid is set explicitly.
+hook="$(render | awk '/crd-install-job.yaml/{f=1} f')"
+if grep -qF "runAsUser: 65534" <<<"${hook}" && grep -qF "allowPrivilegeEscalation: false" <<<"${hook}"; then
+    report "crd-install hook gets the restricted defaults" yes
+else
+    report "crd-install hook gets the restricted defaults" no "hook pod is missing runAsUser 65534 or allowPrivilegeEscalation false"
+fi
+
+echo
 echo "crd-install hook"
 # The hook runs at pre-install/pre-upgrade, so anything wrong here fails the whole release with
 # only a Helm timeout to show for it. It shipped broken once (#2065): registry.k8s.io/kubectl

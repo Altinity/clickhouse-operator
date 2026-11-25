@@ -44,22 +44,23 @@ crdHook:
   podAnnotations: {}
   # crdHook.podSecurityContext -- pod-level security context for CRD installation job
   # required by some admission policies (e.g. Kyverno `restrict-seccomp-strict`)
-  # check `kubectl explain pod.spec.securityContext` for details
-  podSecurityContext: {}
-  #  runAsNonRoot: true
-  #  runAsUser: 1000
-  #  seccompProfile:
-  #    type: RuntimeDefault
+  # check `kubectl explain pod.spec.securityContext` for details.
+  # The default meets the restricted Pod Security Standard, so the pre-install hook is not rejected in a namespace
+  # that enforces it. The kubectl image runs as root by default; it only talks to the API server, so it runs as
+  # uid/gid 65534 here. Set a key to `null` to drop that default.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    runAsGroup: 65534
+    seccompProfile:
+      type: RuntimeDefault
   # crdHook.containerSecurityContext -- container security context for CRD installation job
   # check `kubectl explain pod.spec.containers.securityContext` for details
-  containerSecurityContext: {}
-  #  allowPrivilegeEscalation: false
-  #  capabilities:
-  #    drop:
-  #      - ALL
-  #  runAsNonRoot: true
-  #  seccompProfile:
-  #    type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
 operator:
   image:
     # operator.image.registry -- optional image registry prefix (e.g. 1234567890.dkr.ecr.us-east-1.amazonaws.com)
@@ -70,7 +71,15 @@ operator:
     tag: ""
     # operator.image.pullPolicy -- image pull policy
     pullPolicy: IfNotPresent
-  containerSecurityContext: {}
+  # operator.containerSecurityContext -- security context of the clickhouse-operator container, check `kubectl explain pod.spec.containers.securityContext` for details.
+  # The default meets the restricted Pod Security Standard. The container writes only to the IPC token emptyDir
+  # (/etc/clickhouse-operator-ipc), so the root filesystem is read-only. Set a key to `null` to drop that default.
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
   # operator.resources -- custom resource configuration, check `kubectl explain pod.spec.containers.resources` for details
   resources: {}
   #  limits:
@@ -119,7 +128,15 @@ metrics:
     tag: ""
     # metrics.image.pullPolicy -- image pull policy
     pullPolicy: IfNotPresent
-  containerSecurityContext: {}
+  # metrics.containerSecurityContext -- security context of the metrics-exporter container, check `kubectl explain pod.spec.containers.securityContext` for details.
+  # The default meets the restricted Pod Security Standard. The container writes only to the IPC token emptyDir
+  # (/etc/clickhouse-operator-ipc), so the root filesystem is read-only. Set a key to `null` to drop that default.
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
   # metrics.resources -- custom resource configuration
   resources: {}
   #  limits:
@@ -203,8 +220,15 @@ nodeSelector: {}
 tolerations: []
 # affinity -- affinity for scheduler pod assignment, check `kubectl explain pod.spec.affinity` for details
 affinity: {}
-# podSecurityContext - operator deployment SecurityContext, check `kubectl explain pod.spec.securityContext` for details
-podSecurityContext: {}
+# podSecurityContext -- operator deployment SecurityContext, check `kubectl explain pod.spec.securityContext` for details.
+# The default meets the restricted Pod Security Standard. Both images run as `nobody` (uid and gid 65534); the user is
+# set by number because the kubelet can only verify `runAsNonRoot` against a numeric user. Set a key to `null` to drop that default.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  runAsGroup: 65534
+  seccompProfile:
+    type: RuntimeDefault
 # topologySpreadConstraints - topologySpreadConstraints affinity for scheduler pod assignment, check `kubectl explain pod.spec.topologySpreadConstraints` for details
 topologySpreadConstraints: []
 serviceMonitor:

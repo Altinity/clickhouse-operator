@@ -44,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **ClickHouse settings supporting live reload no longer require a restart** when matched by wildcard `configurationRestartPolicy` rules. Explicit restart rules still take precedence. by [@alex-zaitsev](https://github.com/alex-zaitsev) in [#2109](https://github.com/Altinity/clickhouse-operator/pull/2109)
 
+* **Helm chart defaults now meet the restricted Pod Security Standard.** The operator pod runs as `nobody` (uid/gid 65534, set by number so the kubelet can verify `runAsNonRoot`) with the `RuntimeDefault` seccomp profile; both containers drop all capabilities, disallow privilege escalation and use a read-only root filesystem, since they only write the IPC token to its emptyDir. The CRD installation hook gets the same pod defaults plus no privilege escalation and no capabilities, so the chart installs in namespaces that enforce `restricted`. Set individual `podSecurityContext`, `operator.containerSecurityContext`, `metrics.containerSecurityContext` or `crdHook.*SecurityContext` keys to `null` to drop a default. by [@DrFaust92](https://github.com/DrFaust92) in [#2174](https://github.com/Altinity/clickhouse-operator/pull/2174)
+
 ### Fixed
 
 * **Invalid StatefulSet specifications no longer delete running StatefulSets during recreation.** The operator validates the desired StatefulSet with a server-side dry run before deleting the existing one, preserving ClickHouse and Keeper workloads on validation errors. by [@atsarevskiy](https://github.com/atsarevskiy) in [#2071](https://github.com/Altinity/clickhouse-operator/pull/2071). Fixes [#1420](https://github.com/Altinity/clickhouse-operator/issues/1420)
