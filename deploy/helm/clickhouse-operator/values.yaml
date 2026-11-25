@@ -86,6 +86,11 @@ operator:
   # operator.env -- additional environment variables for the clickhouse-operator container in deployment
   # possible format value `[{"name": "SAMPLE", "value": "text"}]`
   env: []
+  # operator.extraVolumeMounts -- additional volumeMounts for the clickhouse-operator container, usually of volumes from `extraVolumes`,
+  # check `kubectl explain pod.spec.containers.volumeMounts` for details.
+  # For example, to mount the files `clickhouse.access.clientCertFile` and `clientKeyFile` point to:
+  # `[{"name": "client-tls", "mountPath": "/etc/clickhouse-operator-client-tls", "readOnly": true}]`
+  extraVolumeMounts: []
   # operator.logVerbosity -- log verbosity level (glog `-v`) of the clickhouse-operator container.
   # Rendered as `CHOP_LOGGER_V` env var, which overrides `logger.v` of the operator configuration for the clickhouse-operator only.
   # Empty value keeps `logger.v` from the operator configuration.
@@ -132,6 +137,10 @@ metrics:
   # metrics.env -- additional environment variables for the deployment of metrics-exporter containers
   # possible format value `[{"name": "SAMPLE", "value": "text"}]`
   env: []
+  # metrics.extraVolumeMounts -- additional volumeMounts for the metrics-exporter container, usually of volumes from `extraVolumes`,
+  # check `kubectl explain pod.spec.containers.volumeMounts` for details.
+  # The metrics-exporter reads its own copy of the operator configuration, so files that configuration points to must be mounted here too.
+  extraVolumeMounts: []
   # metrics.logVerbosity -- log verbosity level (glog `-v`) of the metrics-exporter container, e.g. `0` to reduce log noise.
   # Rendered as `CHOP_LOGGER_V` env var, which overrides `logger.v` of the operator configuration for the metrics-exporter only.
   # Empty value keeps `logger.v` from the operator configuration.
@@ -158,6 +167,18 @@ metrics:
 # possible value format `[{"name":"your-secret-name"}]`,
 # check `kubectl explain pod.spec.imagePullSecrets` for details
 imagePullSecrets: []
+# extraVolumes -- additional volumes for the clickhouse-operator pod, mounted with `operator.extraVolumeMounts` and `metrics.extraVolumeMounts`,
+# check `kubectl explain pod.spec.volumes` for details.
+# For example, a Secret holding the operator's client certificate:
+# `[{"name": "client-tls", "secret": {"secretName": "clickhouse-operator-client-tls"}}]`
+extraVolumes: []
+# extraContainers -- additional containers for the clickhouse-operator pod, appended after the chart's own containers,
+# check `kubectl explain pod.spec.containers` for details
+extraContainers: []
+# extraInitContainers -- init containers for the clickhouse-operator pod, check `kubectl explain pod.spec.initContainers` for details.
+# An init container with `restartPolicy: Always` is a native sidecar (Kubernetes 1.33+, beta and on by default since 1.29):
+# it starts before the operator and keeps running, for example to write the client certificate `clickhouse.access.clientCertFile` points to
+extraInitContainers: []
 # podLabels -- labels to add to the clickhouse-operator pod
 podLabels: {}
 # podAnnotations -- annotations to add to the clickhouse-operator pod, check `kubectl explain pod.spec.annotations` for details

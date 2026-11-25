@@ -233,6 +233,8 @@ function update_deployment_resource() {
     yq e -i '.spec.template.metadata.annotations += {"checksum/'"${cmName}"'": "{{ include \"altinity-clickhouse-operator.configMapContentHash\" (dict \"ctx\" . \"name\" \"/generated/ConfigMap-'"${cm}"'.yaml\") }}"}' "${file}"
   done
   
+  yq e -i '.spec.template.spec.volumes += ["{{ with .Values.extraVolumes }}{{ toYaml . | nindent 8 }}{{ end }}"]' "${file}"
+  yq e -i '.spec.template.spec += {"__EXTRA_INIT_CONTAINERS__": null}' "${file}"
   yq e -i '.spec.template.spec.containers[0].name |= "{{ .Chart.Name }}"' "${file}"
   yq e -i '.spec.template.spec.containers[0].image |= "{{ if .Values.operator.image.registry }}{{ .Values.operator.image.registry | trimSuffix \"/\" }}/{{ end }}{{ .Values.operator.image.repository }}:{{ include \"altinity-clickhouse-operator.operator.tag\" . }}"' "${file}"
   yq e -i '.spec.template.spec.containers[0].imagePullPolicy |= "{{ .Values.operator.image.pullPolicy }}"' "${file}"
@@ -241,6 +243,7 @@ function update_deployment_resource() {
   yq e -i '(.spec.template.spec.containers[0].env[] | select(.valueFrom.resourceFieldRef.containerName == "clickhouse-operator") | .valueFrom.resourceFieldRef.containerName) = "{{ .Chart.Name }}"' "${file}"
   yq e -i '.spec.template.spec.containers[0].env += ["{{ include \"altinity-clickhouse-operator.operator.loggerEnv\" . | nindent 12 }}"]' "${file}"
   yq e -i '.spec.template.spec.containers[0].env += ["{{ with .Values.operator.env }}{{ toYaml . | nindent 12 }}{{ end }}"]' "${file}"
+  yq e -i '.spec.template.spec.containers[0].volumeMounts += ["{{ with .Values.operator.extraVolumeMounts }}{{ toYaml . | nindent 12 }}{{ end }}"]' "${file}"
   yq e -i '.spec.template.spec.containers[0] += {"__OPERATOR_LIVENESS_PROBE__": null}' "${file}"
   yq e -i '.spec.template.spec.containers[0] += {"__OPERATOR_READINESS_PROBE__": null}' "${file}"
 
@@ -251,6 +254,7 @@ function update_deployment_resource() {
   yq e -i '(.spec.template.spec.containers[1].env[] | select(.valueFrom.resourceFieldRef.containerName == "clickhouse-operator") | .valueFrom.resourceFieldRef.containerName) = "{{ .Chart.Name }}"' "${file}"
   yq e -i '.spec.template.spec.containers[1].env += ["{{ include \"altinity-clickhouse-operator.metrics.loggerEnv\" . | nindent 12 }}"]' "${file}"
   yq e -i '.spec.template.spec.containers[1].env += ["{{ with .Values.metrics.env }}{{ toYaml . | nindent 12 }}{{ end }}"]' "${file}"
+  yq e -i '.spec.template.spec.containers[1].volumeMounts += ["{{ with .Values.metrics.extraVolumeMounts }}{{ toYaml . | nindent 12 }}{{ end }}"]' "${file}"
   yq e -i '.spec.template.spec.containers[1] += {"__METRICS_LIVENESS_PROBE__": null}' "${file}"
   yq e -i '.spec.template.spec.containers[1] += {"__METRICS_READINESS_PROBE__": null}' "${file}"
 
@@ -260,12 +264,18 @@ function update_deployment_resource() {
   perl -pi -e "s/- '{{ with .Values.operator.env }}{{ toYaml . \| nindent 12 }}{{ end }}'/{{ with .Values.operator.env }}{{ toYaml . \| nindent 12 }}{{ end }}/g" "${file}"
   perl -pi -e "s/- '({{ include \"altinity-clickhouse-operator.metrics.loggerEnv\" . \| nindent 12 }})'/\$1/g" "${file}"
   perl -pi -e "s/- '{{ with .Values.metrics.env }}{{ toYaml . \| nindent 12 }}{{ end }}'/{{ with .Values.metrics.env }}{{ toYaml . \| nindent 12 }}{{ end }}/g" "${file}"
+  perl -pi -e "s/- '({{ with .Values.operator.extraVolumeMounts }}{{ toYaml . \| nindent 12 }}{{ end }})'/\$1/g" "${file}"
+  perl -pi -e "s/- '({{ with .Values.metrics.extraVolumeMounts }}{{ toYaml . \| nindent 12 }}{{ end }})'/\$1/g" "${file}"
+  perl -pi -e "s/- '({{ with .Values.extraVolumes }}{{ toYaml . \| nindent 8 }}{{ end }})'/\$1/g" "${file}"
   perl -0pi -e 's/\n\s*__OPERATOR_LIVENESS_PROBE__: null/\n          {{- with .Values.operator.livenessProbe }}\n          livenessProbe: {{- toYaml . | nindent 12 }}\n          {{- end }}/g' "${file}"
   perl -0pi -e 's/\n\s*__OPERATOR_READINESS_PROBE__: null/\n          {{- with .Values.operator.readinessProbe }}\n          readinessProbe: {{- toYaml . | nindent 12 }}\n          {{- end }}/g' "${file}"
   perl -0pi -e 's/\n\s*__METRICS_LIVENESS_PROBE__: null/\n          {{- with .Values.metrics.livenessProbe }}\n          livenessProbe: {{- toYaml . | nindent 12 }}\n          {{- end }}/g' "${file}"
   perl -0pi -e 's/\n\s*__METRICS_READINESS_PROBE__: null/\n          {{- with .Values.metrics.readinessProbe }}\n          readinessProbe: {{- toYaml . | nindent 12 }}\n          {{- end }}/g' "${file}"
   perl -pi -e 's/(\s+\- name: metrics-exporter)/{{ if .Values.metrics.enabled }}\n$1/g' "${file}"
   perl -pi -e "s/(\s+imagePullSecrets: '\{\{ toYaml \.Values\.imagePullSecrets \| nindent 8 \}\}')/{{ end }}\n\$1/g" "${file}"
+  # extraContainers go after the metrics-exporter's closing {{ end }}, so metrics.enabled does not gate them.
+  perl -0pi -e 's/\{\{ end \}\}\n(\s*imagePullSecrets:)/{{ end }}\n        {{ with .Values.extraContainers }}{{ toYaml . | nindent 8 }}{{ end }}\n$1/' "${file}"
+  perl -0pi -e 's/\n\s*__EXTRA_INIT_CONTAINERS__: null/\n      {{- with .Values.extraInitContainers }}\n      initContainers: {{- toYaml . | nindent 8 }}\n      {{- end }}/g' "${file}"
   perl -pi -e "s/'//g" "${file}"
 }
 
