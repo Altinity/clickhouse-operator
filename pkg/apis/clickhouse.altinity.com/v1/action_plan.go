@@ -208,6 +208,11 @@ func (ap *ActionPlan) isExcludedPathSegment(prev, cur string) bool {
 		return true
 	}
 
+	// resource.Quantity caches its string form lazily in .s; the value itself lives in its other fields
+	if cur == ".s" {
+		return true
+	}
+
 	if (((prev == "TaskID") && (cur == ".TaskID")) ||
 		((prev == ".TaskID") && (cur == ".TaskID"))) && ap.skipTaskID {
 		return true

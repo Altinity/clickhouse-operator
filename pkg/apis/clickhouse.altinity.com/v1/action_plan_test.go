@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 // chiWithReplicas builds a CHI whose diff against another has SEVERAL modified entries.
@@ -181,4 +183,38 @@ func TestActionPlanDeepCopyIsRaceFree(t *testing.T) {
 	}
 	close(start)
 	wg.Wait()
+}
+
+// chiWithMemoryLimit builds a CHI whose pod template limits memory to the given quantity.
+func chiWithMemoryLimit(memory resource.Quantity) *ClickHouseInstallation {
+	cr := &ClickHouseInstallation{}
+	cr.EnsureRuntime()
+	cr.Spec.Templates = &Templates{
+		PodTemplates: []PodTemplate{{
+			Name: "default",
+			Spec: core.PodSpec{Containers: []core.Container{{
+				Name: "clickhouse",
+				Resources: core.ResourceRequirements{
+					Limits: core.ResourceList{core.ResourceMemory: memory},
+				},
+			}}},
+		}},
+	}
+	return cr
+}
+
+// TestActionPlanIgnoresQuantityStringCache pins that equal quantities do not produce a plan.
+//
+// resource.Quantity caches its string form in an unexported field that is filled lazily, so
+// the ancestor and the freshly normalized CR can hold the same 2048Mi with and without the
+// cache. Treating that as a spec change re-reconciled the CR forever.
+func TestActionPlanIgnoresQuantityStringCache(t *testing.T) {
+	cached := resource.MustParse("2048Mi")
+	_ = cached.String()
+
+	plan := MakeActionPlan(chiWithMemoryLimit(cached), chiWithMemoryLimit(resource.MustParse("2048Mi")))
+	require.False(t, plan.HasActionsToDo(), plan.String())
+
+	plan = MakeActionPlan(chiWithMemoryLimit(cached), chiWithMemoryLimit(resource.MustParse("4Gi")))
+	require.True(t, plan.HasActionsToDo(), "a real quantity change must still be planned")
 }
