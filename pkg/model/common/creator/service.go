@@ -15,6 +15,9 @@
 package creator
 
 import (
+	"maps"
+
+	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -25,6 +28,20 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
+
+// HostServiceSelector makes the selector of a host Service from the host scope selector and the host pod name.
+// The host scope selector carries the shard and replica names, and a replica name of a host defined
+// in layout.shards[].replicas is its position in the list. When hosts shift in the list - one is removed
+// or inserted not at the tail - a pod of another host keeps the old position labels until its StatefulSet
+// is re-created, so the Service would select pods of two hosts at once. The pod name label is set by the
+// StatefulSet controller and is unique for a host, so the Service selects the pod of its own host only.
+// The StatefulSet selector itself is immutable and is left as is.
+func HostServiceSelector(hostScopeSelector map[string]string, podName string) map[string]string {
+	selector := make(map[string]string, len(hostScopeSelector)+1)
+	maps.Copy(selector, hostScopeSelector)
+	selector[apps.StatefulSetPodNameLabel] = podName
+	return selector
+}
 
 func (c *Creator) CreateService(what interfaces.ServiceType, params ...any) util.Slice[*core.Service] {
 	c.sm.SetCR(c.cr)
