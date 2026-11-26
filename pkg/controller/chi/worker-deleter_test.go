@@ -190,7 +190,12 @@ func TestRemovedHostFQDNs(t *testing.T) {
 		cr := &api.ClickHouseInstallation{}
 		shard := &api.ChiShard{}
 		for _, n := range hostNames {
-			shard.Hosts = append(shard.Hosts, &api.Host{Name: n})
+			host := &api.Host{Name: n}
+			// Removed hosts are matched by name, through the Address the normalizer populates
+			host.Runtime.Address.ClusterName = "c0"
+			host.Runtime.Address.ShardName = "s0"
+			host.Runtime.Address.HostName = n
+			shard.Hosts = append(shard.Hosts, host)
 		}
 		cr.Spec.Configuration = &api.Configuration{
 			Clusters: []*api.Cluster{{Layout: &api.ChiClusterLayout{Shards: []*api.ChiShard{shard}}}},
