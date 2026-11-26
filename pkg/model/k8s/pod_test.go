@@ -47,3 +47,44 @@ func TestPodContainersRestartCountsGet(t *testing.T) {
 	require.Nil(t, PodContainersRestartCountsGet(nil, "clickhouse"))
 	require.Nil(t, PodContainersRestartCountsGet(&core.Pod{}))
 }
+
+// A pod that is not scheduled yet reports no container statuses at all - it must not count as started
+func TestPodHasAllContainersStarted(t *testing.T) {
+	started := true
+	notStarted := false
+
+	// Pending pod, not scheduled to a node - kubelet has reported nothing
+	pending := &core.Pod{
+		Spec:   core.PodSpec{Containers: []core.Container{{Name: "keeper"}}},
+		Status: core.PodStatus{Phase: core.PodPending},
+	}
+	require.False(t, PodHasAllContainersStarted(pending), "no container statuses means nothing has started")
+	require.True(t, PodHasNotStartedContainers(pending))
+
+	// Scheduled, container is waiting
+	waiting := &core.Pod{Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{
+		{Name: "keeper", Started: &notStarted},
+	}}}
+	require.False(t, PodHasAllContainersStarted(waiting))
+
+	// Started is unknown - the null value must be treated the same as false
+	unknown := &core.Pod{Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{
+		{Name: "keeper"},
+	}}}
+	require.False(t, PodHasAllContainersStarted(unknown))
+
+	// One of the containers is not started
+	partial := &core.Pod{Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{
+		{Name: "keeper", Started: &started},
+		{Name: "sidecar", Started: &notStarted},
+	}}}
+	require.False(t, PodHasAllContainersStarted(partial))
+
+	// All containers are started
+	all := &core.Pod{Status: core.PodStatus{ContainerStatuses: []core.ContainerStatus{
+		{Name: "keeper", Started: &started},
+		{Name: "sidecar", Started: &started},
+	}}}
+	require.True(t, PodHasAllContainersStarted(all))
+	require.False(t, PodHasNotStartedContainers(all))
+}

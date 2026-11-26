@@ -70,6 +70,11 @@ func PodHasNotReadyContainers(pod *core.Pod) bool {
 }
 
 func PodHasAllContainersStarted(pod *core.Pod) bool {
+	// No container statuses yet means the pod is not scheduled or kubelet has not reported.
+	// Without this check an empty list is vacuously "all started".
+	if len(pod.Status.ContainerStatuses) < 1 {
+		return false
+	}
 	allContainersStarted := true
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		// Started indicates whether the container has finished its postStart lifecycle hook
