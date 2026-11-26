@@ -86,7 +86,7 @@ crdHook:
 | configs | object | check the `values.yaml` file for the config content (auto-generated from latest operator release) | clickhouse operator configs |
 | crdHook.affinity | object | `{}` | affinity for CRD installation job |
 | crdHook.annotations | object | `{}` | additional annotations for CRD installation job |
-| crdHook.containerSecurityContext | object | `{}` | container security context for CRD installation job check `kubectl explain pod.spec.containers.securityContext` for details |
+| crdHook.containerSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}` | container security context for CRD installation job check `kubectl explain pod.spec.containers.securityContext` for details |
 | crdHook.enabled | bool | `true` | enable automatic CRD installation/update via pre-install/pre-upgrade hooks when disabled, CRDs must be installed manually using kubectl apply |
 | crdHook.image.pullPolicy | string | `"IfNotPresent"` | image pull policy for CRD installation job |
 | crdHook.image.repository | string | `"registry.k8s.io/kubectl"` | image repository for CRD installation job |
@@ -94,7 +94,7 @@ crdHook:
 | crdHook.imagePullSecrets | list | `[]` | image pull secrets for CRD installation job possible value format `[{"name":"your-secret-name"}]`, check `kubectl explain pod.spec.imagePullSecrets` for details |
 | crdHook.nodeSelector | object | `{}` | node selector for CRD installation job |
 | crdHook.podAnnotations | object | `{}` | additional annotations for CRD installation job pod template useful to opt out of service mesh injection, e.g. `sidecar.istio.io/inject: "false"` |
-| crdHook.podSecurityContext | object | `{}` | pod-level security context for CRD installation job required by some admission policies (e.g. Kyverno `restrict-seccomp-strict`) check `kubectl explain pod.spec.securityContext` for details |
+| crdHook.podSecurityContext | object | `{"runAsGroup":65534,"runAsNonRoot":true,"runAsUser":65534,"seccompProfile":{"type":"RuntimeDefault"}}` | pod-level security context for CRD installation job required by some admission policies (e.g. Kyverno `restrict-seccomp-strict`) check `kubectl explain pod.spec.securityContext` for details. The default meets the restricted Pod Security Standard, so the pre-install hook is not rejected in a namespace that enforces it. The kubectl image runs as root by default; it only talks to the API server, so it runs as uid/gid 65534 here. Set a key to `null` to drop that default. |
 | crdHook.resources | object | `{}` | resource limits and requests for CRD installation job |
 | crdHook.tolerations | list | `[]` | tolerations for CRD installation job |
 | dashboards.additionalLabels | object | `{"grafana_dashboard":""}` | labels to add to a secret with dashboards |
@@ -104,7 +104,7 @@ crdHook:
 | deployment.strategy.type | string | `"Recreate"` |  |
 | fullnameOverride | string | `""` | full name of the chart. |
 | imagePullSecrets | list | `[]` | image pull secret for private images in clickhouse-operator pod possible value format `[{"name":"your-secret-name"}]`, check `kubectl explain pod.spec.imagePullSecrets` for details |
-| metrics.containerSecurityContext | object | `{}` |  |
+| metrics.containerSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true}` | security context of the metrics-exporter container, check `kubectl explain pod.spec.containers.securityContext` for details. The default meets the restricted Pod Security Standard. The container writes only to the IPC token emptyDir (/etc/clickhouse-operator-ipc), so the root filesystem is read-only. Set a key to `null` to drop that default. |
 | metrics.enabled | bool | `true` |  |
 | metrics.env | list | `[]` | additional environment variables for the deployment of metrics-exporter containers possible format value `[{"name": "SAMPLE", "value": "text"}]` |
 | metrics.image.pullPolicy | string | `"IfNotPresent"` | image pull policy |
@@ -118,7 +118,7 @@ crdHook:
 | nameOverride | string | `""` | override name of the chart |
 | namespaceOverride | string | `""` |  |
 | nodeSelector | object | `{}` | node for scheduler pod assignment, check `kubectl explain pod.spec.nodeSelector` for details |
-| operator.containerSecurityContext | object | `{}` |  |
+| operator.containerSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true}` | security context of the clickhouse-operator container, check `kubectl explain pod.spec.containers.securityContext` for details. The default meets the restricted Pod Security Standard. The container writes only to the IPC token emptyDir (/etc/clickhouse-operator-ipc), so the root filesystem is read-only. Set a key to `null` to drop that default. |
 | operator.env | list | `[]` | additional environment variables for the clickhouse-operator container in deployment possible format value `[{"name": "SAMPLE", "value": "text"}]` |
 | operator.image.pullPolicy | string | `"IfNotPresent"` | image pull policy |
 | operator.image.registry | string | `""` | optional image registry prefix (e.g. 1234567890.dkr.ecr.us-east-1.amazonaws.com) |
@@ -131,7 +131,7 @@ crdHook:
 | operator.resources | object | `{}` | custom resource configuration, check `kubectl explain pod.spec.containers.resources` for details |
 | podAnnotations | object | check the `values.yaml` file | annotations to add to the clickhouse-operator pod, check `kubectl explain pod.spec.annotations` for details |
 | podLabels | object | `{}` | labels to add to the clickhouse-operator pod |
-| podSecurityContext | object | `{}` |  |
+| podSecurityContext | object | `{"runAsGroup":65534,"runAsNonRoot":true,"runAsUser":65534,"seccompProfile":{"type":"RuntimeDefault"}}` | operator deployment SecurityContext, check `kubectl explain pod.spec.securityContext` for details. The default meets the restricted Pod Security Standard. Both images run as `nobody` (uid and gid 65534); the user is set by number because the kubelet can only verify `runAsNonRoot` against a numeric user. Set a key to `null` to drop that default. |
 | rbac.create | bool | `true` | specifies whether rbac resources should be created |
 | rbac.namespaceScoped | bool | `false` | specifies whether to create roles and rolebindings at the cluster level or namespace level |
 | secret.create | bool | `true` | create a secret with operator credentials |
