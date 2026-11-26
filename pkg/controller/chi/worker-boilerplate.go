@@ -76,6 +76,10 @@ func (w *worker) processReconcileCHI(ctx context.Context, cmd *cmd_queue.Reconci
 		// the same flag and does not restart Pods: the template names the managed
 		// users Secret and does not carry its bytes.
 		return w.updateCHI(context.WithValue(ctx, passwordSecretReconcileKey{}, true), nil, cmd.New)
+	case cmd_queue.ReconcileUnwatch:
+		return w.unwatchCHI(ctx, cmd.Old, cmd.New)
+	case cmd_queue.ReconcileWatch:
+		return w.watchCHI(ctx, cmd.Old, cmd.New)
 	case cmd_queue.ReconcileUpdate:
 		return w.updateCHI(ctx, cmd.Old, cmd.New)
 	case cmd_queue.ReconcileDelete:

@@ -15,10 +15,13 @@
 package clickhouse
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/stretchr/testify/require"
@@ -108,6 +111,24 @@ func TestResolveIPCToken_ConcurrentReadIsSafe(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+func TestDoRequestTimesOut(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+		<-req.Context().Done()
+	}))
+	defer server.Close()
+
+	previous := ipcHTTPClient
+	ipcHTTPClient = &http.Client{Timeout: 20 * time.Millisecond}
+	t.Cleanup(func() {
+		ipcHTTPClient = previous
+	})
+
+	req, err := http.NewRequest(http.MethodGet, server.URL, nil)
+	require.NoError(t, err)
+	_, err = doRequest(req)
+	require.Error(t, err)
 }
 
 // cacheBackedLoad mirrors resolveIPCToken's cache-on-success semantics but
