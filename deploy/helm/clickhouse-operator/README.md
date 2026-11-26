@@ -102,11 +102,15 @@ crdHook:
 | dashboards.annotations.grafana_folder | string | `"clickhouse-operator"` | folder where will place dashboards, requires define values in official grafana helm chart sidecar.dashboards.folderAnnotation: grafana_folder |
 | dashboards.enabled | bool | `false` | provision grafana dashboards as configMaps (can be synced by grafana dashboards sidecar https://github.com/grafana/helm-charts/blob/grafana-8.3.4/charts/grafana/values.yaml#L778 ) |
 | deployment.strategy.type | string | `"Recreate"` |  |
+| extraContainers | list | `[]` | additional containers for the clickhouse-operator pod, appended after the chart's own containers, check `kubectl explain pod.spec.containers` for details |
+| extraInitContainers | list | `[]` | init containers for the clickhouse-operator pod, check `kubectl explain pod.spec.initContainers` for details. An init container with `restartPolicy: Always` is a native sidecar (Kubernetes 1.33+, beta and on by default since 1.29): it starts before the operator and keeps running, for example to write the client certificate `clickhouse.access.clientCertFile` points to |
+| extraVolumes | list | `[]` | additional volumes for the clickhouse-operator pod, mounted with `operator.extraVolumeMounts` and `metrics.extraVolumeMounts`, check `kubectl explain pod.spec.volumes` for details. For example, a Secret holding the operator's client certificate: `[{"name": "client-tls", "secret": {"secretName": "clickhouse-operator-client-tls"}}]` |
 | fullnameOverride | string | `""` | full name of the chart. |
 | imagePullSecrets | list | `[]` | image pull secret for private images in clickhouse-operator pod possible value format `[{"name":"your-secret-name"}]`, check `kubectl explain pod.spec.imagePullSecrets` for details |
 | metrics.containerSecurityContext | object | `{}` |  |
 | metrics.enabled | bool | `true` |  |
 | metrics.env | list | `[]` | additional environment variables for the deployment of metrics-exporter containers possible format value `[{"name": "SAMPLE", "value": "text"}]` |
+| metrics.extraVolumeMounts | list | `[]` | additional volumeMounts for the metrics-exporter container, usually of volumes from `extraVolumes`, check `kubectl explain pod.spec.containers.volumeMounts` for details. The metrics-exporter reads its own copy of the operator configuration, so files that configuration points to must be mounted here too. |
 | metrics.image.pullPolicy | string | `"IfNotPresent"` | image pull policy |
 | metrics.image.registry | string | `""` | optional image registry prefix (e.g. 1234567890.dkr.ecr.us-east-1.amazonaws.com) |
 | metrics.image.repository | string | `"altinity/metrics-exporter"` | image repository |
@@ -120,6 +124,7 @@ crdHook:
 | nodeSelector | object | `{}` | node for scheduler pod assignment, check `kubectl explain pod.spec.nodeSelector` for details |
 | operator.containerSecurityContext | object | `{}` |  |
 | operator.env | list | `[]` | additional environment variables for the clickhouse-operator container in deployment possible format value `[{"name": "SAMPLE", "value": "text"}]` |
+| operator.extraVolumeMounts | list | `[]` | additional volumeMounts for the clickhouse-operator container, usually of volumes from `extraVolumes`, check `kubectl explain pod.spec.containers.volumeMounts` for details. For example, to mount the files `clickhouse.access.clientCertFile` and `clientKeyFile` point to: `[{"name": "client-tls", "mountPath": "/etc/clickhouse-operator-client-tls", "readOnly": true}]` |
 | operator.image.pullPolicy | string | `"IfNotPresent"` | image pull policy |
 | operator.image.registry | string | `""` | optional image registry prefix (e.g. 1234567890.dkr.ecr.us-east-1.amazonaws.com) |
 | operator.image.repository | string | `"altinity/clickhouse-operator"` | image repository |

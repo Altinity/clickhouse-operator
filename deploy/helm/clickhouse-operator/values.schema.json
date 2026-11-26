@@ -801,6 +801,10 @@
                     "description": "additional environment variables for the deployment of metrics-exporter containers possible format value `[{\"name\": \"SAMPLE\", \"value\": \"text\"}]`",
                     "type": "array"
                 },
+                "extraVolumeMounts": {
+                    "description": "additional volumeMounts for the metrics-exporter container, usually of volumes from `extraVolumes`",
+                    "type": "array"
+                },
                 "logVerbosity": {
                     "description": "log verbosity level (glog `-v`) of the metrics-exporter container, rendered as `CHOP_LOGGER_V` env var. Empty value keeps `logger.v` from the operator configuration",
                     "type": ["string", "integer", "null"]
@@ -855,6 +859,10 @@
                 },
                 "env": {
                     "description": "additional environment variables for the clickhouse-operator container in deployment possible format value `[{\"name\": \"SAMPLE\", \"value\": \"text\"}]`",
+                    "type": "array"
+                },
+                "extraVolumeMounts": {
+                    "description": "additional volumeMounts for the clickhouse-operator container, usually of volumes from `extraVolumes`",
                     "type": "array"
                 },
                 "logVerbosity": {
@@ -913,6 +921,18 @@
                     "type": "string"
                 }
             }
+        },
+        "extraVolumes": {
+            "description": "additional volumes for the clickhouse-operator pod, mounted with `operator.extraVolumeMounts` and `metrics.extraVolumeMounts`",
+            "type": "array"
+        },
+        "extraContainers": {
+            "description": "additional containers for the clickhouse-operator pod, appended after the chart's own containers",
+            "type": "array"
+        },
+        "extraInitContainers": {
+            "description": "init containers for the clickhouse-operator pod; one with `restartPolicy: Always` is a native sidecar",
+            "type": "array"
         },
         "podLabels": {
             "description": "labels to add to the clickhouse-operator pod",

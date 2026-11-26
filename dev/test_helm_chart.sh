@@ -158,6 +158,87 @@ else
 fi
 
 echo
+echo "extra volumes"
+# extraVolumes/extraVolumeMounts let a Secret (for example the operator's client certificate,
+# clickhouse.access.clientCertFile/clientKeyFile) be mounted into the operator and the
+# metrics-exporter, which each read their own copy of the operator configuration.
+# Assertions are structural (yq over the rendered Deployment), so a wrong indent fails them.
+extra_values="$(mktemp)"
+cat > "${extra_values}" <<'VALUES'
+extraVolumes:
+  - name: client-tls
+    secret:
+      secretName: clickhouse-operator-client-tls
+operator:
+  extraVolumeMounts:
+    - name: client-tls
+      mountPath: /etc/clickhouse-operator-client-tls
+      readOnly: true
+metrics:
+  extraVolumeMounts:
+    - name: client-tls
+      mountPath: /etc/clickhouse-operator-client-tls
+      readOnly: true
+VALUES
+# deployment_query <yq expression> <helm args...> prints the expression over the operator Deployment.
+deployment_query() {
+    local expr="$1"; shift
+    render "$@" | yq ea '[select(.kind == "Deployment")] | .[0] | '"${expr}" -
+}
+expect_query() {
+    local name="$1" expr="$2" want="$3"; shift 3
+    local got
+    got="$(deployment_query "${expr}" "$@" 2>&1)"
+    if [[ "${got}" == "${want}" ]]; then report "${name}" yes; else report "${name}" no "expected ${want}, got ${got}"; fi
+}
+expect_query "no extra volume by default" \
+    '[.spec.template.spec.volumes[] | select(.name == "client-tls")] | length' 0
+expect_query "extraVolumes adds the pod volume" \
+    '.spec.template.spec.volumes[] | select(.name == "client-tls") | .secret.secretName' \
+    clickhouse-operator-client-tls -f "${extra_values}"
+expect_query "operator.extraVolumeMounts mounts it in the operator" \
+    '.spec.template.spec.containers[0].volumeMounts[] | select(.name == "client-tls") | .mountPath' \
+    /etc/clickhouse-operator-client-tls -f "${extra_values}"
+expect_query "metrics.extraVolumeMounts mounts it in the metrics-exporter" \
+    '.spec.template.spec.containers[] | select(.name == "metrics-exporter") | .volumeMounts[] | select(.name == "client-tls") | .readOnly' \
+    true -f "${extra_values}"
+expect_query "the chart's own volumes are kept" \
+    '[.spec.template.spec.volumes[] | select(.name == "clickhouse-operator-ipc")] | length' 1 -f "${extra_values}"
+expect_query "metrics.enabled=false keeps the volume and the operator mount" \
+    '[.spec.template.spec.containers[0].volumeMounts[] | select(.name == "client-tls")] | length' \
+    1 -f "${extra_values}" --set metrics.enabled=false
+rm -f "${extra_values}"
+
+echo
+echo "extra containers"
+# extraContainers/extraInitContainers let the pod run more containers, for example a native sidecar
+# (an init container with restartPolicy: Always) that writes the client certificate before the
+# operator starts.
+containers_values="$(mktemp)"
+cat > "${containers_values}" <<'VALUES'
+extraInitContainers:
+  - name: cert-writer
+    image: example/cert-writer:1
+    restartPolicy: Always
+extraContainers:
+  - name: extra-sidecar
+    image: example/sidecar:1
+VALUES
+expect_query "no initContainers by default" '.spec.template.spec | has("initContainers")' false
+expect_query "only the chart's containers by default" '[.spec.template.spec.containers[].name] | join(",")' \
+    "altinity-clickhouse-operator,metrics-exporter"
+expect_query "extraContainers are appended after the chart's containers" \
+    '[.spec.template.spec.containers[].name] | join(",")' \
+    "altinity-clickhouse-operator,metrics-exporter,extra-sidecar" -f "${containers_values}"
+expect_query "metrics.enabled=false does not drop extraContainers" \
+    '[.spec.template.spec.containers[].name] | join(",")' \
+    "altinity-clickhouse-operator,extra-sidecar" -f "${containers_values}" --set metrics.enabled=false
+expect_query "extraInitContainers renders a native sidecar" \
+    '.spec.template.spec.initContainers[] | select(.name == "cert-writer") | .restartPolicy' \
+    Always -f "${containers_values}"
+rm -f "${containers_values}"
+
+echo
 echo "crd-install hook"
 # The hook runs at pre-install/pre-upgrade, so anything wrong here fails the whole release with
 # only a Helm timeout to show for it. It shipped broken once (#2065): registry.k8s.io/kubectl
