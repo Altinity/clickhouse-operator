@@ -16,6 +16,7 @@
 # PEP-585 builtin generics (list[dict]) in this file don't fail at import time.
 from __future__ import annotations
 
+import base64
 import copy
 import json
 import os
@@ -779,6 +780,126 @@ def create_tls_secret_for_fips_hosts(
         "certs_dir": certs_dir,
         "dns_names": dns_names,
     }
+
+
+# ---------------------------------------------------------------------------
+# Operator client certificate (clickhouse.access.clientCertFile/clientKeyFile)
+# ---------------------------------------------------------------------------
+
+# Where the client-certificate Secret is mounted in BOTH the clickhouse-operator and the
+# metrics-exporter containers; each reads its own copy of the operator config, so the paths in
+# clickhouse.access.clientCertFile/clientKeyFile must resolve in both.
+OPERATOR_CLIENT_TLS_MOUNT = "/etc/clickhouse-operator-client-tls"
+_OPERATOR_CLIENT_TLS_VOLUME = "client-tls"
+_OPERATOR_CONTAINERS = ("clickhouse-operator", "metrics-exporter")
+
+
+def _run_openssl(command):
+    result = subprocess.run(command, text=True, capture_output=True, check=False)
+    assert result.returncode == 0, error(
+        "openssl failed\n"
+        f"command: {' '.join(shlex.quote(part) for part in command)}\n"
+        f"stdout:\n{result.stdout}\n"
+        f"stderr:\n{result.stderr}"
+    )
+
+
+def make_client_cert(certs_dir, name, ca_crt=None, ca_key=None):
+    """Issue a client certificate (extendedKeyUsage clientAuth) and return (crt, key) paths.
+
+    With ca_crt/ca_key the certificate is signed by that CA (the one
+    create_tls_secret_for_fips_hosts made, so the server trusts it). Without them a fresh
+    self-signed CA is made first, giving a certificate the server does NOT trust.
+    """
+    if ca_crt is None:
+        ca_crt = os.path.join(certs_dir, f"{name}-ca.crt")
+        ca_key = os.path.join(certs_dir, f"{name}-ca.key")
+        _run_openssl([
+            "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+            "-subj", f"/CN={name}-untrusted-ca", "-keyout", ca_key, "-out", ca_crt,
+        ])
+    crt = os.path.join(certs_dir, f"{name}.crt")
+    key = os.path.join(certs_dir, f"{name}.key")
+    csr = os.path.join(certs_dir, f"{name}.csr")
+    ext = os.path.join(certs_dir, f"{name}.ext")
+    with open(ext, "w", encoding="utf-8") as f:
+        f.write("basicConstraints = CA:FALSE\nkeyUsage = digitalSignature\nextendedKeyUsage = clientAuth\n")
+    _run_openssl([
+        "openssl", "req", "-new", "-newkey", "rsa:2048", "-nodes",
+        "-subj", f"/CN={name}", "-keyout", key, "-out", csr,
+    ])
+    _run_openssl([
+        "openssl", "x509", "-req", "-in", csr, "-CA", ca_crt, "-CAkey", ca_key, "-CAcreateserial",
+        "-out", crt, "-days", "1", "-extfile", ext,
+    ])
+    return crt, key
+
+
+def _client_tls_secret_data(crt, key, ca_crt):
+    data = {}
+    for k, path in (("tls.crt", crt), ("tls.key", key), ("ca.crt", ca_crt)):
+        with open(path, "rb") as f:
+            data[k] = base64.b64encode(f.read()).decode()
+    return data
+
+
+def create_operator_client_tls_secret(secret_name, crt, key, ca_crt, ns):
+    """Secret in the operator namespace with tls.crt, tls.key and ca.crt (ca.crt also serves
+    clickhouse.access.rootCASecretRef, so the operator verifies the server with the same CA)."""
+    kubectl.launch(
+        f"create secret generic {secret_name} "
+        f"--from-file=tls.crt={shlex.quote(crt)} "
+        f"--from-file=tls.key={shlex.quote(key)} "
+        f"--from-file=ca.crt={shlex.quote(ca_crt)}",
+        ns=ns,
+    )
+
+
+def rotate_operator_client_tls_secret(secret_name, crt, key, ca_crt, ns):
+    """Replace the Secret's data in one update; the kubelet then swaps the mounted files atomically.
+
+    The patch goes through --patch-file, not -p: the base64 payload is several KiB, and a command
+    line that long typed into the interactive shell is cut at the terminal's 4096-byte line limit,
+    which leaves the quote open and the shell waiting for more input."""
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+        json.dump({"data": _client_tls_secret_data(crt, key, ca_crt)}, f)
+        patch_path = f.name
+    try:
+        kubectl.launch(f"patch secret {secret_name} --type=merge --patch-file={shlex.quote(patch_path)}", ns=ns)
+    finally:
+        os.unlink(patch_path)
+
+
+def _operator_client_tls_patch(secret_name=None):
+    """Strategic merge patch mounting secret_name into both operator containers, or, with no
+    secret_name, removing that mount."""
+    if secret_name is None:
+        volume = {"name": _OPERATOR_CLIENT_TLS_VOLUME, "$patch": "delete"}
+        mount = {"mountPath": OPERATOR_CLIENT_TLS_MOUNT, "$patch": "delete"}
+    else:
+        volume = {"name": _OPERATOR_CLIENT_TLS_VOLUME, "secret": {"secretName": secret_name}}
+        mount = {"name": _OPERATOR_CLIENT_TLS_VOLUME, "mountPath": OPERATOR_CLIENT_TLS_MOUNT, "readOnly": True}
+    return {
+        "spec": {"template": {"spec": {
+            "volumes": [volume],
+            "containers": [{"name": c, "volumeMounts": [mount]} for c in _OPERATOR_CONTAINERS],
+        }}}
+    }
+
+
+def mount_operator_client_tls(secret_name, ns):
+    """Mount the client-certificate Secret into both operator containers (strategic merge patch:
+    volumes merge by name, containers by name, volumeMounts by mountPath)."""
+    body = json.dumps(_operator_client_tls_patch(secret_name))
+    kubectl.launch(f"patch deployment clickhouse-operator -p {shlex.quote(body)}", ns=ns)
+    kubectl.launch("rollout status deployment.v1.apps/clickhouse-operator", ns=ns)
+
+
+def unmount_operator_client_tls(ns):
+    """Undo mount_operator_client_tls. Safe to call when it was never applied."""
+    body = json.dumps(_operator_client_tls_patch())
+    kubectl.launch(f"patch deployment clickhouse-operator -p {shlex.quote(body)}", ns=ns, ok_to_fail=True)
+    kubectl.launch("rollout status deployment.v1.apps/clickhouse-operator", ns=ns)
 
 
 # ---------------------------------------------------------------------------

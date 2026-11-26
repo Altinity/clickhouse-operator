@@ -42,6 +42,10 @@ func NewClusterConnectionParamsFromCHOpConfig(config *api.OperatorConfig) *Clust
 		config.ClickHouse.Access.RootCA,
 		config.ClickHouse.Access.Port,
 	)
+	params.ClusterCredentials.SetClientCertificate(
+		config.ClickHouse.Access.ClientCertFile,
+		config.ClickHouse.Access.ClientKeyFile,
+	)
 	params.SetConnectTimeout(config.ClickHouse.Access.Timeouts.Connect)
 	params.SetQueryTimeout(config.ClickHouse.Access.Timeouts.Query)
 
@@ -87,7 +91,8 @@ func (p *ClusterConnectionParams) OverlayClusterSecurityTLS(tls *api.ClusterSecu
 }
 
 // OverlayTLS layers TLS knobs over the CHOP-config-derived defaults. Empty values leave
-// the existing value alone, same as OverlayClusterSecurityTLS.
+// the existing value alone, same as OverlayClusterSecurityTLS. The client certificate is
+// operator-scoped and is deliberately not overlaid.
 func (p *ClusterConnectionParams) OverlayTLS(
 	verify api.TLSVerify,
 	minVersion api.TLSMinVersion,
@@ -126,5 +131,6 @@ func (p *ClusterConnectionParams) NewEndpointConnectionParams(host string) *Endp
 		p.Port,
 	).SetTimeouts(p.Timeouts)
 	endpoint.EndpointCredentials.SetTLSSecurity(p.TLSVerify, p.TLSMinVersion, p.TLSServerName)
+	endpoint.EndpointCredentials.SetClientCertificate(p.ClientCertFile, p.ClientKeyFile)
 	return endpoint
 }

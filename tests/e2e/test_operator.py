@@ -7791,6 +7791,143 @@ def test_010080(self):
         delete_test_namespace()
 
 
+def _fetch_errors_pattern(chi, n):
+    """The exporter's fetch-errors gauge for this CHI, with value n."""
+    return f'^chi_clickhouse_metric_fetch_errors{{[^}}]*chi="{chi}"[^}}]*}} {n}$'
+
+
+@TestScenario
+@Tags("HEAVY")
+@Requirements(RQ_SRS_026_ClickHouseOperator_EnableHttps("1.0"))
+@Name("test_010089. Operator presents a client certificate to a ClickHouse with verificationMode strict")
+def test_010089(self):
+    """Verify clickhouse.access.clientCertFile/clientKeyFile end to end against a server that
+    requires a client certificate (openSSL.server.verificationMode=strict):
+      - WITH: the operator and the metrics-exporter present the mounted certificate; the CHI
+        reaches Completed and the exporter scrapes (fetch_errors == 0).
+      - WITHOUT: the same server refuses the operator (fetch_errors == 1), proving strict is
+        really enforced and the WITH arm is not passing for another reason.
+      - ROTATION: replacing the Secret with an untrusted certificate breaks the scrape, and
+        replacing it back restores it, with the same operator pod and no restart: the files are
+        re-read on new connections.
+    """
+    create_shell_namespace_clickhouse_template()
+    operator_namespace = current().context.operator_namespace
+    secret_name = "test-010089-client-tls"
+
+    chi_manifest = "manifests/chi/test-010089-https-strict.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
+    with_cert_chopconf = "manifests/chopconf/test-010089-chopconf-client-cert.yaml"
+    without_cert_chopconf = "manifests/chopconf/test-010089-chopconf-no-client-cert.yaml"
+
+    with Given("a server TLS secret and its CA for this namespace's ClickHouse pods"):
+        create_tls_secret_for_fips_hosts(chi=chi, chk=chi, replicas=1)
+        certs_dir = current().context.tls["certs_dir"]
+        ca_crt = current().context.tls["ca_crt"]
+        ca_key = os.path.join(certs_dir, "ca.key")
+
+    with And("a client certificate signed by that CA, and one signed by an unrelated CA"):
+        good_crt, good_key = make_client_cert(certs_dir, "operator-client", ca_crt=ca_crt, ca_key=ca_key)
+        bad_crt, bad_key = make_client_cert(certs_dir, "operator-client-untrusted")
+
+    with And("the client certificate is published in the operator namespace and mounted into both operator containers"):
+        create_operator_client_tls_secret(secret_name, good_crt, good_key, ca_crt, ns=operator_namespace)
+        mount_operator_client_tls(secret_name, ns=operator_namespace)
+
+    with And("the operator presents the client certificate"):
+        util.apply_operator_config(with_cert_chopconf)
+
+    with When("the strict-TLS ClickHouse CHI is deployed"):
+        kubectl.create_and_check(
+            manifest=chi_manifest,
+            check={
+                "apply_templates": {current().context.clickhouse_template},
+                "object_counts": {"statefulset": 1, "pod": 1, "service": 2},
+                "do_not_delete": 1,
+            },
+            timeout=600,
+        )
+
+    with Then("WITH: the CHI is Completed and the exporter scrapes over mutual TLS (fetch_errors=0)"):
+        kubectl.wait_chi_status(chi, "Completed")
+        check_metrics_monitoring(
+            operator_namespace=operator_namespace,
+            operator_pod=kubectl.get_operator_pod(ns=operator_namespace),
+            expect_pattern=_fetch_errors_pattern(chi, 0),
+            max_retries=12,
+        )
+
+    with When("the operator no longer presents a client certificate"):
+        # The operator merges every chopconf CR in its namespace: remove the previous one first.
+        kubectl.delete(util.get_full_path(with_cert_chopconf, lookup_in_host=False), operator_namespace)
+        util.apply_operator_config(without_cert_chopconf)
+
+    with Then("WITHOUT: the strict server refuses the operator (fetch_errors=1)"):
+        check_metrics_monitoring(
+            operator_namespace=operator_namespace,
+            operator_pod=kubectl.get_operator_pod(ns=operator_namespace),
+            expect_pattern=_fetch_errors_pattern(chi, 1),
+            max_retries=12,
+        )
+
+    with When("the client certificate is configured again"):
+        kubectl.delete(util.get_full_path(without_cert_chopconf, lookup_in_host=False), operator_namespace)
+        util.apply_operator_config(with_cert_chopconf)
+        check_metrics_monitoring(
+            operator_namespace=operator_namespace,
+            operator_pod=kubectl.get_operator_pod(ns=operator_namespace),
+            expect_pattern=_fetch_errors_pattern(chi, 0),
+            max_retries=12,
+        )
+        operator_pod = kubectl.get_operator_pod(ns=operator_namespace)
+        restarts = {
+            c: kubectl.get_container_restart_count(operator_pod, container=c, ns=operator_namespace)
+            for c in ("clickhouse-operator", "metrics-exporter")
+        }
+
+    # Rotation needs no restart, but it is not instant: the kubelet refreshes a Secret volume
+    # within about its sync period plus cache TTL (~1-2 min by default), and a pooled connection
+    # keeps the certificate it was opened with until it is retired (operator pool caps: 2 min
+    # idle, 10 min lifetime; the exporter's connections stay busy, so the 10 min cap applies).
+    # max_retries=20 gives check_metrics_monitoring about 16 minutes.
+    with When("the Secret is rotated to a certificate the server does not trust"):
+        rotate_operator_client_tls_secret(secret_name, bad_crt, bad_key, ca_crt, ns=operator_namespace)
+
+    with Then("ROTATION: new connections present the rotated (untrusted) certificate (fetch_errors=1)"):
+        check_metrics_monitoring(
+            operator_namespace=operator_namespace,
+            operator_pod=operator_pod,
+            expect_pattern=_fetch_errors_pattern(chi, 1),
+            max_retries=20,
+        )
+
+    with When("the Secret is rotated back to a trusted certificate"):
+        rotate_operator_client_tls_secret(secret_name, good_crt, good_key, ca_crt, ns=operator_namespace)
+
+    with Then("ROTATION: scraping recovers (fetch_errors=0) with the same operator pod and no restart"):
+        check_metrics_monitoring(
+            operator_namespace=operator_namespace,
+            operator_pod=operator_pod,
+            expect_pattern=_fetch_errors_pattern(chi, 0),
+            max_retries=20,
+        )
+        assert kubectl.get_operator_pod(ns=operator_namespace) == operator_pod, error(
+            "the operator pod was replaced: rotation must not need a restart"
+        )
+        for c, before in restarts.items():
+            assert kubectl.get_container_restart_count(
+                operator_pod, container=c, ns=operator_namespace
+            ) == before, error(f"the {c} container restarted during rotation")
+
+    with Finally("I clean up"):
+        for chopconf in (with_cert_chopconf, without_cert_chopconf):
+            kubectl.delete(util.get_full_path(chopconf, lookup_in_host=False), operator_namespace, ok_to_fail=True)
+        unmount_operator_client_tls(ns=operator_namespace)
+        util.restart_operator()
+        kubectl.launch(f"delete secret {secret_name}", ns=operator_namespace, ok_to_fail=True)
+        delete_test_namespace()
+
+
 @TestScenario
 @Tags("HEAVY")
 @Name("test_010081. Scale-up restart gate and scaled-up replica Distributed table")

@@ -1,0 +1,16 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-010089-chopconf-no-client-cert"
+spec:
+  clickhouse:
+    access:
+      scheme: https
+      port: 8443
+      rootCASecretRef:
+        name: test-010089-client-tls
+        key: ca.crt
+  security:
+    clickhouse:
+      tls:
+        verify: Strict

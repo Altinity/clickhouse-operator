@@ -8701,6 +8701,12 @@ spec:
                             key:
                               type: string
                               description: "Key within the Secret whose value is the PEM CA bundle. When empty, the operator tries 'ca.crt' then 'tls.crt'"
+                        clientCertFile:
+                          type: string
+                          description: "Path to a PEM client certificate the operator presents on https connections to ClickHouse (mutual TLS). Must be set together with clientKeyFile. Re-read when the file changes"
+                        clientKeyFile:
+                          type: string
+                          description: "Path to the PEM private key for clientCertFile. Must be set together with clientCertFile. Re-read when the file changes"
                         secret:
                           type: object
                           properties:

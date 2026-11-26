@@ -500,6 +500,16 @@ configs:
           rootCASecretRef:
             name: ""
             key: ""
+          # Client certificate (mutual TLS) the operator presents on https connections to ClickHouse,
+          # needed when ClickHouse runs with verificationMode "strict". Paths to PEM files inside the
+          # operator container (and the metrics-exporter container, which reads its own copy of this
+          # config). Set both or neither: with a single path, connections to ClickHouse fail. The files are
+          # read on every new connection, so a rotated certificate is used without an operator restart.
+          # Example, with a Secret mounted at /etc/clickhouse-operator/client-tls:
+          #   clientCertFile: "/etc/clickhouse-operator/client-tls/tls.crt"
+          #   clientKeyFile: "/etc/clickhouse-operator/client-tls/tls.key"
+          clientCertFile: ""
+          clientKeyFile: ""
           # Location of the k8s Secret with username and password to be used by the operator to connect to ClickHouse instances.
           # Can be used instead of explicitly specified username and password available in sections:
           #   - clickhouse.access.username
