@@ -4,6 +4,12 @@ metadata:
   name: "test-044-chopconf"
 spec:
   reconcile:
+    # The slow replica becomes Kubernetes Ready while its Service-ready label is still no.
+    # Automatic recovery would then reconcile before the test checks that the schema is absent.
+    recovery:
+      onStatus:
+        aborted:
+          onPodReady: none
     host:
       wait:
         exclude: "false"

@@ -27,7 +27,9 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	commonConfig "github.com/altinity/clickhouse-operator/pkg/model/common/config"
+	commonlabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -187,8 +189,13 @@ func (w *worker) isPodOK(ctx context.Context, host *api.Host) bool {
 }
 
 // isHostHealthyForReconcile is true when host is safe to count as a live peer for
-// shard-safety checks. Stopped/troubleshoot hosts are intentionally unavailable
-// and do not block disruption of a peer.
+// shard-safety checks and recovery ordering. Stopped/troubleshoot hosts are
+// intentionally unavailable and do not block disruption of a peer.
+//
+// Kubelet readiness alone is not enough: after an aborted reconcile a pod can be
+// container-Ready while still excluded from the chop-generated Service
+// (clickhouse.altinity.com/ready=no). Counting that host as healthy lets recovery
+// disrupt its last Service-eligible sibling (#2106).
 func (w *worker) isHostHealthyForReconcile(ctx context.Context, host *api.Host) bool {
 	if host == nil {
 		return false
@@ -199,9 +206,9 @@ func (w *worker) isHostHealthyForReconcile(ctx context.Context, host *api.Host) 
 	if w.c == nil || w.c.kube == nil {
 		return false
 	}
-	// One fetch, four pure reads. Pod().Get is a live API call, and this predicate runs per peer
-	// across the shard walk, so asking four times cost four round trips per host - and let the
-	// four answers come from four different versions of the pod, which is exactly the kind of
+	// One fetch, five pure reads. Pod().Get is a live API call, and this predicate runs per peer
+	// across the shard walk, so asking multiple times cost multiple round trips per host - and let
+	// the answers come from different versions of the pod, which is exactly the kind of
 	// inconsistency a health verdict must not be built on.
 	pod, err := w.c.kube.Pod().Get(ctx, host)
 	if err != nil {
@@ -210,7 +217,22 @@ func (w *worker) isHostHealthyForReconcile(ctx context.Context, host *api.Host) 
 	return k8s.PodPhaseIsRunning(pod) &&
 		!k8s.PodHasNotReadyContainers(pod) &&
 		!podIsTerminating(pod) &&
-		!k8s.PodHasCrushedContainers(pod)
+		!k8s.PodHasCrushedContainers(pod) &&
+		podHasOperatorServiceReadyLabel(pod, host.GetCR())
+}
+
+// podHasOperatorServiceReadyLabel reports whether the pod carries
+// clickhouse.altinity.com/ready=yes for the given CR's labeler.
+func podHasOperatorServiceReadyLabel(pod *core.Pod, cr api.ICustomResource) bool {
+	if pod == nil || cr == nil {
+		return false
+	}
+	l := chiLabeler.New(cr)
+	labels := pod.GetLabels()
+	if labels == nil {
+		return false
+	}
+	return labels[l.Get(commonlabeler.LabelReadyName)] == l.Get(commonlabeler.LabelReadyValueReady)
 }
 
 func (w *worker) hasUnhealthyHosts(ctx context.Context, cr *api.ClickHouseInstallation) bool {
