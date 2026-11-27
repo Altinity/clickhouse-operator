@@ -73,8 +73,8 @@ func (c *Pod) Get(ctx context.Context, params ...any) (*core.Pod, error) {
 }
 
 // GetRestartCounters maps the name of the pod's ClickHouse container => its restarts count. A restart of the host is
-// one of its ClickHouse: the other containers do not count, as the liveness probe of the backup sidecar restarts the
-// sidecar alone, also while ClickHouse is shut down to restart.
+// one of its ClickHouse: the other containers do not count, as kubelet restarts a backup sidecar that exits on its
+// own, also while ClickHouse is shut down to restart.
 func (c *Pod) GetRestartCounters(ctx context.Context, params ...any) (map[string]int, error) {
 	pod, err := c.Get(ctx, params...)
 	if err != nil {

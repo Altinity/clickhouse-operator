@@ -16,8 +16,6 @@ package chbackup
 
 import (
 	"fmt"
-	"path"
-	"slices"
 	"strings"
 
 	core "k8s.io/api/core/v1"
@@ -29,6 +27,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 )
 
 // envVarReferencePrefix starts a reference to another env var in a value, which kubelet expands from
@@ -49,12 +48,9 @@ const (
 const commandWordQuotes = `"'`
 
 // sidecarSettings is how the clickhouse-backup sidecar of a host takes the settings the storage path
-// check reads. The operator never reads a Secret: it tells the Job where every setting comes from, and
-// kubelet resolves it for the Job as it does for the sidecar.
+// check reads. The Job reads no configuration file: the generated configuration file Secret of the cluster holds
+// the settings of the file under their env var names too, and kubelet resolves them for the Job from there.
 type sidecarSettings struct {
-	// defaultsPaths tells whether the sidecar runs the operator's own command, which defaults the storage
-	// paths its environment leaves unset
-	defaultsPaths bool
 	// sources holds, by key of PathCheckKeys, the env vars that set the key in the sidecar, in the order
 	// kubelet applies them, each made optional so that it never keeps the Job from starting. A key nothing
 	// sets has none.
@@ -64,47 +60,28 @@ type sidecarSettings struct {
 }
 
 // newSidecarSettings tells how the sidecar of a host takes the settings the storage path check reads, from
-// the sidecar as the creator builds it. What the Job cannot follow makes the settings unverifiable: env vars
-// from an envFrom source other than the storage Secret, a configuration file named other than by
-// that Secret, and a value that resolves otherwise in a pod of the Job. A file that Secret names reaches the
-// Job as a setting, which leaves the cluster out just as well when set.
+// the sidecar as the creator builds it: from the configuration file the operator generates, overridden by the env
+// vars of the sidecar. What the Job cannot follow makes the settings unverifiable: env vars from an envFrom source,
+// a command that may name another configuration file, and a value that resolves otherwise in a pod of the Job.
 func newSidecarSettings(host *api.Host, containers interfaces.IContainerManager) sidecarSettings {
 	sidecar, _ := containers.NewBackupContainer(host)
-	settings := sidecarSettings{defaultsPaths: chiCreator.IsBackupSidecarCommand(&sidecar), sources: map[string][]core.EnvVar{}}
-	storageSecret := host.GetCluster().GetBackup().GetStorageSecretName()
-	mounts := slices.Clone(sidecar.VolumeMounts)
+	settings := sidecarSettings{sources: map[string][]core.EnvVar{}}
 	// What the operator does not set itself comes from the clickhouse-backup container of the pod template the
 	// cluster's backup names
 	if template, ok := host.GetBackupPodTemplate(); ok {
-		if slices.ContainsFunc(sidecar.EnvFrom, func(source core.EnvFromSource) bool {
-			return (source.SecretRef == nil) || (source.SecretRef.Name != storageSecret) || (source.Prefix != "")
-		}) {
+		if len(sidecar.EnvFrom) > 0 {
 			return settings.cannotVerify(fmt.Sprintf("the %s container of pod template %s takes environment variables from envFrom",
 				config.ClickHouseBackupContainerName, template.Name))
 		}
-		if !settings.defaultsPaths && (namesConfigFile(sidecar.Command) || namesConfigFile(sidecar.Args)) {
+		if !chiCreator.IsBackupSidecarCommand(&sidecar) && (namesConfigFile(sidecar.Command) || namesConfigFile(sidecar.Args)) {
 			return settings.cannotVerify(fmt.Sprintf("the %s container of pod template %s runs a command that may name a configuration "+
 				"file", config.ClickHouseBackupContainerName, template.Name))
 		}
 	}
-	// The sidecar mounts every volume of the ClickHouse container as well
-	if template, ok := host.GetPodTemplate(); ok {
-		if clickHouse, ok := chiCreator.PodSpecContainerGetClickHouse(&template.Spec); ok {
-			mounts = append(mounts, clickHouse.VolumeMounts...)
-		}
-	}
-	for _, mount := range mounts {
-		if pathsOverlap(mount.MountPath, config.DirPathClickHouseBackupConfig) {
-			return settings.cannotVerify(fmt.Sprintf("the %s sidecar mounts a volume at %s, where its configuration file may be",
-				config.ClickHouseBackupContainerName, mount.MountPath))
-		}
-	}
-	if lastEnvVar(sidecar.Env, config.ClickHouseBackupEnvConfig) != nil {
-		return settings.cannotVerify(fmt.Sprintf("the %s sidecar reads a configuration file %s names",
-			config.ClickHouseBackupContainerName, config.ClickHouseBackupEnvConfig))
-	}
+	configSecret := managers.NewNameManager(managers.NameManagerTypeClickHouse).
+		Name(interfaces.NameBackupConfigSecret, host.GetCR(), host.GetCluster().GetName())
 	for _, key := range PathCheckKeys {
-		sources, unverifiable := sidecarSettingSources(storageSecret, sidecar.Env, key)
+		sources, unverifiable := sidecarSettingSources(configSecret, sidecar.Env, key)
 		if unverifiable != "" {
 			return settings.cannotVerify(unverifiable)
 		}
@@ -124,20 +101,17 @@ func (s sidecarSettings) cannotVerify(reason string) sidecarSettings {
 
 // equal reports whether two hosts take the settings alike.
 func (s sidecarSettings) equal(other sidecarSettings) bool {
-	return (s.defaultsPaths == other.defaultsPaths) && (s.unverifiable == other.unverifiable) &&
+	return (s.unverifiable == other.unverifiable) &&
 		apiEquality.Semantic.DeepEqual(s.sources, other.sources)
 }
 
 // sidecarSettingSources returns the env vars that set the key in the sidecar, in the order kubelet applies
-// them, or why the Job cannot follow them: the key of the storage Secret, which the sidecar takes
-// through envFrom, before every env var of the sidecar. What an entry that always sets the variable comes
+// them, or why the Job cannot follow them: the key of the configuration file Secret, which stands for the setting
+// of the configuration file, before every env var of the sidecar, which takes precedence over the file. What an entry that always sets the variable comes
 // after is overridden, and is left out. An optional source that lacks the key leaves the variable as it
 // was, in the sidecar and in the Job alike.
-func sidecarSettingSources(storageSecret string, env []core.EnvVar, key string) ([]core.EnvVar, string) {
-	var entries []core.EnvVar
-	if storageSecret != "" {
-		entries = append(entries, k8s.NewEnvVarFromSecret(key, storageSecret, key))
-	}
+func sidecarSettingSources(configSecret string, env []core.EnvVar, key string) ([]core.EnvVar, string) {
+	entries := []core.EnvVar{k8s.NewEnvVarFromSecret(key, configSecret, key)}
 	for i := range env {
 		if env[i].Name == key {
 			entries = append(entries, env[i])
@@ -192,16 +166,6 @@ func alwaysSets(envVar core.EnvVar) bool {
 	return true
 }
 
-// lastEnvVar returns the last env var of the name, which kubelet applies over the others, nil for none.
-func lastEnvVar(env []core.EnvVar, name string) *core.EnvVar {
-	for i := len(env) - 1; i >= 0; i-- {
-		if env[i].Name == name {
-			return &env[i]
-		}
-	}
-	return nil
-}
-
 // namesConfigFile reports whether a command line may name a configuration file of clickhouse-backup: a word of
 // an argument, which a shell may split it into, is the flag that does. Any argument holding the flag with two
 // dashes counts as well, wherever a wrapper puts it. A command line that only looks so, as a flag of another
@@ -224,13 +188,4 @@ func namesConfigFile(args []string) bool {
 		}
 	}
 	return false
-}
-
-// pathsOverlap reports whether one path is the other or lies below it.
-func pathsOverlap(x, y string) bool {
-	x, y = path.Clean(x), path.Clean(y)
-	within := func(target, dir string) bool {
-		return (dir == "/") || (target == dir) || strings.HasPrefix(target, dir+"/")
-	}
-	return within(x, y) || within(y, x)
 }

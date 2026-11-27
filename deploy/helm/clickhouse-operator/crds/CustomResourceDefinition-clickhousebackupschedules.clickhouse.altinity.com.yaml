@@ -225,9 +225,9 @@ spec:
                       cronJobName:
                         type: string
                         description: "Name of the CronJob that runs the schedule on the cluster"
-                      storage:
+                      configSecret:
                         type: string
-                        description: "Backup storage the runs of the cluster keep their backups in, as its CronJob was last built"
+                        description: "Secret of the clickhouse-backup configuration the runs of the cluster keep their backups by, as its CronJob was last built: for a cluster that lost its CronJob, the storage its unpruned backups lie in"
                       lastScheduleTime:
                         type: string
                         format: date-time

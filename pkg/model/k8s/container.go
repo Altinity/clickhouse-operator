@@ -206,7 +206,13 @@ func ContainerGetImageTag(container *core.Container) (string, bool) {
 	if container == nil {
 		return "", false
 	}
-	parts, err := docker.Parse(container.Image)
+	// For "name:tag@sha256:..." docker.Parse keeps only the digest, so the tag (and the version in it)
+	// is lost. Parse the reference without the digest when its name still carries an explicit tag.
+	image := container.Image
+	if name, _, found := strings.Cut(image, "@"); found && strings.Contains(path.Base(name), ":") {
+		image = name
+	}
+	parts, err := docker.Parse(image)
 	if err != nil {
 		return "", false
 	}

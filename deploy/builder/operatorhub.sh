@@ -84,9 +84,6 @@ if [[ -s "${SKIPS_FILE}" ]]; then
 fi
 rm "${SKIPS_FILE}"
 
-#$CHIT.crd.yaml
-#$CONF.crd.yaml
-
 CHI="clickhouseinstallations.clickhouse.altinity.com"
 CHIT="clickhouseinstallationtemplates.clickhouse.altinity.com"
 CONF="clickhouseoperatorconfigurations.clickhouse.altinity.com"
@@ -95,47 +92,24 @@ CHB="clickhousebackups.clickhouse.altinity.com"
 CHBS="clickhousebackupschedules.clickhouse.altinity.com"
 CHR="clickhouserestores.clickhouse.altinity.com"
 
-# Build partial .yaml manifest(s)
+# Build CRDs-only manifest once, then split it into one file per CRD (matched by full metadata.name)
+CRDS_FILE="$(mktemp)"
 MANIFEST_PRINT_CRD="yes" \
 MANIFEST_PRINT_RBAC_CLUSTERED="no" \
 MANIFEST_PRINT_RBAC_NAMESPACED="no" \
 MANIFEST_PRINT_DEPLOYMENT="no" \
 MANIFEST_PRINT_SERVICE_METRICS="no" \
-"${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" | yq "select(.metadata.name == \"${CHI}\")" > "${MANIFESTS_DIR}/${CHI}.crd.yaml"
+"${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" > "${CRDS_FILE}"
 
-# Build partial .yaml manifest(s)
-MANIFEST_PRINT_CRD="yes" \
-MANIFEST_PRINT_RBAC_CLUSTERED="no" \
-MANIFEST_PRINT_RBAC_NAMESPACED="no" \
-MANIFEST_PRINT_DEPLOYMENT="no" \
-MANIFEST_PRINT_SERVICE_METRICS="no" \
-"${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" | yq "select(.metadata.name == \"${CHIT}\")" > "${MANIFESTS_DIR}/${CHIT}.crd.yaml"
-
-# Build partial .yaml manifest(s)
-MANIFEST_PRINT_CRD="yes" \
-MANIFEST_PRINT_RBAC_CLUSTERED="no" \
-MANIFEST_PRINT_RBAC_NAMESPACED="no" \
-MANIFEST_PRINT_DEPLOYMENT="no" \
-MANIFEST_PRINT_SERVICE_METRICS="no" \
-"${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" | yq "select(.metadata.name == \"${CONF}\")" > "${MANIFESTS_DIR}/${CONF}.crd.yaml"
-
-# Build partial .yaml manifest(s)
-MANIFEST_PRINT_CRD="yes" \
-MANIFEST_PRINT_RBAC_CLUSTERED="no" \
-MANIFEST_PRINT_RBAC_NAMESPACED="no" \
-MANIFEST_PRINT_DEPLOYMENT="no" \
-MANIFEST_PRINT_SERVICE_METRICS="no" \
-"${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" | yq "select(.metadata.name == \"${CHK}\")" > "${MANIFESTS_DIR}/${CHK}.crd.yaml"
-
-# Backup CRDs: ClickHouseBackup, ClickHouseBackupSchedule, ClickHouseRestore
-for CRD in "${CHB}" "${CHBS}" "${CHR}"; do
-    MANIFEST_PRINT_CRD="yes" \
-    MANIFEST_PRINT_RBAC_CLUSTERED="no" \
-    MANIFEST_PRINT_RBAC_NAMESPACED="no" \
-    MANIFEST_PRINT_DEPLOYMENT="no" \
-    MANIFEST_PRINT_SERVICE_METRICS="no" \
-    "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" | yq "select(.metadata.name == \"${CRD}\")" > "${MANIFESTS_DIR}/${CRD}.crd.yaml"
+for CRD in "${CHI}" "${CHIT}" "${CONF}" "${CHK}" "${CHB}" "${CHBS}" "${CHR}"; do
+    yq "select(.metadata.name == \"${CRD}\")" "${CRDS_FILE}" > "${MANIFESTS_DIR}/${CRD}.crd.yaml"
+    if [[ ! -s "${MANIFESTS_DIR}/${CRD}.crd.yaml" ]]; then
+        echo "ERROR: CRD ${CRD} not found in install manifest" >&2
+        rm -f "${CRDS_FILE}"
+        exit 1
+    fi
 done
+rm -f "${CRDS_FILE}"
 
 # TODO
 # Package file not used any more?

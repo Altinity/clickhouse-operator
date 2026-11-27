@@ -53,6 +53,7 @@ func backupSecretGetter(t *testing.T) subst.SecretGetter {
 			t.Fatalf("unexpected Secret read: %s/%s", namespace, name)
 		}
 		return &core.Secret{Data: map[string][]byte{
+			config.ClickHouseBackupSecretKeyClickHouseUsername: []byte(testBackupUsername),
 			config.ClickHouseBackupSecretKeyClickHousePassword: []byte(backupSecretPassword),
 		}}, nil
 	}
@@ -75,16 +76,16 @@ func normalizeBackupCR(t *testing.T, cr *chi.ClickHouseInstallation, secretGet s
 // backupStorageSecret is the storage Secret enabledBackup names, without which backup stays off
 const backupStorageSecret = "s3-credentials"
 
-// backupStorage declares a storage of the given Secret
-func backupStorage(name, secret string) chi.BackupStorage {
-	return chi.BackupStorage{Name: name, SecretRef: &core.LocalObjectReference{Name: secret}}
+// configSecretRef references the configuration Secret of the given name
+func configSecretRef(secret string) *core.LocalObjectReference {
+	return &core.LocalObjectReference{Name: secret}
 }
 
 // enabledBackup enables backup with a storage Secret
 func enabledBackup() *chi.ClusterBackup {
 	return &chi.ClusterBackup{
-		Enabled:  types.NewStringBool(true),
-		Storages: []chi.BackupStorage{backupStorage("main", backupStorageSecret)},
+		Enabled:         types.NewStringBool(true),
+		ConfigSecretRef: configSecretRef(backupStorageSecret),
 	}
 }
 
@@ -109,7 +110,7 @@ func findCluster(t *testing.T, cr *chi.ClickHouseInstallation, name string) *chi
 }
 
 func backupUser(field string) string {
-	return config.ClickHouseBackupUsername + "/" + field
+	return testBackupUsername + "/" + field
 }
 
 // requireBackupUserFromSecret checks the backup user authenticates with the password of the backup Secret
@@ -127,7 +128,7 @@ func requireBackupUserFromSecret(t *testing.T, cr *chi.ClickHouseInstallation) {
 func requireNoBackupUser(t *testing.T, cr *chi.ClickHouseInstallation) {
 	t.Helper()
 	cr.Spec.Configuration.Users.WalkKeys(func(key string, _ *chi.Setting) {
-		require.NotContains(t, key, config.ClickHouseBackupUsername+"/")
+		require.NotContains(t, key, testBackupUsername+"/")
 	})
 }
 
@@ -147,8 +148,8 @@ func requireNoBackupEnvVar(t *testing.T, cr *chi.ClickHouseInstallation) {
 func TestBackupClusterInheritance(t *testing.T) {
 	cr := &chi.ClickHouseInstallation{}
 	cr.Spec.Backup = &chi.ClusterBackup{
-		Enabled:  types.NewStringBool(true),
-		Storages: []chi.BackupStorage{backupStorage("main", backupStorageSecret)},
+		Enabled:         types.NewStringBool(true),
+		ConfigSecretRef: configSecretRef(backupStorageSecret),
 	}
 	cr.Spec.Configuration = &chi.Configuration{Clusters: []*chi.Cluster{
 		backupCluster("inherits", nil),
@@ -160,19 +161,19 @@ func TestBackupClusterInheritance(t *testing.T) {
 
 	inherits := findCluster(t, got, "inherits").GetBackup()
 	require.True(t, inherits.IsEnabled())
-	require.Equal(t, backupStorageSecret, inherits.GetStorageSecretName())
+	require.Equal(t, backupStorageSecret, inherits.GetConfigSecretName())
 
 	optsOut := findCluster(t, got, "opts-out").GetBackup()
 	require.False(t, optsOut.IsEnabled(), "a cluster-level `enabled: no` wins over the installation-level `yes`")
-	require.Equal(t, backupStorageSecret, optsOut.GetStorageSecretName())
+	require.Equal(t, backupStorageSecret, optsOut.GetConfigSecretName())
 }
 
 // .spec.backup is part of the spec, so a template can switch backup on for every installation using it.
 func TestBackupFromTemplate(t *testing.T) {
 	tpl := newCHIT("chit-backup", "")
 	tpl.Spec.Backup = &chi.ClusterBackup{
-		Enabled:  types.NewStringBool(true),
-		Storages: []chi.BackupStorage{backupStorage("main", backupStorageSecret)},
+		Enabled:         types.NewStringBool(true),
+		ConfigSecretRef: configSecretRef(backupStorageSecret),
 	}
 	registerCHIT(t, tpl)
 
@@ -185,79 +186,54 @@ func TestBackupFromTemplate(t *testing.T) {
 	got := normalizeBackupCR(t, cr, backupSecretGetter(t))
 	backup := findCluster(t, got, "c").GetBackup()
 	require.True(t, backup.IsEnabled())
-	require.Equal(t, backupStorageSecret, backup.GetStorageSecretName())
+	require.Equal(t, backupStorageSecret, backup.GetConfigSecretName())
 	requireBackupUserFromSecret(t, got)
 }
 
-// A cluster takes the installation's storages along with its own, pairing them by name, and uses the storage it
-// tells itself over the installation's: one of its own, or one it names. A storage of its own that the installation
-// declares too takes the Secret the cluster leaves out from the installation's. An explicit "" leaves the cluster
-// without a storage rather than inheriting the installation's.
-func TestBackupStorageInheritance(t *testing.T) {
+// A cluster takes the installation's configuration Secret unless it names one of its own. An explicit name ""
+// leaves the cluster without one rather than inheriting the installation's.
+func TestBackupConfigSecretInheritance(t *testing.T) {
 	cr := &chi.ClickHouseInstallation{}
 	cr.Spec.Backup = &chi.ClusterBackup{
-		Enabled:  types.NewStringBool(true),
-		Storages: []chi.BackupStorage{backupStorage("main", backupStorageSecret)},
+		Enabled:         types.NewStringBool(true),
+		ConfigSecretRef: configSecretRef(backupStorageSecret),
 	}
 	cr.Spec.Configuration = &chi.Configuration{Clusters: []*chi.Cluster{
 		backupCluster("inherits", nil),
-		backupCluster("own", &chi.ClusterBackup{Storages: []chi.BackupStorage{backupStorage("main", "s3-cold")}}),
-		backupCluster("own-without-secret", &chi.ClusterBackup{Storages: []chi.BackupStorage{{Name: "main"}}}),
-		backupCluster("own-named", &chi.ClusterBackup{Storages: []chi.BackupStorage{backupStorage("cold", "s3-cold")}}),
-		backupCluster("names", &chi.ClusterBackup{
-			Storages: []chi.BackupStorage{backupStorage("cold", "s3-cold")},
-			Storage:  types.NewString("main"),
-		}),
-		backupCluster("opts-out", &chi.ClusterBackup{Storage: types.NewString("")}),
+		backupCluster("own", &chi.ClusterBackup{ConfigSecretRef: configSecretRef("s3-cold")}),
+		backupCluster("opts-out", &chi.ClusterBackup{ConfigSecretRef: configSecretRef("")}),
 	}}
 
 	got := normalizeBackupCR(t, cr, backupSecretGetter(t))
 	requireNotAborted(t, got)
-	for cluster, want := range map[string]struct{ storage, secret string }{
-		"inherits":           {"main", backupStorageSecret},
-		"own":                {"main", "s3-cold"},
-		"own-without-secret": {"main", backupStorageSecret},
-		"own-named":          {"cold", "s3-cold"},
-		"names":              {"main", backupStorageSecret},
-		"opts-out":           {"", ""},
+	for cluster, want := range map[string]string{
+		"inherits": backupStorageSecret,
+		"own":      "s3-cold",
+		"opts-out": "",
 	} {
-		backup := findCluster(t, got, cluster).GetBackup()
-		require.Equal(t, want.storage, backup.GetStorageName(), cluster)
-		require.Equal(t, want.secret, backup.GetStorageSecretName(), cluster)
+		require.Equal(t, want, findCluster(t, got, cluster).GetBackup().GetConfigSecretName(), cluster)
 	}
-	require.Equal(t, "cold", findCluster(t, got, "own-named").GetBackup().GetStorage().Value(),
-		"the normalized cluster names the storage it uses")
-	require.Len(t, findCluster(t, got, "own-named").GetBackup().GetStorages(), 2, "the installation's storage is declared there too")
-	require.Len(t, got.Spec.Backup.GetStorages(), 1, "the installation keeps its own storages")
+	require.Equal(t, backupStorageSecret, got.Spec.Backup.GetConfigSecretName(), "the installation keeps its own Secret")
 }
 
-// An installation's own storage wins over the one of a template it uses, which it takes along: the template applies
-// to many installations, each keeping its backups where it says. A storage of the installation that the template
-// declares too takes the Secret it leaves out from the template's.
-func TestBackupStorageOverATemplate(t *testing.T) {
+// An installation's own configuration Secret wins over the one of a template it uses: the template applies to many
+// installations, each keeping its backups where it says.
+func TestBackupConfigSecretOverATemplate(t *testing.T) {
 	tpl := newCHIT("chit-storage", "")
 	tpl.Spec.Backup = &chi.ClusterBackup{
-		Enabled:  types.NewStringBool(true),
-		Storages: []chi.BackupStorage{backupStorage("shared", "s3-shared")},
+		Enabled:         types.NewStringBool(true),
+		ConfigSecretRef: configSecretRef("s3-shared"),
 	}
 	registerCHIT(t, tpl)
 
 	for name, tc := range map[string]struct {
-		backup          *chi.ClusterBackup
-		storage, secret string
+		backup *chi.ClusterBackup
+		secret string
 	}{
-		"an installation of no storage": {storage: "shared", secret: "s3-shared"},
-		"an installation of a storage of its own": {
-			backup:  &chi.ClusterBackup{Storages: []chi.BackupStorage{backupStorage("own", "s3-own")}},
-			storage: "own", secret: "s3-own",
-		},
-		"an installation of the template's storage without a Secret": {
-			backup:  &chi.ClusterBackup{Storages: []chi.BackupStorage{{Name: "shared"}}},
-			storage: "shared", secret: "s3-shared",
-		},
-		"an installation of its own Secret of the template's storage": {
-			backup:  &chi.ClusterBackup{Storages: []chi.BackupStorage{backupStorage("shared", "s3-own")}},
-			storage: "shared", secret: "s3-own",
+		"an installation of no Secret": {secret: "s3-shared"},
+		"an installation of a Secret of its own": {
+			backup: &chi.ClusterBackup{ConfigSecretRef: configSecretRef("s3-own")},
+			secret: "s3-own",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -268,47 +244,8 @@ func TestBackupStorageOverATemplate(t *testing.T) {
 
 			got := normalizeBackupCR(t, cr, backupSecretGetter(t))
 			requireNotAborted(t, got)
-			backup := findCluster(t, got, "c").GetBackup()
-			require.Equal(t, tc.storage, backup.GetStorageName())
-			require.Equal(t, tc.secret, backup.GetStorageSecretName())
-			require.Equal(t, []chi.BackupStorage{backupStorage("shared", "s3-shared")}, tpl.Spec.Backup.Storages,
-				"the template keeps its storage")
-		})
-	}
-}
-
-// A cluster that turns backup on and uses a storage nobody declares aborts the CR before anything is written,
-// rather than turning backup off there: that would remove the sidecars and restart every host over a typo. A
-// cluster that does not turn backup on uses no storage, so nothing is aborted over it.
-func TestBackupStorageUndeclaredAborts(t *testing.T) {
-	for name, tc := range map[string]struct {
-		cluster *chi.ClusterBackup
-		aborts  bool
-	}{
-		"a storage the installation declares": {cluster: &chi.ClusterBackup{Storage: types.NewString("main")}},
-		"a storage nobody declares":           {cluster: &chi.ClusterBackup{Storage: types.NewString("dr")}, aborts: true},
-		"a storage nobody declares, backup off": {
-			cluster: &chi.ClusterBackup{Enabled: types.NewStringBool(false), Storage: types.NewString("dr")},
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			cr := &chi.ClickHouseInstallation{}
-			cr.Spec.Backup = enabledBackup()
-			cr.Spec.Configuration = &chi.Configuration{Clusters: []*chi.Cluster{
-				backupCluster("ok", nil),
-				backupCluster("c", tc.cluster),
-			}}
-
-			got := normalizeBackupCR(t, cr, backupSecretGetter(t))
-			if !tc.aborts {
-				requireNotAborted(t, got)
-				return
-			}
-			require.Equal(t, chi.StatusAborted, got.EnsureStatus().GetStatus())
-			errs := got.EnsureStatus().GetErrors()
-			require.Len(t, errs, 1, errs)
-			require.Equal(t, "["+chi.StatusReasonInvalidBackupStorage+`] backup of cluster "c", its own or inherited: `+
-				`backup.storage "dr" names a storage backup.storages does not declare (declared: "main")`, errs[0])
+			require.Equal(t, tc.secret, findCluster(t, got, "c").GetBackup().GetConfigSecretName())
+			require.Equal(t, "s3-shared", tpl.Spec.Backup.GetConfigSecretName(), "the template keeps its Secret")
 		})
 	}
 }
@@ -442,16 +379,26 @@ func TestBackupUserInjected(t *testing.T) {
 	require.Equal(t, chop.Config().ClickHouse.Config.User.Default.Quota, users.Get(backupUser(userFieldQuota)).String())
 }
 
-// Until the backup Secret exists there is no password to give the user, so it is left out entirely -
-// including whatever the installation set for it, which would otherwise make it a user with the default
-// password and default networks. The operator creates the Secret and normalizes again.
-func TestBackupUserPendingSecret(t *testing.T) {
-	for name, secretGet := range map[string]subst.SecretGetter{
-		"Secret not created yet": missingSecretGetter,
-		"no Secret getter":       nil,
-		"Secret lacks the password": func(namespace, name string) (*core.Secret, error) {
-			return &core.Secret{}, nil
-		},
+// The operator manages a backup user only when the backup Secret sets both its username and its password, which are
+// the user's to set: there is no username of the operator's own. Without them there is no backup user, and a user
+// of any name the CR defines stays the CR's own.
+func TestBackupUserWithoutCredentials(t *testing.T) {
+	for name, tc := range map[string]struct {
+		secretGet subst.SecretGetter
+	}{
+		"Secret not created yet": {secretGet: missingSecretGetter},
+		"no Secret getter":       {},
+		"Secret lacks the username": {secretGet: func(namespace, name string) (*core.Secret, error) {
+			return &core.Secret{Data: map[string][]byte{
+				config.ClickHouseBackupSecretKeyClickHouseUsername: []byte(""),
+				config.ClickHouseBackupSecretKeyClickHousePassword: []byte(backupSecretPassword),
+			}}, nil
+		}},
+		"Secret lacks the password": {secretGet: func(namespace, name string) (*core.Secret, error) {
+			return &core.Secret{Data: map[string][]byte{
+				config.ClickHouseBackupSecretKeyClickHouseUsername: []byte(testBackupUsername),
+			}}, nil
+		}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			cr := &chi.ClickHouseInstallation{}
@@ -462,11 +409,15 @@ func TestBackupUserPendingSecret(t *testing.T) {
 				},
 			}
 
-			got := normalizeBackupCR(t, cr, secretGet)
+			got := normalizeBackupCR(t, cr, tc.secretGet)
 			requireNotAborted(t, got)
 			require.True(t, findCluster(t, got, "c").GetBackup().IsEnabled())
-			requireNoBackupUser(t, got)
 			requireNoBackupEnvVar(t, got)
+			users := got.Spec.Configuration.Users
+			require.False(t, users.Has("/"+userFieldPasswordSHA256Hex), "no user of an empty name")
+			// No username and password both, no backup user: a user of that name is the CR's own
+			require.Equal(t, "backup-profile", users.Get(backupUser(userFieldProfile)).String())
+			require.NotElementsMatch(t, config.ClickHouseBackupUserNetworksIP, users.Get(backupUser(userFieldNetworksIP)).AsVectorOfStrings())
 		})
 	}
 }
@@ -824,7 +775,7 @@ func TestBackupPodTemplate(t *testing.T) {
 	t.Run("a cluster's empty podTemplate over the installation's - the operator's own sidecar", func(t *testing.T) {
 		cr := newCR(&chi.ClusterBackup{PodTemplate: types.NewString("")}, podTemplate(backupTemplate, sidecar))
 		cr.Spec.Backup = enabledOn(backupTemplate)
-		cr.Spec.Backup.Storages = []chi.BackupStorage{backupStorage("main", backupStorageSecret)}
+		cr.Spec.Backup.ConfigSecretRef = configSecretRef(backupStorageSecret)
 		requireSidecars(t, normalizeBackupCR(t, cr, backupSecretGetter(t)), config.DefaultClickHouseBackupDockerImage, "")
 	})
 	t.Run("a cluster's empty podTemplate over the installation's, without a storage - no sidecar", func(t *testing.T) {
@@ -975,13 +926,13 @@ func TestIsBackupEnabled(t *testing.T) {
 		"cluster opts out of the CR": {spec: enabledBackup(), cluster: &chi.ClusterBackup{Enabled: types.NewStringBool(false)}, want: false},
 		"enabled without storage":    {spec: &chi.ClusterBackup{Enabled: types.NewStringBool(true)}, want: false},
 		"storage of the CR, enabled for the cluster": {
-			spec:    &chi.ClusterBackup{Storages: []chi.BackupStorage{backupStorage("main", backupStorageSecret)}},
+			spec:    &chi.ClusterBackup{ConfigSecretRef: configSecretRef(backupStorageSecret)},
 			cluster: &chi.ClusterBackup{Enabled: types.NewStringBool(true)},
 			want:    true,
 		},
 		"cluster drops the storage of the CR": {
 			spec:    enabledBackup(),
-			cluster: &chi.ClusterBackup{Storage: types.NewString("")},
+			cluster: &chi.ClusterBackup{ConfigSecretRef: configSecretRef("")},
 			want:    false,
 		},
 	} {
@@ -1061,3 +1012,68 @@ func TestBackupContainerValidation(t *testing.T) {
 	requireNotAborted(t, normalizeBackupCR(t, newCR(true, container(config.ClickHouseBackupContainerName, "")), backupSecretGetter(t)))
 	requireNotAborted(t, normalizeBackupCR(t, newCR(true, clickHousePod, container(config.ClickHouseBackupContainerName, "")), backupSecretGetter(t)))
 }
+
+// The backup Secret names the backup user: the operator creates the user of that name, from the pod only, and a user
+// of the default name is then the installation's own, with the default networks of any user
+func TestBackupUserNamedBySecret(t *testing.T) {
+	const named = "backup.operator-1"
+	cr := &chi.ClickHouseInstallation{}
+	cr.Spec.Configuration = &chi.Configuration{
+		Users: users(
+			named+"/"+userFieldNetworksIP, "::/0",
+			named+"/"+userFieldProfile, "backup-profile",
+			backupUser(userFieldPassword), "chosen-by-user",
+			"reader/"+userFieldPassword, "chosen-by-user",
+		),
+		Clusters: []*chi.Cluster{backupCluster("c", enabledBackup())},
+	}
+
+	got := normalizeBackupCR(t, cr, func(namespace, name string) (*core.Secret, error) {
+		return &core.Secret{Data: map[string][]byte{
+			config.ClickHouseBackupSecretKeyClickHouseUsername: []byte(named),
+			config.ClickHouseBackupSecretKeyClickHousePassword: []byte(backupSecretPassword),
+		}}, nil
+	})
+	requireNotAborted(t, got)
+	users := got.Spec.Configuration.Users
+	hash := sha256.Sum256([]byte(backupSecretPassword))
+	require.Equal(t, hex.EncodeToString(hash[:]), users.Get(named+"/"+userFieldPasswordSHA256Hex).String())
+	require.ElementsMatch(t, config.ClickHouseBackupUserNetworksIP, users.Get(named+"/"+userFieldNetworksIP).AsVectorOfStrings())
+	require.False(t, users.Has(named+"/"+userFieldNetworksHostRegexp))
+	require.Equal(t, "backup-profile", users.Get(named+"/"+userFieldProfile).String())
+	require.NotEqual(t, hex.EncodeToString(hash[:]), users.Get(backupUser(userFieldPasswordSHA256Hex)).String())
+	require.True(t, users.Has("reader/"+userFieldNetworksIP), "fixture: an ordinary user gets default networks")
+	for _, field := range []string{userFieldNetworksIP, userFieldNetworksHostRegexp} {
+		require.Equal(t, users.Get("reader/"+field), users.Get(backupUser(field)), "a user of the default name is the installation's own: %s", field)
+	}
+}
+
+// A backup Secret naming a user the backup user cannot be aborts the CR, rather than take over the default user or
+// the operator's own, or break the users configuration
+func TestBackupUserNamedInvalidly(t *testing.T) {
+	for name, username := range map[string]string{
+		"default user":  "default",
+		"operator user": chop.Config().ClickHouse.Access.Username,
+		"invalid name":  "backup user",
+		"leading digit": "1backup",
+		"path":          "backup/password",
+	} {
+		t.Run(name, func(t *testing.T) {
+			cr := &chi.ClickHouseInstallation{}
+			cr.Spec.Configuration = &chi.Configuration{Clusters: []*chi.Cluster{backupCluster("c", enabledBackup())}}
+			got := normalizeBackupCR(t, cr, func(namespace, name string) (*core.Secret, error) {
+				return &core.Secret{Data: map[string][]byte{
+					config.ClickHouseBackupSecretKeyClickHouseUsername: []byte(username),
+					config.ClickHouseBackupSecretKeyClickHousePassword: []byte(backupSecretPassword),
+				}}, nil
+			})
+			status := got.EnsureStatus()
+			require.Equal(t, chi.StatusAborted, status.GetStatus())
+			require.True(t, strings.HasPrefix(status.GetErrors()[0], "["+chi.StatusReasonBackupSecretUnresolved+"] "), status.GetErrors()[0])
+			require.Contains(t, status.GetErrors()[0], config.ClickHouseBackupSecretKeyClickHouseUsername)
+		})
+	}
+}
+
+// testBackupUsername is the ClickHouse username the backup Secrets of the tests set: the operator has none of its own
+const testBackupUsername = "backup_user"

@@ -164,7 +164,7 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstal
 	case gatePasswordSecretChanged:
 		w.a.M(new).F().Info("Referenced password Secret changed - continue reconcile to refresh users configuration")
 	case gateBackupSecretChanged:
-		w.a.M(new).F().Info("Backup Secret created or completed - continue reconcile to give the backup user its new password")
+		w.a.M(new).F().Info("Backup Secret created or completed - continue reconcile to give the sidecars its new REST API credentials")
 	case gateStuckHostRecovery:
 		w.a.M(new).F().Info("CR has a sustained-NotReady host - continue reconcile for stuck-host recovery")
 	case gateUnhealthyHosts:
@@ -275,7 +275,7 @@ func (w *worker) buildCR(ctx context.Context, _cr *api.ClickHouseInstallation) *
 	actionPlan := api.MakeActionPlan(cr.GetAncestorT(), cr)
 	cr.EnsureRuntime().ActionPlan = actionPlan
 	cr.EnsureStatus().SetActionPlan(actionPlan)
-	w.a.V(1).M(cr).Info(actionPlan.Log("buildCR"))
+	w.a.V(1).M(cr).Info("%s", actionPlan.Log("buildCR"))
 
 	return cr
 }
@@ -418,9 +418,13 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.C
 
 func (w *worker) reconcileCRAuxObjectsPreliminaryDomain(ctx context.Context, cr *api.ClickHouseInstallation) error {
 	w.warnBackupWithoutStorage(cr)
-	w.warnMissingStorageSecrets(ctx, cr)
 	w.warnUnpublishedBackupAPI(cr)
-	return w.reconcileBackupSecret(ctx, cr)
+	if err := w.reconcileBackupSecret(ctx, cr); err != nil {
+		return err
+	}
+	w.warnIncompleteBackupCredentials(ctx, cr)
+	// The configuration files take the credentials of the backup Secret
+	return w.reconcileBackupConfigSecrets(ctx, cr)
 }
 
 // reconcileCRServicePreliminary runs first stage of CR reconcile process
@@ -1450,6 +1454,9 @@ func (w *worker) reconcileHostTables(ctx context.Context, host *api.Host, opts *
 			return err
 		}
 		version = v
+		// A new host whose image tag carries no version gets MinVersion from findMinMaxVersions.
+		// The schemer is built from host.Runtime.Version, so hand it the version the host just reported.
+		host.Runtime.Version = v
 		w.a.V(1).
 			M(host).F().
 			Info("Check host for ClickHouse availability. Host: %s ClickHouse version available: %s", host.GetName(), version)

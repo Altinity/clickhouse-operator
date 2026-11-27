@@ -110,25 +110,20 @@ const (
 	// in both the ClickHouse container and the sidecar of a host that has no volume there
 	ClickHouseBackupSharedDataVolumeName = "clickhouse-backup-shared-data"
 
-	// ClickHouseBackupCredentialsVolumeName and ClickHouseBackupStorageVolumeName specify names of the volumes of
-	// the backup Secret and of the storage Secret, which the sidecar alone mounts at DirPathClickHouseBackupCredentials
-	// and DirPathClickHouseBackupStorage. kubelet keeps their files up to date, and the sidecar's liveness probe
-	// compares them with the env vars the sidecar started with.
-	ClickHouseBackupCredentialsVolumeName = "clickhouse-backup-credentials"
-	ClickHouseBackupStorageVolumeName     = "clickhouse-backup-storage"
-	DirPathClickHouseBackupCredentials    = "/var/run/secrets/clickhouse-backup/credentials"
-	DirPathClickHouseBackupStorage        = "/var/run/secrets/clickhouse-backup/storage"
+	// ClickHouseBackupConfigVolumeName specifies name of the volume of the generated backup configuration Secret,
+	// which the sidecar alone mounts at DirPathClickHouseBackupConfig. kubelet keeps the file up to date, and
+	// clickhouse-backup reads it anew for every operation, so a change reaches the sidecar without a restart.
+	ClickHouseBackupConfigVolumeName = "clickhouse-backup-config"
 
 	// DirPathClickHouseBackupConfig is where clickhouse-backup reads its configuration file from, unless
 	// ClickHouseBackupEnvConfig names another one
 	DirPathClickHouseBackupConfig = "/etc/clickhouse-backup"
 
-	// ClickHouseBackupUsername specifies the ClickHouse user the sidecar connects as. It is reachable
-	// from localhost only, so nothing outside the pod can use it.
-	ClickHouseBackupUsername = "clickhouse_backup"
-
 	// Keys of the operator-generated backup Secret. They are named after the clickhouse-backup
-	// environment variables they feed, so the sidecar can take the Secret as-is.
+	// environment variables they stand for: the backup Jobs take the REST API credentials from them as env vars,
+	// and the generated configuration file of the sidecar takes all of them. The operator generates the REST API
+	// credentials only: the ClickHouse ones are set by the user, or not at all, leaving clickhouse-backup with its
+	// own defaults.
 	ClickHouseBackupSecretKeyAPIUsername        = "API_USERNAME"
 	ClickHouseBackupSecretKeyAPIPassword        = "API_PASSWORD"
 	ClickHouseBackupSecretKeyClickHouseUsername = "CLICKHOUSE_USERNAME"
@@ -181,7 +176,7 @@ const (
 	ClickHouseBackupAPIListenHost = "0.0.0.0"
 )
 
-// ClickHouseBackupUserNetworksIP lists the only addresses ClickHouseBackupUsername may connect from - the pod's loopback
+// ClickHouseBackupUserNetworksIP lists the only addresses the backup user may connect from - the pod's loopback
 var ClickHouseBackupUserNetworksIP = []string{"::1", "127.0.0.1"}
 
 const (

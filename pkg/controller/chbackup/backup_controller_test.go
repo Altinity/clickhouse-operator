@@ -200,7 +200,7 @@ func TestBackupCreatesItsJob(t *testing.T) {
 	got := f.backup("b1")
 	require.Equal(t, api.OperationPhaseRunning, got.Status.Phase)
 	require.Equal(t, "b1-main-backup", got.Status.Clusters[0].JobName)
-	require.Equal(t, testStorage, got.Status.Clusters[0].Storage, "the storage the Job keeps the backup in")
+	require.Equal(t, testStorageSecret, got.Status.Clusters[0].ConfigSecret, "the Secret of the storage the Job keeps the backup in")
 	require.Equal(t, model.ResolveBackupName(got), got.Status.BackupName)
 	require.NotNil(t, got.Status.StartTime)
 	require.Equal(t, meta.ConditionTrue, condition(t, got.Status.Conditions, api.BackupConditionValidated).Status)
@@ -210,7 +210,7 @@ func TestBackupCreatesItsJob(t *testing.T) {
 	job := &batch.Job{}
 	require.NoError(t, f.client.Get(context.Background(), key("b1-main-backup"), job))
 	require.True(t, meta.IsControlledBy(job, got))
-	require.Equal(t, model.Labels(api.ClickHouseBackupCRDResourceKind, "b1", testCHI, "main", testStorage), job.Labels)
+	require.Equal(t, model.Labels(api.ClickHouseBackupCRDResourceKind, "b1", testCHI, "main"), job.Labels)
 	require.Contains(t, envValues(job.Spec.Template.Spec), "chi-demo-main-0-0 chi-demo-main-1-0", "hosts come from the normalized installation")
 }
 
@@ -452,7 +452,7 @@ func TestBackupAsksThePodsBeforeStoppingAJob(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			other := jobOwnedBy(t, "other-job", newBackupCR("other"), model.Labels(api.ClickHouseBackupCRDResourceKind, "other", "another-chi", "main", testStorage))
+			other := jobOwnedBy(t, "other-job", newBackupCR("other"), model.Labels(api.ClickHouseBackupCRDResourceKind, "other", "another-chi", "main"))
 			f := newBackupFixture(t, newFakeCR(readyInstallation(t)), nil, newBackupCR("b1"), other)
 			f.reconcile("b1")
 			job := &batch.Job{}
@@ -500,7 +500,7 @@ func TestBackupNeverStopsAJobWhosePodJustStarted(t *testing.T) {
 // keeps every other operation on the installation waiting until it is stopped.
 func TestBackupWaitsForAJobNotStoppedYet(t *testing.T) {
 	owner := newRestoreCR("other")
-	pending := jobOwnedBy(t, "other-job", owner, model.Labels(api.ClickHouseRestoreCRDResourceKind, "other", testCHI, "main", testStorage))
+	pending := jobOwnedBy(t, "other-job", owner, model.Labels(api.ClickHouseRestoreCRDResourceKind, "other", testCHI, "main"))
 	f := newBackupFixture(t, newFakeCR(readyInstallation(t)), nil, newBackupCR("b1"), pending)
 	stallJob(t, f.client, "other-job", neverStarted)
 
@@ -522,7 +522,7 @@ func TestBackupReportsAStoppedJobAsNotStarted(t *testing.T) {
 	chb := newBackupCR("b1")
 	chb.Status.Phase = api.OperationPhaseRunning
 	chb.Status.Clusters = runningOn("b1-main-backup")
-	job := jobOwnedBy(t, "b1-main-backup", chb, model.Labels(api.ClickHouseBackupCRDResourceKind, "b1", testCHI, "main", testStorage))
+	job := jobOwnedBy(t, "b1-main-backup", chb, model.Labels(api.ClickHouseBackupCRDResourceKind, "b1", testCHI, "main"))
 	job.Annotations = map[string]string{model.AnnotationJobNotStarted: jobStartTimeout.String()}
 	job.Status.Conditions = []batch.JobCondition{{Type: batch.JobFailed, Status: core.ConditionTrue, Reason: batch.JobReasonDeadlineExceeded}}
 	f := newBackupFixture(t, newFakeCR(readyInstallation(t)), nil, chb, job)
@@ -550,7 +550,7 @@ func TestBackupReportsALostJob(t *testing.T) {
 func TestBackupNeverAdoptsAStaleJob(t *testing.T) {
 	predecessor := newBackupCR("b1")
 	predecessor.UID = "predecessor-uid"
-	stale := jobOwnedBy(t, "b1-main-backup", predecessor, model.Labels(api.ClickHouseBackupCRDResourceKind, "b1", testCHI, "main", testStorage))
+	stale := jobOwnedBy(t, "b1-main-backup", predecessor, model.Labels(api.ClickHouseBackupCRDResourceKind, "b1", testCHI, "main"))
 	f := newBackupFixture(t, newFakeCR(readyInstallation(t)), nil, newBackupCR("b1"), stale)
 
 	require.NotZero(t, f.reconcile("b1").RequeueAfter)
@@ -577,7 +577,7 @@ func TestBackupWaitsForAnotherOperationOnTheInstallation(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			owner := newRestoreCR("other")
-			running := jobOwnedBy(t, "other-job", owner, model.Labels(kind, "other", testCHI, "main", testStorage))
+			running := jobOwnedBy(t, "other-job", owner, model.Labels(kind, "other", testCHI, "main"))
 			f := newBackupFixture(t, newFakeCR(readyInstallation(t)), nil, newBackupCR("b1"), running)
 
 			require.NotZero(t, f.reconcile("b1").RequeueAfter)
@@ -592,7 +592,7 @@ func TestBackupWaitsForAnotherOperationOnTheInstallation(t *testing.T) {
 		})
 	}
 
-	otherCHI := jobOwnedBy(t, "other-job", newRestoreCR("other"), model.Labels(api.ClickHouseRestoreCRDResourceKind, "other", "another-chi", "main", testStorage))
+	otherCHI := jobOwnedBy(t, "other-job", newRestoreCR("other"), model.Labels(api.ClickHouseRestoreCRDResourceKind, "other", "another-chi", "main"))
 	f := newBackupFixture(t, newFakeCR(readyInstallation(t)), nil, newBackupCR("b1"), otherCHI)
 	f.reconcile("b1")
 	require.Equal(t, api.OperationPhaseRunning, f.backup("b1").Status.Phase, "operations on other installations do not interfere")
@@ -706,7 +706,7 @@ func TestBackupConfirmsAnAbsenceAgainstTheAPIServer(t *testing.T) {
 	chb := newBackupCR("b1")
 	chb.Status.Phase = api.OperationPhaseRunning
 	chb.Status.Clusters = runningOn("b1-main-backup")
-	job := jobOwnedBy(t, "b1-main-backup", chb, model.Labels(api.ClickHouseBackupCRDResourceKind, "b1", testCHI, "main", testStorage))
+	job := jobOwnedBy(t, "b1-main-backup", chb, model.Labels(api.ClickHouseBackupCRDResourceKind, "b1", testCHI, "main"))
 
 	live := newClient(t, nil, chb, job)
 	lagging := newClient(t, nil, chb)
@@ -857,7 +857,7 @@ func TestBackupRunsAJobPerCluster(t *testing.T) {
 		require.NotNil(t, cluster.StartTime)
 		job := &batch.Job{}
 		require.NoError(t, f.client.Get(context.Background(), key(tc.job), job))
-		require.Equal(t, model.Labels(api.ClickHouseBackupCRDResourceKind, "b1", testCHI, tc.cluster, testStorage), job.Labels)
+		require.Equal(t, model.Labels(api.ClickHouseBackupCRDResourceKind, "b1", testCHI, tc.cluster), job.Labels)
 		require.Equal(t, got.Status.BackupName, jobEnv(t, f.client, tc.job, "BACKUP_NAME"), "every cluster makes the one backup")
 		require.Equal(t, strings.Join(tc.hosts, " "), jobEnv(t, f.client, tc.job, "BACKUP_HOSTS"))
 	}

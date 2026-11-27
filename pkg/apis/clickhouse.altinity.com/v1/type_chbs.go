@@ -181,8 +181,10 @@ type ScheduleClusterStatus struct {
 	Name string `json:"name" yaml:"name"`
 	// CronJobName is the name of the CronJob that runs the schedule on the cluster.
 	CronJobName string `json:"cronJobName,omitempty" yaml:"cronJobName,omitempty"`
-	// Storage is the storage the runs of the cluster keep their backups in, as its CronJob was last built.
-	Storage string `json:"storage,omitempty" yaml:"storage,omitempty"`
+	// ConfigSecret is the Secret of the clickhouse-backup configuration the runs of the cluster keep their backups by,
+	// as its CronJob was last built: for a cluster that lost its CronJob, it tells the storage its unpruned backups
+	// lie in.
+	ConfigSecret string `json:"configSecret,omitempty" yaml:"configSecret,omitempty"`
 	// LastScheduleTime is the last time a backup job was scheduled on the cluster.
 	LastScheduleTime *meta.Time `json:"lastScheduleTime,omitempty" yaml:"lastScheduleTime,omitempty"`
 	// LastSuccessfulTime is the last time a scheduled backup job of the cluster completed successfully.

@@ -15,9 +15,6 @@
 package v1
 
 import (
-	"errors"
-	"slices"
-
 	core "k8s.io/api/core/v1"
 
 	clickhouse_altinity_com "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
@@ -34,18 +31,10 @@ const (
 )
 
 // BackupStorageHint tells how to settle the backup of a cluster that turns it on without a storage,
-// which leaves it off: name a storage, or turn backup off there, which a cluster may inherit unasked.
-const BackupStorageHint = "declare a storage in backup.storages with the Secret of its settings in secretRef, " +
+// which leaves it off: name the Secret of the sidecar configuration, or turn backup off there, which a cluster may
+// inherit unasked.
+const BackupStorageHint = "name the Secret of the clickhouse-backup configuration in backup.configSecretRef, " +
 	"or name the pod template of the sidecar in backup.podTemplate, or set backup.enabled to \"no\""
-
-// Errors of a backup storage that cannot be resolved. Their texts complete "backup.storage ...".
-var (
-	// ErrBackupStorageNotFound is returned when backup.storage names a storage backup.storages does not declare.
-	ErrBackupStorageNotFound = errors.New("names a storage backup.storages does not declare")
-	// ErrBackupStorageNotChosen is returned when backup.storage is left out while backup.storages declares several
-	// storages.
-	ErrBackupStorageNotChosen = errors.New("is left out while backup.storages declares several storages")
-)
 
 // BackupAnnotations lists the annotations that record operator-managed recovery. They describe the
 // installation, not its pods, so they must never be copied into pod templates: a change there would
@@ -60,36 +49,23 @@ var BackupAnnotations = []string{
 type ClusterBackup struct {
 	// Enabled turns operator-managed backup on for the cluster: the operator injects the
 	// clickhouse-backup sidecar into its pods and backup/restore resources may target it. It takes
-	// effect only with a storage whose Secret holds its settings, or with PodTemplate, see IsEnabled.
+	// effect only with ConfigSecretRef, or with PodTemplate, see IsEnabled.
 	Enabled *types.StringBool `json:"enabled,omitempty"                yaml:"enabled,omitempty"`
 	// PodTemplate names the pod template whose clickhouse-backup container the sidecar is built on: what the
 	// container sets is kept, and only what it lacks is filled in. Only that container is taken, not the other
 	// containers, volumes or pod settings of the template. Empty, the operator builds the sidecar on its own.
 	PodTemplate *types.String `json:"podTemplate,omitempty"            yaml:"podTemplate,omitempty"`
-	// Storages declares the storages the backups may be kept in, each under a name of its own. A cluster takes
-	// those of the installation along with its own, pairing them by name: a storage of its own that the
-	// installation declares too takes what it leaves out from the installation's. Templates contribute theirs
-	// alike.
-	Storages []BackupStorage `json:"storages,omitempty"               yaml:"storages,omitempty"`
-	// Storage names the storage of Storages the sidecar keeps the backups in. Left out, it is the only storage
-	// the same level declares, or else the one the level a cluster inherits from uses. It must be given where a
-	// level declares several. An explicit "" on a cluster leaves the cluster without a storage.
-	Storage *types.String `json:"storage,omitempty"                yaml:"storage,omitempty"`
+	// ConfigSecretRef names a Secret in the installation's namespace whose key config.yml holds the clickhouse-backup
+	// configuration of the sidecar, a YAML mapping of its sections, e.g. general.remote_storage, s3.bucket,
+	// s3.access_key. The operator generates the configuration file of the sidecar from it, which follows a change of
+	// the Secret without a restart. A cluster that leaves it out takes the installation's, an installation a
+	// template's; an explicit name "" on a cluster leaves the cluster without one. Without one, the storage is
+	// configured by the clickhouse-backup container of the pod template PodTemplate names.
+	ConfigSecretRef *core.LocalObjectReference `json:"configSecretRef,omitempty" yaml:"configSecretRef,omitempty"`
 	// Recovery names the backup a new installation restores the cluster from once it has
 	// completed its first reconcile. It configures the operator, not the sidecar: it never changes a
 	// pod. It is never taken from a ClickHouseInstallationTemplate.
 	Recovery *BackupRecovery `json:"recovery,omitempty"               yaml:"recovery,omitempty"`
-}
-
-// BackupStorage is a storage backups are kept in.
-type BackupStorage struct {
-	// Name identifies the storage: backup.storage names it.
-	Name string `json:"name" yaml:"name"`
-	// SecretRef names a Secret in the installation's namespace whose keys are passed to the sidecar as environment
-	// variables, e.g. REMOTE_STORAGE, S3_BUCKET, S3_ACCESS_KEY. Without one, of its own or of the storage of the
-	// same name it pairs with, the storage is configured by the clickhouse-backup container of the pod template
-	// backup.podTemplate names.
-	SecretRef *core.LocalObjectReference `json:"secretRef,omitempty" yaml:"secretRef,omitempty"`
 }
 
 // BackupRecovery names the backup a cluster is recovered from.
@@ -175,11 +151,11 @@ func (b *ClusterBackup) LacksStorage() bool {
 }
 
 // namesStorageSettings reports whether the backup names a source of the storage settings of its sidecar: the
-// Secret of its storage, or the pod template whose container the sidecar is built on. Without either, the sidecar
+// Secret of its configuration, or the pod template whose container the sidecar is built on. Without either, the sidecar
 // runs the bundled image, which carries no configuration file, on the operator's environment alone, which sets
 // no storage: clickhouse-backup takes none then, and refuses every upload and download.
 func (b *ClusterBackup) namesStorageSettings() bool {
-	return (b.GetStorageSecretName() != "") || (b.GetPodTemplate().Value() != "")
+	return (b.GetConfigSecretName() != "") || (b.GetPodTemplate().Value() != "")
 }
 
 // GetPodTemplate returns the name of the pod template the sidecar is built on, nil-safe.
@@ -190,94 +166,12 @@ func (b *ClusterBackup) GetPodTemplate() *types.String {
 	return b.PodTemplate
 }
 
-// GetStorages returns the storages the backup declares, nil-safe.
-func (b *ClusterBackup) GetStorages() []BackupStorage {
-	if b == nil {
-		return nil
-	}
-	return b.Storages
-}
-
-// GetStorage returns the name of the storage the backup uses as the spec gives it, nil-safe: see ResolveStorage.
-func (b *ClusterBackup) GetStorage() *types.String {
-	if b == nil {
-		return nil
-	}
-	return b.Storage
-}
-
-// chosenStorage returns the name of the storage one level of the spec uses: the one it names, or else the only one
-// it declares; nil when it tells none.
-func (b *ClusterBackup) chosenStorage() *types.String {
-	if storage := b.GetStorage(); storage.HasValue() {
-		return storage
-	}
-	if storages := b.GetStorages(); len(storages) == 1 {
-		return types.NewString(storages[0].Name)
-	}
-	return nil
-}
-
-// ResolveStorage returns the storage the sidecar keeps the backups in, nil-safe: the one the backup names, or
-// else the only one it declares; nil when it names "" or declares none. It fails when the backup names a storage it
-// does not declare, or declares several without naming one.
-func (b *ClusterBackup) ResolveStorage() (*BackupStorage, error) {
-	storages := b.GetStorages()
-	storage := b.chosenStorage()
-	switch {
-	case !storage.HasValue() && (len(storages) > 1):
-		return nil, ErrBackupStorageNotChosen
-	case storage.Value() == "":
-		return nil, nil
-	}
-	index := slices.IndexFunc(storages, func(s BackupStorage) bool { return s.Name == storage.Value() })
-	if index < 0 {
-		return nil, ErrBackupStorageNotFound
-	}
-	return &storages[index], nil
-}
-
-// GetStorageName returns the name of the storage the sidecar keeps the backups in, nil-safe: "" for none, or for a
-// storage that cannot be resolved, see ResolveStorage.
-func (b *ClusterBackup) GetStorageName() string {
-	storage, _ := b.ResolveStorage()
-	return storage.GetName()
-}
-
-// GetStorageSecretName returns the name of the Secret of the storage the sidecar keeps the backups in, nil-safe: ""
-// for none, or for a storage that cannot be resolved, see ResolveStorage.
-func (b *ClusterBackup) GetStorageSecretName() string {
-	storage, _ := b.ResolveStorage()
-	return storage.GetSecretName()
-}
-
-// GetName returns the name of the storage, nil-safe.
-func (s *BackupStorage) GetName() string {
-	if s == nil {
+// GetConfigSecretName returns the name of the Secret of the sidecar configuration, "" when there is none, nil-safe.
+func (b *ClusterBackup) GetConfigSecretName() string {
+	if (b == nil) || (b.ConfigSecretRef == nil) {
 		return ""
 	}
-	return s.Name
-}
-
-// GetSecretName returns the name of the Secret of the storage, "" when there is none, nil-safe.
-func (s *BackupStorage) GetSecretName() string {
-	if (s == nil) || (s.SecretRef == nil) {
-		return ""
-	}
-	return s.SecretRef.Name
-}
-
-// MergeFrom merges from the specified storage of the same name, filling empty fields or overriding with non-empty
-// ones according to _type.
-func (s *BackupStorage) MergeFrom(from *BackupStorage, _type MergeType) *BackupStorage {
-	if from == nil {
-		return s
-	}
-	if s == nil {
-		s = &BackupStorage{Name: from.Name}
-	}
-	s.SecretRef = MergePointer(s.SecretRef, from.SecretRef, _type)
-	return s
+	return b.ConfigSecretRef.Name
 }
 
 // GetRecovery returns the recovery of the cluster, nil-safe.
@@ -328,9 +222,7 @@ func (r *BackupRecovery) MergeFrom(from *BackupRecovery, _type MergeType) *Backu
 }
 
 // MergeFrom merges from the specified backup block, filling empty fields or overriding
-// with non-empty ones according to _type. Storages pair by name. The storage each block uses is taken as that block
-// tells it, its only storage when it names none, so that the storage of a block wins over the one of the block it
-// takes others from: the storage a cluster declares over the installation's, an installation's over a template's.
+// with non-empty ones according to _type.
 func (b *ClusterBackup) MergeFrom(from *ClusterBackup, _type MergeType) *ClusterBackup {
 	if from == nil {
 		return b
@@ -341,10 +233,9 @@ func (b *ClusterBackup) MergeFrom(from *ClusterBackup, _type MergeType) *Cluster
 
 	b.Enabled = MergeScalar(b.Enabled, from.Enabled, _type)
 	b.PodTemplate = MergeScalar(b.PodTemplate, from.PodTemplate, _type)
-	b.Storage = MergeScalar(b.chosenStorage(), from.chosenStorage(), _type)
-	// The storages are merged into a clone: they may be those of a cached template or of the installation level,
-	// which other clusters read
-	b.Storages = mergeByName(slices.Clone(b.Storages), from.Storages, _type)
+	// The reference is copied: it may be that of a cached template or of the installation level, which other
+	// clusters read
+	b.ConfigSecretRef = MergePointer(b.ConfigSecretRef, from.ConfigSecretRef.DeepCopy(), _type)
 	b.Recovery = b.Recovery.MergeFrom(from.Recovery, _type)
 
 	return b

@@ -114,7 +114,7 @@ func TestBackupFailsPastItsStartingDeadlineBeforeItIsValidated(t *testing.T) {
 func TestBackupFailsOnAClusterPastItsStartingDeadline(t *testing.T) {
 	chb := newBackupCreated("b1")
 	chb.Spec.StartingDeadlineSeconds = ptr.To(int64(60))
-	running := jobOwnedBy(t, "other-job", newRestoreCR("other"), model.Labels(api.ClickHouseRestoreCRDResourceKind, "other", testCHI, "main", testStorage))
+	running := jobOwnedBy(t, "other-job", newRestoreCR("other"), model.Labels(api.ClickHouseRestoreCRDResourceKind, "other", testCHI, "main"))
 	f := newBackupFixture(t, newFakeCR(readyInstallation(t)), nil, chb, running)
 	clock := f.at(backupCreated.Add(50 * time.Second))
 
@@ -163,7 +163,7 @@ func TestBackupRunsASchedule(t *testing.T) {
 	job := &batch.Job{}
 	require.NoError(t, f.client.Get(context.Background(), key("pre-upgrade-main-backup"), job))
 	require.Contains(t, envValues(job.Spec.Template.Spec), "db.*")
-	require.Equal(t, model.Labels(api.ClickHouseBackupCRDResourceKind, "pre-upgrade", testCHI, "main", testStorage), job.Labels)
+	require.Equal(t, model.Labels(api.ClickHouseBackupCRDResourceKind, "pre-upgrade", testCHI, "main"), job.Labels)
 
 	edited := &api.ClickHouseBackupSchedule{}
 	require.NoError(t, f.client.Get(context.Background(), key("nightly"), edited))

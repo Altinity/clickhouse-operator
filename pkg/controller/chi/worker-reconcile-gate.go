@@ -31,9 +31,9 @@ const (
 	// spec did not, so generation is unchanged, but the managed users Secret must
 	// be regenerated. The Pod template does not include the Secret's contents.
 	gatePasswordSecretChanged reconcileGateDecision = "PasswordSecretChanged"
-	// gateBackupSecretChanged: this pass created the backup Secret or filled in its missing keys,
-	// with new random values. The sidecars restart with them, so the backup user's password in the
-	// users config must follow, or the sidecars are locked out of ClickHouse.
+	// gateBackupSecretChanged: this pass created the backup Secret or filled in its missing REST API keys, with new
+	// random values. The configuration files of the sidecars must take them, or the backup Jobs, which read them from
+	// the Secret, are refused by the sidecars.
 	gateBackupSecretChanged reconcileGateDecision = "BackupSecretChanged"
 	// gateStuckHostRecovery: a host has been sustained-NotReady past its threshold.
 	gateStuckHostRecovery reconcileGateDecision = "StuckHostRecovery"

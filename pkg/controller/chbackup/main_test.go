@@ -102,7 +102,6 @@ const (
 	// which their backup stays off
 	testStorageSecret = "s3-credentials"
 	// testStorage is the backup storage of the test installation, whose Secret is testStorageSecret
-	testStorage = "main"
 )
 
 func backupCluster(name string, shards int, enabled bool) *api.Cluster {
@@ -110,8 +109,8 @@ func backupCluster(name string, shards int, enabled bool) *api.Cluster {
 		Name:   name,
 		Layout: &api.ChiClusterLayout{ShardsCount: shards, ReplicasCount: 2},
 		Backup: &api.ClusterBackup{
-			Enabled:  types.NewStringBool(enabled),
-			Storages: []api.BackupStorage{{Name: testStorage, SecretRef: &core.LocalObjectReference{Name: testStorageSecret}}},
+			Enabled:         types.NewStringBool(enabled),
+			ConfigSecretRef: &core.LocalObjectReference{Name: testStorageSecret},
 		},
 	}
 }
@@ -119,7 +118,7 @@ func backupCluster(name string, shards int, enabled bool) *api.Cluster {
 // lackingCluster is a cluster that turns backup on without a storage, which leaves its backup off.
 func lackingCluster(name string, shards int) *api.Cluster {
 	cluster := backupCluster(name, shards, true)
-	cluster.Backup.Storages = nil
+	cluster.Backup.ConfigSecretRef = nil
 	return cluster
 }
 

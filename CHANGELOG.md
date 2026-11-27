@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* **EXPERIMENTAL: Operator-managed backup and restore.** Added `ClickHouseBackup`, `ClickHouseBackupSchedule`, and `ClickHouseRestore` resources using `clickhouse-backup`. Supports per-cluster backups and restores, scheduled backups, retention, configurable storage paths, and cross-installation restores. Enable with `spec.backup.enabled: "yes"`. See [backup documentation](docs/backup.md). by [@discostur](https://github.com/discostur) and [@sunsingerus](https://github.com/sunsingerus) in [#2015](https://github.com/Altinity/clickhouse-operator/pull/2015). Related [#1795](https://github.com/Altinity/clickhouse-operator/issues/1795), [#862](https://github.com/Altinity/clickhouse-operator/issues/862)
+* **EXPERIMENTAL: Operator-managed backup and restore.** Added `ClickHouseBackup`, `ClickHouseBackupSchedule`, and `ClickHouseRestore` resources using `clickhouse-backup`. Supports per-cluster backups and restores, scheduled backups, retention, configurable storage paths, and cross-installation restores. Enable with `spec.backup.enabled: "yes"` and configure storage using `backup.configSecretRef`, referencing a Kubernetes Secret containing `config.yml`. Storage configuration changes can be applied without restarting backup sidecars. See [backup documentation](docs/backup.md). by [@discostur](https://github.com/discostur), [@sunsingerus](https://github.com/sunsingerus), and [@Slach](https://github.com/Slach) in [#2015](https://github.com/Altinity/clickhouse-operator/pull/2015) and [#2118](https://github.com/Altinity/clickhouse-operator/pull/2118). Related [#1795](https://github.com/Altinity/clickhouse-operator/issues/1795), [#862](https://github.com/Altinity/clickhouse-operator/issues/862)
 
 * **Hot-reload ClickHouse user passwords from Kubernetes Secrets.** Set `valueFrom.hotReload: true` on `password`, `password_sha256_hex`, or `password_double_sha1_hex` to rotate credentials without restarting Pods. Enabling requires a one-time rollout; automatic Secret-change detection applies to references declared directly in the CHI. See [documentation](docs/security_hardening.md#rotating-user-passwords-without-pod-restarts).
 
@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * **Volume downscale tool now supports StorageClass migration.** Set `NEW_STORAGE_CLASS` in `tools/volume_downscale.sh` to move a volume to another StorageClass at the same or a smaller size; the script also detects repeated volume attachment and mount failures. See [runbook](tools/volume_downscale.md). by [@lesandie](https://github.com/lesandie) in [#2125](https://github.com/Altinity/clickhouse-operator/pull/2125)
 
 * **Operator and metrics-exporter logging verbosity can now be configured independently.** Set `operator.logVerbosity` and `metrics.logVerbosity` in Helm, or use per-container `CHOP_LOGGER_*` environment variables to override shared logging settings. See [logging documentation](docs/operator_configuration.md#logging). by [@Slach](https://github.com/Slach) in [#2131](https://github.com/Altinity/clickhouse-operator/pull/2131). Fixes [#1793](https://github.com/Altinity/clickhouse-operator/issues/1793)
+
+* **Kubernetes API client QPS and burst can be set in the operator configuration** as `reconcile.runtime.k8sClientQPS` and `reconcile.runtime.k8sClientBurst`. The `OPERATOR_K8S_CLIENT_QPS_LIMIT` and `OPERATOR_K8S_CLIENT_BURST_LIMIT` env vars still override them. The operator now warns at startup when `reconcileShardsThreadsNumber` is above the client QPS. by [@shubhamkapoor01](https://github.com/shubhamkapoor01) in [#2137](https://github.com/Altinity/clickhouse-operator/pull/2137). Fixes [#2045](https://github.com/Altinity/clickhouse-operator/issues/2045)
 
 ### Changed
 
@@ -60,6 +62,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **Reduced StatefulSet API requests during ClickHouse and Keeper reconciliation.** StatefulSets are now listed once per build pass instead of fetched individually for each host, reducing API-server load and reconciliation latency on large installations. by [@shubhamkapoor01](https://github.com/shubhamkapoor01) in [#2134](https://github.com/Altinity/clickhouse-operator/pull/2134). Fixes [#2063](https://github.com/Altinity/clickhouse-operator/issues/2063)
 
+* **ClickHouse image tags pinned with a digest now retain their version**, preventing missing version-dependent configuration and failures creating replicated databases and tables on new replicas. For images without a parseable version tag, the operator uses the running ClickHouse version when preparing schema migration. by [@clain23](https://github.com/clain23) in [#2151](https://github.com/Altinity/clickhouse-operator/pull/2151). Fixes [#2149](https://github.com/Altinity/clickhouse-operator/issues/2149)
+
+* **Users with non-password authentication methods no longer receive an injected default password**, preventing invalid user configurations and ClickHouse startup failures. Supports certificate, LDAP, Kerberos, SSH, HTTP, `no_password`, and `auth_methods` authentication. by [@ringerc](https://github.com/ringerc) in [#2156](https://github.com/Altinity/clickhouse-operator/pull/2156) and [@alex-zaitsev](https://github.com/alex-zaitsev) in [#2157](https://github.com/Altinity/clickhouse-operator/pull/2157). Fixes [#2155](https://github.com/Altinity/clickhouse-operator/issues/2155)
+
+* **Operator API packages can now be imported as a Go module without additional dependency overrides.** The fork-specific `mergo` implementation is included in `pkg/util/mergo`, removing the need for downstream consumers to add their own `mergo` `replace` directive to build against the operator's Go API packages. by [@sks](https://github.com/sks) in [#2160](https://github.com/Altinity/clickhouse-operator/pull/2160). Fixes [#2150](https://github.com/Altinity/clickhouse-operator/issues/2150)
+
 * **Malformed boolean-like configuration values no longer interrupt reconciliation** of other resources. by [@sunsingerus](https://github.com/sunsingerus)
 
 * **Corrected ClickHouse container detection** when logging or backup sidecars appear first in a pod template. by [@sunsingerus](https://github.com/sunsingerus)
@@ -70,7 +78,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **Updated Go from `1.26.8` to `1.27.3`**, including the fix for `CVE-2026-111943`. Go 1.27 also removes support for certain legacy `GODEBUG` settings. Review [upgrade compatibility](docs/security_hardening_fips.md). by [@sunsingerus](https://github.com/sunsingerus) and [@lucas-alpaca](https://github.com/lucas-alpaca) in [#2120](https://github.com/Altinity/clickhouse-operator/pull/2120)
 
-* **Updated `golang.org/x/net` to `v0.60.0` and `golang.org/x/text` to `v0.42.0`** to address security vulnerabilities. by [@sunsingerus](https://github.com/sunsingerus)
+* **Updated `golang.org/x/net` from `v0.56.0` to `v0.62.0` and `golang.org/x/text` from `v0.39.0` to `v0.43.0`.** `x/net` `v0.60.0` addresses `CVE-2026-78659`, `CVE-2026-78660`, `CVE-2026-78663`, `CVE-2026-78669`, and `CVE-2026-97032`; `v0.62.0` addresses `CVE-2026-78661` and `CVE-2026-97045`. `x/text` `v0.41.0` addresses `CVE-2026-56851`.
+
+* **Updated `go.opentelemetry.io/otel/sdk` and `go.opentelemetry.io/otel/trace` to `v1.47.0`** to address `CVE-2026-128085`. The matching `otel`, `otel/metric`, `otel/sdk/metric`, and `otel/log` modules are `v1.47.0` as well.
 
 ## [0.27.4](https://github.com/Altinity/clickhouse-operator/compare/release-0.27.3...release-0.27.4)
 

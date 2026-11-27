@@ -105,7 +105,7 @@ func TestRestoreFromAnotherInstallationWaitsForARunThere(t *testing.T) {
 	restores, schedules, _, _ := sourceRestoreFixture(t, nil)
 	c := restores.Client
 	run := jobOwnedBy(t, "s1-main-backup-29000000", newScheduleCR("s1"),
-		model.Labels(api.ClickHouseBackupScheduleCRDResourceKind, "s1", testCHI, "main", testStorage))
+		model.Labels(api.ClickHouseBackupScheduleCRDResourceKind, "s1", testCHI, "main"))
 	require.NoError(t, c.Create(context.Background(), run))
 	_, err := schedules.Reconcile(context.Background(), request("s1"))
 	require.NoError(t, err)

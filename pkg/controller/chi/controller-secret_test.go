@@ -32,6 +32,7 @@ import (
 	chopInformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
@@ -69,8 +70,8 @@ func newBackupSecretOwner(name string, completedWithBackup, reconciledWithBackup
 	normalized := func(backup bool) *api.ClickHouseInstallation {
 		cr := &api.ClickHouseInstallation{}
 		cr.Spec.Backup = &api.ClusterBackup{
-			Enabled:  commonTypes.NewStringBool(backup),
-			Storages: []api.BackupStorage{{Name: "main", SecretRef: &core.LocalObjectReference{Name: testStorageSecret}}},
+			Enabled:         commonTypes.NewStringBool(backup),
+			ConfigSecretRef: &core.LocalObjectReference{Name: testStorageSecret},
 		}
 		cr.Spec.Configuration = &api.Configuration{Clusters: []*api.Cluster{{Name: "c"}}}
 		return cr
@@ -246,6 +247,120 @@ func TestBackupSecretDeletionReconcilesOwner(t *testing.T) {
 				}
 				return queued >= len(want)
 			}, 5*time.Second, 10*time.Millisecond, "the deletions did not reconcile %v", want)
+			require.ElementsMatch(t, want, queuedCRs(t, c))
+		})
+	}
+}
+
+// Other ClickHouse credentials in the backup Secret of a CR that uses backup reconcile the CR: only a reconcile
+// writes the backup user to ClickHouse and the new credentials to the configuration files of the sidecars, set where
+// there were none or removed included. Other REST API credentials reconcile nothing, as the configuration files
+// follow them on their own.
+func TestBackupSecretRotationReconcilesOwner(t *testing.T) {
+	yes := true
+	backupSecretName := func(cr *api.ClickHouseInstallation) string {
+		return managers.NewNameManager(managers.NameManagerTypeClickHouse).Name(interfaces.NameBackupAutoSecret, cr)
+	}
+	filled := func(secret *core.Secret) *core.Secret {
+		secret.Data = map[string][]byte{
+			config.ClickHouseBackupSecretKeyAPIUsername:        []byte("clickhouse_operator_backup"),
+			config.ClickHouseBackupSecretKeyAPIPassword:        []byte("api"),
+			config.ClickHouseBackupSecretKeyClickHouseUsername: []byte("clickhouse_operator_backup"),
+			config.ClickHouseBackupSecretKeyClickHousePassword: []byte("clickhouse"),
+		}
+		return secret
+	}
+
+	for name, tc := range map[string]struct {
+		before func(secret *core.Secret)
+		change func(secret *core.Secret)
+		want   bool
+	}{
+		"ClickHouse password changed": {
+			change: func(secret *core.Secret) {
+				secret.Data[config.ClickHouseBackupSecretKeyClickHousePassword] = []byte("new")
+			},
+			want: true,
+		},
+		"ClickHouse password removed": {
+			change: func(secret *core.Secret) { delete(secret.Data, config.ClickHouseBackupSecretKeyClickHousePassword) },
+			want:   true,
+		},
+		"ClickHouse username changed": {
+			change: func(secret *core.Secret) {
+				secret.Data[config.ClickHouseBackupSecretKeyClickHouseUsername] = []byte("new")
+			},
+			want: true,
+		},
+		"REST API password changed": {
+			change: func(secret *core.Secret) { secret.Data[config.ClickHouseBackupSecretKeyAPIPassword] = []byte("new") },
+		},
+		"ClickHouse credentials set": {
+			before: func(secret *core.Secret) {
+				delete(secret.Data, config.ClickHouseBackupSecretKeyClickHouseUsername)
+				delete(secret.Data, config.ClickHouseBackupSecretKeyClickHousePassword)
+			},
+			change: func(secret *core.Secret) {
+				secret.Data[config.ClickHouseBackupSecretKeyClickHouseUsername] = []byte("new")
+				secret.Data[config.ClickHouseBackupSecretKeyClickHousePassword] = []byte("new")
+			},
+			want: true,
+		},
+		"labels changed": {
+			change: func(secret *core.Secret) { secret.Labels["other"] = "yes" },
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			owner := newBackupSecretOwner("owner", &yes, nil)
+			// Changed after the case's Secret, it tells that the informer has handled that change
+			sentinel := newBackupSecretOwner("sentinel", &yes, nil)
+			secret := filled(newOwnedSecret(owner, backupSecretName(owner)))
+			if tc.before != nil {
+				tc.before(secret)
+			}
+			sentinelSecret := filled(newOwnedSecret(sentinel, backupSecretName(sentinel)))
+
+			c := &Controller{
+				kube: &backupSecretOwnerFakeKube{crs: map[string]*api.ClickHouseInstallation{
+					owner.GetName():    owner,
+					sentinel.GetName(): sentinel,
+				}},
+				namer: managers.NewNameManager(managers.NameManagerTypeClickHouse),
+			}
+			c.initQueues()
+			client := kubeFake.NewSimpleClientset(secret.DeepCopy(), sentinelSecret.DeepCopy())
+			factory := NewInformerFactoryForCHOPGeneratedObjects(client, 0)
+			chopFactory := func() chopInformers.SharedInformerFactory {
+				return chopInformers.NewSharedInformerFactory(chopFake.NewSimpleClientset(), 0)
+			}
+			c.addEventHandlers(chopFactory(), chopFactory(), factory)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer factory.Shutdown()
+			defer cancel()
+			factory.Start(ctx.Done())
+			for informer, synced := range factory.WaitForCacheSync(ctx.Done()) {
+				require.True(t, synced, "informer of %v must sync", informer)
+			}
+
+			secrets := client.CoreV1().Secrets(secret.GetNamespace())
+			tc.change(secret)
+			_, err := secrets.Update(ctx, secret, meta.UpdateOptions{})
+			require.NoError(t, err)
+			sentinelSecret.Data[config.ClickHouseBackupSecretKeyClickHousePassword] = []byte("new")
+			_, err = secrets.Update(ctx, sentinelSecret, meta.UpdateOptions{})
+			require.NoError(t, err)
+			want := []string{sentinel.GetName()}
+			if tc.want {
+				want = []string{owner.GetName(), sentinel.GetName()}
+			}
+			require.Eventually(t, func() bool {
+				queued := 0
+				for _, q := range c.queues {
+					queued += q.Len()
+				}
+				return queued >= len(want)
+			}, 5*time.Second, 10*time.Millisecond, "the changes did not reconcile %v", want)
 			require.ElementsMatch(t, want, queuedCRs(t, c))
 		})
 	}

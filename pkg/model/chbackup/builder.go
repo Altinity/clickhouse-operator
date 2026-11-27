@@ -55,8 +55,6 @@ const (
 	LabelBackupCHI = clickhouse_altinity_com.APIGroupName + "/backup-chi"
 	// LabelBackupCluster names the cluster of the installation the object operates on.
 	LabelBackupCluster = clickhouse_altinity_com.APIGroupName + "/backup-cluster"
-	// LabelBackupStorage names the backup storage of the cluster the object keeps backups in, or reads them from.
-	LabelBackupStorage = clickhouse_altinity_com.APIGroupName + "/backup-storage"
 )
 
 // Annotations the backup controllers keep on the objects built here.
@@ -65,6 +63,11 @@ const (
 	// last, so a reconcile updates the CronJob only when that spec changes. Comparing specs directly
 	// would never match, as the API server fills in defaults the builder leaves out.
 	AnnotationBackupObjectVersion = clickhouse_altinity_com.APIGroupName + "/backup-object-version"
+	// AnnotationBackupConfigSecret names the Secret of the clickhouse-backup configuration of the cluster a Job or
+	// CronJob keeps backups in, or reads them from, as it was built: the status of its resource records where the
+	// backups lie, which tells where to look for those of a cluster that lost its CronJob. An annotation, as a
+	// Secret name may be longer than a label value.
+	AnnotationBackupConfigSecret = clickhouse_altinity_com.APIGroupName + "/backup-config-secret"
 	// AnnotationScheduledJobObserved records the last phase of a scheduled backup Job that was
 	// reported, so every scheduled run is counted and announced once.
 	AnnotationScheduledJobObserved = clickhouse_altinity_com.APIGroupName + "/backup-job-observed"
@@ -168,14 +171,13 @@ var jobResources = core.ResourceRequirements{
 }
 
 // Labels returns the labels of the Jobs and CronJobs built for a backup custom resource on a
-// cluster of an installation, which keeps its backups in the named storage, or reads them from it.
-func Labels(kind, crName, chiName, cluster, storage string) map[string]string {
+// cluster of an installation.
+func Labels(kind, crName, chiName, cluster string) map[string]string {
 	return map[string]string{
 		LabelBackupCRKind:  kind,
 		LabelBackupCRName:  LabelValue(crName),
 		LabelBackupCHI:     LabelValue(chiName),
 		LabelBackupCluster: LabelValue(cluster),
-		LabelBackupStorage: storage,
 	}
 }
 
@@ -215,12 +217,6 @@ func ClusterJobsSelector(chiName, cluster, kind string) k8sLabels.Selector {
 // Cluster names are shorter than a label value may be, so the label holds them as they are.
 func ObjectCluster(obj meta.Object) string {
 	return obj.GetLabels()[LabelBackupCluster]
-}
-
-// ObjectStorage returns the backup storage a Job or CronJob built here keeps backups in, or reads them from, ""
-// for none or any other object. Storage names are label values, so the label holds them as they are.
-func ObjectStorage(obj meta.Object) string {
-	return obj.GetLabels()[LabelBackupStorage]
 }
 
 // OwnedJobsSelector selects the Jobs built for the named backup custom resource.
@@ -445,7 +441,7 @@ func BuildBackupJob(chb *api.ClickHouseBackup, chi api.ICustomResource, topology
 	)
 	options := chb.GetBackupOptions()
 	env = append(env, backupOptionsEnv(options, topology)...)
-	labels := Labels(api.ClickHouseBackupCRDResourceKind, chb.GetName(), chb.TargetInstallation(), cluster, topology.storage())
+	labels := Labels(api.ClickHouseBackupCRDResourceKind, chb.GetName(), chb.TargetInstallation(), cluster)
 	return newJob(BackupJobName(chb, cluster), chb.GetNamespace(), labels, options.GetActiveDeadlineSeconds(), topology, env)
 }
 
@@ -459,7 +455,7 @@ func BuildVerifyJob(chb *api.ClickHouseBackup, chi api.ICustomResource, topology
 		envVar(envBackupName, backupName),
 		envVar(envVerifyHosts, joinHosts(topology.firstPerShard())),
 	)
-	labels := Labels(api.ClickHouseBackupCRDResourceKind, chb.GetName(), chb.TargetInstallation(), cluster, topology.storage())
+	labels := Labels(api.ClickHouseBackupCRDResourceKind, chb.GetName(), chb.TargetInstallation(), cluster)
 	return newJob(VerifyJobName(chb, cluster), chb.GetNamespace(), labels, chb.GetBackupOptions().GetActiveDeadlineSeconds(), topology, env)
 }
 
@@ -495,7 +491,7 @@ func BuildRestoreJob(chr *api.ClickHouseRestore, chi api.ICustomResource, topolo
 	// A restore checks every replica holds the backup of its shard under its own path, whatever the
 	// replicas the backup was made on
 	env = append(env, pathCheckEnv(topology, "")...)
-	labels := Labels(api.ClickHouseRestoreCRDResourceKind, chr.GetName(), chr.Spec.ClickHouseInstallation, cluster, topology.storage())
+	labels := Labels(api.ClickHouseRestoreCRDResourceKind, chr.GetName(), chr.Spec.ClickHouseInstallation, cluster)
 	return newJob(RestoreJobName(chr, cluster), chr.GetNamespace(), labels, chr.Spec.GetActiveDeadlineSeconds(), topology, env)
 }
 
@@ -654,8 +650,7 @@ func BuildBackupCronJob(chbs *api.ClickHouseBackupSchedule, chi api.ICustomResou
 		envVar(envRetentionHosts, joinHosts(RetentionHosts(chbs, topology))),
 	)
 	env = append(env, backupOptionsEnv(options, topology)...)
-	labels := Labels(api.ClickHouseBackupScheduleCRDResourceKind, chbs.GetName(), chbs.Spec.ClickHouseInstallation, cluster,
-		topology.storage())
+	labels := Labels(api.ClickHouseBackupScheduleCRDResourceKind, chbs.GetName(), chbs.Spec.ClickHouseInstallation, cluster)
 
 	concurrencyPolicy := batch.ForbidConcurrent
 	if chbs.Spec.ConcurrencyPolicy != "" {
@@ -682,9 +677,9 @@ func BuildBackupCronJob(chbs *api.ClickHouseBackupSchedule, chi api.ICustomResou
 			},
 		},
 	}
-	cronJob.Annotations = map[string]string{
+	cronJob.Annotations = util.MergeStringMapsOverwrite(configSecretAnnotations(topology), map[string]string{
 		AnnotationBackupObjectVersion: util.Fingerprint(cronJob.Spec),
-	}
+	})
 	return cronJob
 }
 
@@ -705,16 +700,13 @@ func backupOptionsEnv(options *api.BackupOptions, topology *Topology) []core.Env
 // of the hosts it drives are their own, for the replica selection of a backup, none for a restore:
 // every backup-enabled cluster of the installation by index, with its shards and every setting that
 // tells where its sidecars keep their backups, taken from where the sidecars take it, see
-// sidecarSettingSources. The operator never reads a Secret: kubelet resolves it for the Job, and a key
-// the Secret lacks stays unset, as for the sidecars. The paths a sidecar running the operator's command
-// defaults an unset path to are passed once, and set empty for a cluster whose sidecars run a command
-// of their own, which defaults none. A cluster whose settings the Job cannot know is passed with why,
-// and without settings; a configuration file its storage Secret names reaches the Job as its
-// CLICKHOUSE_BACKUP_CONFIG setting, which leaves the cluster out just as well when set.
+// sidecarSettingSources. kubelet resolves the keys of the configuration file Secret of a cluster for the Job, and
+// a key the Secret lacks stays unset, as the setting is in the file. The paths the configuration files default an
+// unset path to are passed once. A cluster whose settings the Job cannot know is passed with why, and without
+// settings.
 func pathCheckEnv(topology *Topology, selection api.ReplicaSelection) []core.EnvVar {
 	var indexes []string
 	self := 0
-	defaults := false
 	var clusterEnv []core.EnvVar
 	for index, cluster := range topology.enabled {
 		indexes = append(indexes, strconv.Itoa(index))
@@ -733,13 +725,6 @@ func pathCheckEnv(topology *Topology, selection api.ReplicaSelection) []core.Env
 			clusterEnv = append(clusterEnv, envVar(pathClusterEnv(index, pathEnvUnverifiable), cluster.sidecar.unverifiable))
 			continue
 		}
-		defaults = defaults || cluster.sidecar.defaultsPaths
-		if !cluster.sidecar.defaultsPaths {
-			clusterEnv = append(clusterEnv,
-				envVar(pathClusterEnv(index, envDefaultPath), ""),
-				envVar(pathClusterEnv(index, envDefaultObjectDiskPath), ""),
-			)
-		}
 		for _, key := range PathCheckKeys {
 			for _, source := range cluster.sidecar.sources[key] {
 				source.Name = pathClusterEnv(index, key)
@@ -752,15 +737,11 @@ func pathCheckEnv(topology *Topology, selection api.ReplicaSelection) []core.Env
 		envVar(envPathSelf, strconv.Itoa(self)),
 		envVar(envPathInstallation, topology.installation),
 		envVar(envPathNamespace, topology.namespace),
+		envVar(envDefaultPath, chop.Config().Backup.StoragePath),
+		envVar(envDefaultObjectDiskPath, chop.Config().Backup.StorageObjectDiskPath),
 	}
 	if selection != "" {
 		env = append(env, envVar(envPathReplicaSelection, string(selection)))
-	}
-	if defaults {
-		env = append(env,
-			envVar(envDefaultPath, chop.Config().Backup.StoragePath),
-			envVar(envDefaultObjectDiskPath, chop.Config().Backup.StorageObjectDiskPath),
-		)
 	}
 	return append(env, clusterEnv...)
 }
@@ -800,12 +781,29 @@ func splitHosts(hosts string) []string {
 func newJob(name, namespace string, labels map[string]string, deadline int64, topology *Topology, env []core.EnvVar) *batch.Job {
 	return &batch.Job{
 		ObjectMeta: meta.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-			Labels:    labels,
+			Name:        name,
+			Namespace:   namespace,
+			Labels:      labels,
+			Annotations: configSecretAnnotations(topology),
 		},
 		Spec: newJobSpec(labels, deadline, topology, env),
 	}
+}
+
+// configSecretAnnotations returns the annotations naming the configuration Secret of the cluster the topology
+// targets, none for none.
+func configSecretAnnotations(topology *Topology) map[string]string {
+	secret := topology.configSecret()
+	if secret == "" {
+		return nil
+	}
+	return map[string]string{AnnotationBackupConfigSecret: secret}
+}
+
+// ObjectConfigSecret returns the configuration Secret of the cluster a Job or CronJob built here keeps backups in,
+// or reads them from, as it was built, "" for none or any other object.
+func ObjectConfigSecret(obj meta.Object) string {
+	return obj.GetAnnotations()[AnnotationBackupConfigSecret]
 }
 
 // newJobSpec builds a Job that runs the script once. A failed attempt is never retried: the

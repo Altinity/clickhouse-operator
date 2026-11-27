@@ -62,8 +62,8 @@ type topologyShard struct {
 // topologyCluster is one backup-enabled cluster of an installation.
 type topologyCluster struct {
 	name string
-	// storage is the backup storage the sidecars of the cluster keep backups in
-	storage string
+	// configSecret is the Secret of the clickhouse-backup configuration the sidecars of the cluster keep backups by
+	configSecret string
 	// pod holds what a Job inherits from the cluster's first host: its sidecar and its pod template.
 	pod    podSettings
 	shards []topologyShard
@@ -310,9 +310,9 @@ func newTopologyCluster(
 	containers interfaces.IContainerManager,
 ) topologyCluster {
 	cluster := topologyCluster{
-		name:       c.GetName(),
-		storage:    c.GetBackup().GetStorageName(),
-		replicated: !c.GetZookeeper().IsEmpty(),
+		name:         c.GetName(),
+		configSecret: c.GetBackup().GetConfigSecretName(),
+		replicated:   !c.GetZookeeper().IsEmpty(),
 	}
 	if c.GetLayout() == nil {
 		return cluster
@@ -411,12 +411,12 @@ func (t *Topology) cluster() string {
 	return t.clusters[0].name
 }
 
-// storage returns the backup storage of the cluster a Job built from the topology targets.
-func (t *Topology) storage() string {
+// configSecret returns the configuration Secret of the cluster a Job built from the topology targets.
+func (t *Topology) configSecret() string {
 	if (t == nil) || (len(t.clusters) == 0) {
 		return ""
 	}
-	return t.clusters[0].storage
+	return t.clusters[0].configSecret
 }
 
 // firstPerShard returns the first host of every shard. Replicas of a shard hold the same

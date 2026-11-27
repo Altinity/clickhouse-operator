@@ -37,6 +37,10 @@ type Request struct {
 	// merge of authors that need not know each other's container names, which is where containers
 	// pairing by name can leave one container as two.
 	podTemplateLayers map[string][]string
+
+	// backupUsername is the user the clickhouse-backup sidecars connect to ClickHouse as, as the backup Secret
+	// names it, "" while there is none: backup is off, or the backup Secret is not complete yet
+	backupUsername string
 }
 
 // AddPodTemplateLayer records that the named layer defines the pod templates given. A layer is

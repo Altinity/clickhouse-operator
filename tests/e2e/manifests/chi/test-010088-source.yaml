@@ -10,10 +10,8 @@ spec:
     - name: clickhouse-version
   backup:
     enabled: "yes"
-    storages:
-      - name: main
-        secretRef:
-          name: backup-storage
+    configSecretRef:
+      name: backup-storage
   configuration:
     zookeeper:
       nodes:

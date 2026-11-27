@@ -454,11 +454,8 @@ Another example with selectively described replicas. Note - `replicasCount` spec
   backup:
     enabled: "yes"
     podTemplate: backup-sidecar  # its clickhouse-backup container is the sidecar's base
-    storages:                # storages the backups may be kept in, one per level for now
-      - name: main
-        secretRef:
-          name: clickhouse-backup-storage
-    # storage: main          # the storage the sidecar uses; left out, the only one declared
+    configSecretRef:         # the Secret of the clickhouse-backup configuration of the sidecar
+      name: clickhouse-backup-config
     recovery:                # a new installation only
       backupName: default-prod-nightly-20261003-020000
   configuration:
@@ -476,25 +473,21 @@ sidecar into each Pod - enabling or disabling it rolls the cluster's Pods - and 
   - `podTemplate` - the pod template whose container named `clickhouse-backup` the sidecar is built on, its `image`, `env`,
     `resources`, `securityContext` and more; only that container is taken, and the Jobs run its image under its identity.
     Left empty, the operator builds the sidecar on its own (see [backup.md](backup.md#customizing-the-sidecar))
-  - `storages` - the storages the backups may be kept in, one per level for now, each a `name` (a DNS label of
-    at most 45 characters) and a `secretRef`: the `name` of a Secret in the installation's namespace whose keys become
-    the sidecar's environment variables and configure the storage, e.g. `REMOTE_STORAGE`, `S3_BUCKET`, `S3_PATH`,
-    `S3_ACCESS_KEY`, `S3_SECRET_KEY`; without `secretRef`, the container `podTemplate` names configures the storage.
-    A cluster takes the installation's storages along with its own, pairing them by name: a storage of its own that
-    the installation declares too takes what it leaves out, such as `secretRef`, from the installation's. Templates
-    contribute theirs alike. Pods start without the Secret, but backups and restores fail until it exists.
-    The sidecars follow the Secret: once it is created or changed, each restarts by itself within minutes - ClickHouse
-    does not - when it runs no backup or restore (see [backup.md](backup.md#secret-changes)). The storage path defaults
+  - `configSecretRef` - the `name` of a Secret in the installation's namespace whose key `config.yml` holds the
+    clickhouse-backup configuration of the sidecar, a YAML mapping of its sections, e.g. `general.remote_storage`,
+    `s3.bucket`, `s3.path`, `s3.access_key`, `s3.secret_key`; the operator generates the sidecar's configuration file
+    from it. A cluster takes the installation's unless it names its own, and the installation a template's;
+    `name: ""` on a cluster leaves it without one. Without it, the container `podTemplate` names configures the
+    storage. Backup takes effect only where `configSecretRef` or `podTemplate` is set. Pods start without the Secret,
+    but backups and restores fail until it exists.
+    The sidecars follow the Secret: once it is created or changed, the operator regenerates their configuration file,
+    which they read anew for every operation, within minutes and without a restart (see
+    [backup.md](backup.md#secret-changes)). The storage path defaults
     to `backup/{namespace}/{installation}/{cluster}/{shard}`, or the default the operator configuration sets in
     `backup.storagePath`, and no two shards may share one; with several backup-enabled clusters, keep the whole
     sidecar configuration in this Secret and the sidecar container's `env`, as backups and restores refuse to run on
-    paths they cannot check, such as those of a configuration file (see [backup.md](backup.md#storage-paths))
-  - `storage` - the storage of `storages` the sidecar keeps the backups in. Left out, it is the only storage the same
-    level declares, or else the one the level a cluster inherits from uses, so a cluster's own storage wins over the
-    installation's; `""` on a cluster leaves it without a storage. Backup takes effect only where the storage a
-    cluster uses has a `secretRef`, or `podTemplate` is set. On a cluster that turns backup on, a name no level
-    declares aborts the reconcile with `InvalidBackupStorage` before anything changes (see
-    [backup.md](backup.md#storages))
+    paths they cannot check, such as those of an `envFrom` or of a configuration file the sidecar's command names (see
+    [backup.md](backup.md#storage-paths))
   - `recovery.backupName` - for a new installation: the backup it starts from. Once its first reconcile completes,
     the operator restores every backup-enabled cluster from it, once, provided the installation holds no tables yet;
     a cluster may name another backup, or `""` for none. Taken from the installation only, never from a template;

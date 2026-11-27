@@ -26,6 +26,7 @@ import (
 	"errors"
 	"math/big"
 	"net"
+	"runtime"
 	"testing"
 	"time"
 
@@ -445,6 +446,18 @@ func TestTLSHandshake(t *testing.T) {
 // via vendor source); a second RegisterTLSConfig with the same key REPLACES
 // the first. We exercise the polarity by building each config-shape and
 // attempting handshakes against an unknown-CA TLS server.
+// isUnknownAuthority reports whether a handshake failed over a certificate of an unknown authority. Without
+// RootCAs, macOS verifies against the system roots through the platform verifier, which reports an untrusted
+// certificate as a plain error inside tls.CertificateVerificationError rather than x509.UnknownAuthorityError.
+func isUnknownAuthority(err error) bool {
+	var unkAuth x509.UnknownAuthorityError
+	if errors.As(err, &unkAuth) {
+		return true
+	}
+	var verification *tls.CertificateVerificationError
+	return (runtime.GOOS == "darwin") && errors.As(err, &verification)
+}
+
 func TestEnforceVerifiedLegacyTLS(t *testing.T) {
 	s := newTLSTestServer(t)
 	defer s.Close()
@@ -464,8 +477,7 @@ func TestEnforceVerifiedLegacyTLS(t *testing.T) {
 		// Type-based assertion: Go's x509 error wording changes between
 		// releases (e.g. Go 1.26 reshaped the unknown-authority message),
 		// but the error TYPE is part of the stdlib API contract.
-		var unkAuth x509.UnknownAuthorityError
-		if !errors.As(err, &unkAuth) {
+		if !isUnknownAuthority(err) {
 			t.Fatalf("expected x509.UnknownAuthorityError, got: %v", err)
 		}
 	})

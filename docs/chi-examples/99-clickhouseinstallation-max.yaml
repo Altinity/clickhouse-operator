@@ -363,22 +363,13 @@ spec:
     # image under its identity. Empty, the operator builds the sidecar on its own.
     # See docs/backup.md#customizing-the-sidecar.
     podTemplate: ""
-    # Storages the backups may be kept in, one per level for now. name: a DNS label of at
-    # most 45 characters. secretRef: Secret in this CHI's namespace with the storage
-    # configuration of clickhouse-backup, one environment variable per key: REMOTE_STORAGE,
-    # S3_BUCKET, S3_PATH, S3_ACCESS_KEY, ...; without it, the clickhouse-backup container of the
-    # pod template podTemplate names configures the storage. A cluster takes these along with its
-    # own, pairing them by name: its own storage of a name declared here takes what it leaves out,
-    # such as secretRef, from this one.
-    storages:
-      - name: main
-        secretRef:
-          name: clickhouse-backup-storage
-    # Storage of storages the sidecar keeps the backups in. Left out, the only storage this level
-    # declares, or else the one the level a cluster inherits from uses. "" on a cluster: no storage.
-    # On a cluster that turns backup on, a name no level declares aborts the reconcile
-    # (InvalidBackupStorage).
-    storage: main
+    # Secret in this CHI's namespace whose key config.yml holds the clickhouse-backup configuration of
+    # the sidecar, a YAML mapping of its sections: general.remote_storage, s3.bucket, s3.path,
+    # s3.access_key, ...; the operator generates the sidecar's configuration file from it. A cluster
+    # takes this one unless it names its own; name: "" on a cluster leaves it without one. Without it,
+    # the clickhouse-backup container of the pod template podTemplate names configures the storage.
+    configSecretRef:
+      name: clickhouse-backup-config
 
   defaults:
     replicasUseFQDN: "no"

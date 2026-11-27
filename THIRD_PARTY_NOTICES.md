@@ -53,7 +53,7 @@ The main project license is Apache-2.0; see [`LICENSE`](LICENSE) and [`NOTICE`](
 | `github.com/google/go-cmp/cmp` | BSD-3-Clause | `vendor/github.com/google/go-cmp/LICENSE` |
 | `github.com/google/gofuzz` | Apache-2.0 | `vendor/github.com/google/gofuzz/LICENSE` |
 | `github.com/google/uuid` | BSD-3-Clause | `vendor/github.com/google/uuid/LICENSE` |
-| `github.com/imdario/mergo` | BSD-3-Clause | `vendor/github.com/imdario/mergo/LICENSE` |
+| `github.com/imdario/mergo` (sunsingerus fork, vendored at `pkg/util/mergo`) | BSD-3-Clause | `pkg/util/mergo/LICENSE` |
 | `github.com/josharian/intern` | MIT | `vendor/github.com/josharian/intern/license.md` |
 | `github.com/json-iterator/go` | MIT | `vendor/github.com/json-iterator/go/LICENSE` |
 | `github.com/juliangruber/go-intersect` | MIT | [`LICENSE.md`](https://github.com/juliangruber/go-intersect/blob/v1.0.0/LICENSE.md) |

@@ -40,7 +40,6 @@ const (
 	// testStorageSecret is the storage Secret enabledBackup names, without which backup stays off
 	testStorageSecret = "s3-credentials"
 	// testStorage is the backup storage of the test installation, whose Secret is testStorageSecret
-	testStorage = "main"
 )
 
 // The normalizer and the namer resolve configuration through the global chop singleton.
@@ -53,8 +52,8 @@ func TestMain(m *testing.M) {
 
 func enabledBackup() *api.ClusterBackup {
 	return &api.ClusterBackup{
-		Enabled:  types.NewStringBool(true),
-		Storages: []api.BackupStorage{{Name: testStorage, SecretRef: &core.LocalObjectReference{Name: testStorageSecret}}},
+		Enabled:         types.NewStringBool(true),
+		ConfigSecretRef: &core.LocalObjectReference{Name: testStorageSecret},
 	}
 }
 
@@ -285,7 +284,8 @@ func TestTopologyForCluster(t *testing.T) {
 }
 
 // The {shard} macro of every host is the name of its shard, which the path check expands storage
-// paths with; a sidecar defaults an unset storage path only when it runs the operator's own command.
+// paths with; a sidecar reads the configuration file the operator generates, with its default paths, whatever
+// command it runs.
 func TestTopologyKnowsWhatThePathCheckNeeds(t *testing.T) {
 	cluster := &api.Cluster{
 		Name: "main",
@@ -314,11 +314,9 @@ func TestTopologyKnowsWhatThePathCheckNeeds(t *testing.T) {
 	topology, err := NewTopology(stored, "")
 	require.NoError(t, err)
 
-	defaults := map[string]bool{}
 	for _, c := range topology.enabled {
-		defaults[c.name] = c.sidecar.defaultsPaths
+		require.Empty(t, c.sidecar.unverifiable, "%s: every sidecar reads the configuration file the operator generates", c.name)
 	}
-	require.Equal(t, map[string]bool{"main": true, "own": false, "args": false, "image": true}, defaults)
 	require.Equal(t, "east", topology.enabled[0].shards[0].name)
 	require.Equal(t, "west", topology.enabled[0].shards[1].name)
 	require.Equal(t, "demo", topology.installation)

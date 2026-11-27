@@ -250,7 +250,7 @@ func TestScheduleCreatesItsCronJob(t *testing.T) {
 	require.False(t, ptr.Deref(cronJob.Spec.Suspend, true))
 	require.Contains(t, f.cronJobEnv("s1-main-backup"), "chi-demo-main-0-0 chi-demo-main-1-0")
 	require.Equal(t, "s1-main-backup", got.Status.Clusters[0].CronJobName)
-	require.Equal(t, testStorage, got.Status.Clusters[0].Storage, "the storage the runs keep their backups in")
+	require.Equal(t, testStorageSecret, got.Status.Clusters[0].ConfigSecret, "the Secret of the storage the runs keep their backups in")
 	require.Equal(t, meta.ConditionTrue, condition(t, got.Status.Conditions, api.BackupConditionValidated).Status)
 	require.Equal(t, api.BackupReasonScheduled, readyReason(t, got))
 }
@@ -330,7 +330,7 @@ func TestScheduleSuspendsWhileARestoreRuns(t *testing.T) {
 	f := newScheduleFixture(t, newFakeCR(readyInstallation(t)), nil, newScheduleCR("s1"))
 	f.reconcile("s1")
 
-	restore := jobOwnedBy(t, "r1-restore", newRestoreCR("r1"), model.Labels(api.ClickHouseRestoreCRDResourceKind, "r1", testCHI, "main", testStorage))
+	restore := jobOwnedBy(t, "r1-restore", newRestoreCR("r1"), model.Labels(api.ClickHouseRestoreCRDResourceKind, "r1", testCHI, "main"))
 	require.NoError(t, f.client.Create(context.Background(), restore))
 	require.Equal(t, []reconcile.Request{request("s1")}, f.controller.SchedulesForJob(context.Background(), restore),
 		"a restore Job holds the schedules of its installation")
@@ -351,7 +351,7 @@ func TestScheduleSuspendsWhileARestoreRuns(t *testing.T) {
 func TestScheduleSuspendedBySpecStaysSuspendedAfterARestore(t *testing.T) {
 	chbs := newScheduleCR("s1")
 	chbs.Spec.Suspend = types.NewStringBool(true)
-	restore := jobOwnedBy(t, "r1-restore", newRestoreCR("r1"), model.Labels(api.ClickHouseRestoreCRDResourceKind, "r1", testCHI, "main", testStorage))
+	restore := jobOwnedBy(t, "r1-restore", newRestoreCR("r1"), model.Labels(api.ClickHouseRestoreCRDResourceKind, "r1", testCHI, "main"))
 	f := newScheduleFixture(t, newFakeCR(readyInstallation(t)), nil, chbs, restore)
 
 	f.reconcile("s1")
@@ -507,7 +507,7 @@ func TestScheduleNeverAdoptsAStaleCronJob(t *testing.T) {
 	stale := &batch.CronJob{}
 	stale.Name = "s1-main-backup"
 	stale.Namespace = testNamespace
-	stale.Labels = model.Labels(api.ClickHouseBackupScheduleCRDResourceKind, "s1", testCHI, "main", testStorage)
+	stale.Labels = model.Labels(api.ClickHouseBackupScheduleCRDResourceKind, "s1", testCHI, "main")
 	stale.Spec.Schedule = "* * * * *"
 	require.NoError(t, ctrl.SetControllerReference(predecessor, stale, newScheme(t)))
 	f := newScheduleFixture(t, newFakeCR(readyInstallation(t)), nil, newScheduleCR("s1"), stale)
@@ -1092,7 +1092,7 @@ func TestScheduleReportsARunWithoutData(t *testing.T) {
 	require.NoError(t, f.client.Get(context.Background(), key(empty.Name), job))
 	require.Contains(t, job.Annotations, model.AnnotationScheduledJobWithoutData)
 
-	restore := jobOwnedBy(t, "r1-restore", newRestoreCR("r1"), model.Labels(api.ClickHouseRestoreCRDResourceKind, "r1", testCHI, "main", testStorage))
+	restore := jobOwnedBy(t, "r1-restore", newRestoreCR("r1"), model.Labels(api.ClickHouseRestoreCRDResourceKind, "r1", testCHI, "main"))
 	require.NoError(t, f.client.Create(context.Background(), restore))
 	f.reconcile("s1")
 	require.Equal(t, api.BackupReasonSuspendedForRestore, readyReason(t, f.schedule("s1")))
@@ -1635,7 +1635,7 @@ func TestScheduleHoldsOnlyTheClustersARestoreRestores(t *testing.T) {
 		require.True(t, suspended(f, "s1-hot-backup"))
 	})
 	t.Run("the Job of a restore of one cluster", func(t *testing.T) {
-		job := jobOwnedBy(t, "gone-hot-restore", newRestoreCR("gone"), model.Labels(api.ClickHouseRestoreCRDResourceKind, "gone", testCHI, "hot", testStorage))
+		job := jobOwnedBy(t, "gone-hot-restore", newRestoreCR("gone"), model.Labels(api.ClickHouseRestoreCRDResourceKind, "gone", testCHI, "hot"))
 		f := newScheduleFixture(t, newFakeCR(twoClusters(t, api.StatusCompleted)), nil, newScheduleCR("s1"), job)
 
 		f.reconcile("s1")
@@ -1751,7 +1751,7 @@ func TestScheduleReadyFollowsRunsWhileTheInstallationReconciles(t *testing.T) {
 // The operator records when it suspends a CronJob, which a restore waits on, and drops the record
 // when it resumes the CronJob.
 func TestScheduleRecordsWhenItSuspendsACronJob(t *testing.T) {
-	restore := jobOwnedBy(t, "r1-main-restore", newRestoreCR("r1"), model.Labels(api.ClickHouseRestoreCRDResourceKind, "r1", testCHI, "main", testStorage))
+	restore := jobOwnedBy(t, "r1-main-restore", newRestoreCR("r1"), model.Labels(api.ClickHouseRestoreCRDResourceKind, "r1", testCHI, "main"))
 	f := newScheduleFixture(t, newFakeCR(readyInstallation(t)), nil, newScheduleCR("s1"), restore)
 
 	f.reconcile("s1")
