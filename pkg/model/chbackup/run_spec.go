@@ -158,7 +158,7 @@ func BackupRunSpec(chb *api.ClickHouseBackup, topology *Topology) *RunSpec {
 		(record.BackupNamePrefix != "") {
 		spec.RunsSchedule = true
 		spec.Prefix = record.BackupNamePrefix
-		spec.Entries = SlotEntries(record.Schedules, record.TimeZone)
+		spec.Entries = SlotEntries(record.Schedules, record.Time, record.TimeZone)
 		spec.TimeZone = record.TimeZone
 		spec.KeepBackups = slices.Clone(record.KeepBackups)
 		spec.Previous = record.PreviousSchedules
@@ -173,7 +173,7 @@ func ScheduledRunSpec(chbs *api.ClickHouseBackupSchedule, topology *Topology, sl
 	spec.Prefix = BackupNamePrefix(chbs)
 	spec.Slot = slot
 	spec.Timeouts = RunTimeouts(chbs.Spec.Timeouts)
-	spec.Entries = SlotEntries(chbs.Spec.Schedules, chbs.Spec.TimeZone)
+	spec.Entries = SlotEntries(chbs.Spec.Schedules, chbs.Spec.Time, chbs.Spec.TimeZone)
 	spec.TimeZone = chbs.Spec.TimeZone
 	spec.KeepBackups = slices.Clone(chbs.Spec.Retention.GetKeepBackups())
 	spec.Previous = chbs.Status.Retention.GetPrevious()

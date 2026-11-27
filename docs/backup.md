@@ -404,14 +404,13 @@ metadata:
 spec:
   clickHouseInstallation: backup-demo
   timeZone: Europe/Berlin
+  time: "02:30"
   schedules:
     - period: hour
       keep: 24
     - period: daily
-      time: "02:30"
       keep: 7
     - period: weekly
-      time: "02:30"
       day: 0
       keep: 4
 ```
@@ -421,6 +420,7 @@ spec:
 | `clickHouseInstallation`      | required                       | The CHI to back up, in the same namespace. |
 | `cluster`                     | all                            | Back up only this cluster. |
 | `schedules`                   | required                       | The entries. At most one entry per period. |
+| `time`                        | `00:00`                        | `HH:MM` in `timeZone`, for all entries. Required with a `daily`, `weekly` or `monthly` entry. |
 | `timeZone`                    | UTC                            | The IANA time zone of the entries, e.g. `Europe/Berlin`. |
 | `suspend`                     | `false`                        | Start no new runs. A run in progress continues. |
 | `startingDeadlineSeconds`     | no limit                       | How many seconds after its slot a late run can still start. |
@@ -437,7 +437,6 @@ Each entry of `schedules`:
 | Field             | Meaning |
 |-------------------|---------|
 | `period`          | `minute`, `hour`, `6hours`, `daily`, `weekly` or `monthly`. |
-| `time`            | `HH:MM` in `timeZone`. Required for `daily`, `weekly` and `monthly`. All entries with a time use the same time. |
 | `day`             | `weekly`: `0`..`6`, `0` is Sunday. `monthly`: `1`..`31`. Required for these two periods only. |
 | `keep`            | How many of the newest backups of this entry retention keeps. At least 1. |
 | `incremental`     | Make incremental backups for this entry. At most one entry. |
@@ -446,7 +445,7 @@ Each entry of `schedules`:
 ### How a schedule runs
 
 * **Slots.** A schedule runs at the due times of all its entries. In the example, that is every hour at
-  :30. `hour` uses only the minute of the shared time. `6hours` uses the hour modulo 6 and the minute.
+  :30. `hour` uses only the minute of `time`. `6hours` uses the hour modulo 6 and the minute.
   `minute` uses no time.
 * **One run per slot.** A run counts for every entry whose slot it is. In the example, the run of
   Sunday 02:30 counts for the weekly, the daily and the hourly entry.

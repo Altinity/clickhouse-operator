@@ -131,12 +131,6 @@ spec:
                           - daily
                           - weekly
                           - monthly
-                      time:
-                        type: string
-                        description: |
-                          Time of day HH:MM in timeZone. Required for daily, weekly and monthly.
-                          hour uses only the minute. 6hours uses the hour modulo 6 and the minute. Empty takes the time of the other entries, or 00:00.
-                        pattern: "^(([01][0-9]|2[0-3]):[0-5][0-9])?$"
                       day:
                         type: integer
                         format: int32
@@ -169,6 +163,12 @@ spec:
                         items:
                           type: string
                           pattern: '^(--env=)?[A-Z][A-Z0-9_]{0,63}=[A-Za-z0-9_.,:/@+=-]{1,256}$'
+                time:
+                  type: string
+                  description: |
+                    Time of day HH:MM in timeZone. Required for daily, weekly and monthly entries.
+                    An hour entry uses only the minute. A 6hours entry uses the hour modulo 6 and the minute.
+                  pattern: "^(([01][0-9]|2[0-3]):[0-5][0-9])?$"
                 timeZone:
                   type: string
                   maxLength: 64
@@ -490,8 +490,6 @@ spec:
                         properties:
                           period:
                             type: string
-                          time:
-                            type: string
                           day:
                             type: integer
                             format: int32
@@ -505,6 +503,8 @@ spec:
                             nullable: true
                             items:
                               type: string
+                    appliedTime:
+                      type: string
                     appliedTimeZone:
                       type: string
                       description: "Time zone that the runs use."
@@ -529,8 +529,6 @@ spec:
                               properties:
                                 period:
                                   type: string
-                                time:
-                                  type: string
                                 day:
                                   type: integer
                                   format: int32
@@ -544,6 +542,8 @@ spec:
                                   nullable: true
                                   items:
                                     type: string
+                          time:
+                            type: string
                           timeZone:
                             type: string
                             description: "Time zone before the change."
@@ -657,7 +657,49 @@ spec:
                           plan:
                             type: object
                             nullable: true
-                            x-kubernetes-preserve-unknown-fields: true
+                            properties:
+                              backupName:
+                                type: string
+                              key:
+                                type: string
+                              namingPrefix:
+                                type: string
+                              sourceEnv:
+                                type: string
+                              actionEnv:
+                                type: string
+                              hadLocal:
+                                type: array
+                                items:
+                                  type: string
+                              resumed:
+                                type: array
+                                items:
+                                  type: string
+                              replaced:
+                                type: array
+                                items:
+                                  type: string
+                              schemaCopies:
+                                type: array
+                                items:
+                                  type: string
+                              dataHosts:
+                                type: array
+                                items:
+                                  type: string
+                              copyHosts:
+                                type: array
+                                items:
+                                  type: string
+                              copyToDetached:
+                                type: boolean
+                              listed:
+                                type: boolean
+                              holdsRBAC:
+                                type: boolean
+                              giveUp:
+                                type: boolean
                 recentRuns:
                   type: array
                   nullable: true
@@ -755,7 +797,49 @@ spec:
                           plan:
                             type: object
                             nullable: true
-                            x-kubernetes-preserve-unknown-fields: true
+                            properties:
+                              backupName:
+                                type: string
+                              key:
+                                type: string
+                              namingPrefix:
+                                type: string
+                              sourceEnv:
+                                type: string
+                              actionEnv:
+                                type: string
+                              hadLocal:
+                                type: array
+                                items:
+                                  type: string
+                              resumed:
+                                type: array
+                                items:
+                                  type: string
+                              replaced:
+                                type: array
+                                items:
+                                  type: string
+                              schemaCopies:
+                                type: array
+                                items:
+                                  type: string
+                              dataHosts:
+                                type: array
+                                items:
+                                  type: string
+                              copyHosts:
+                                type: array
+                                items:
+                                  type: string
+                              copyToDetached:
+                                type: boolean
+                              listed:
+                                type: boolean
+                              holdsRBAC:
+                                type: boolean
+                              giveUp:
+                                type: boolean
                 backups:
                   type: array
                   nullable: true

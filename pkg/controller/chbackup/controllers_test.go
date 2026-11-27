@@ -218,7 +218,8 @@ func TestScheduleRunsTheRepeatedWallClockHourOnce(t *testing.T) {
 	chbs := newScheduleCR("nightly")
 	chbs.Spec.BackupNamePrefix = "nightly"
 	chbs.Spec.TimeZone = "Europe/Berlin"
-	chbs.Spec.Schedules = []api.BackupScheduleEntry{{Period: api.BackupPeriodHour, Time: "00:00", Keep: 5}}
+	chbs.Spec.Schedules = []api.BackupScheduleEntry{{Period: api.BackupPeriodHour, Keep: 5}}
+	chbs.Spec.Time = "00:00"
 	chbs.CreationTimestamp = meta.NewTime(time.Date(2026, time.October, 24, 20, 0, 0, 0, time.UTC))
 	c := newClient(t, nil, chbs)
 	controller := NewScheduleController(c, c, newScheme(t), newFakeCR(chi))

@@ -732,6 +732,7 @@ type BackupScheduleRecord struct {
 	BackupNamePrefix string `json:"backupNamePrefix,omitempty" yaml:"backupNamePrefix,omitempty"`
 	// Schedules decide whether the backup is incremental and which backups retention keeps.
 	Schedules         []BackupScheduleEntry  `json:"schedules,omitempty" yaml:"schedules,omitempty"`
+	Time              string                 `json:"time,omitempty" yaml:"time,omitempty"`
 	TimeZone          string                 `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
 	KeepBackups       []BackupRetentionPin   `json:"keepBackups,omitempty" yaml:"keepBackups,omitempty"`
 	PreviousSchedules []RetiredScheduleRules `json:"previousSchedules,omitempty" yaml:"previousSchedules,omitempty"`

@@ -717,7 +717,7 @@ func TestOrchestratorPrunesAfterAScheduledRun(t *testing.T) {
 	spec := &model.RunSpec{
 		Operation: api.BackupRunOperationBackup, Cluster: "main", Prefix: "nightly",
 		Slot:           time.Date(2026, time.November, 12, 3, 0, 0, 0, time.UTC),
-		Entries:        model.SlotEntries([]api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Time: "03:00", Keep: 2}}, ""),
+		Entries:        model.SlotEntries([]api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Keep: 2}}, "03:00", ""),
 		BackupHosts:    []string{"h0", "h1"},
 		RetentionHosts: []string{"h0", "h1"},
 	}
@@ -752,10 +752,10 @@ func TestOrchestratorRunsTheSlotOfASpringForwardGap(t *testing.T) {
 		Operation: api.BackupRunOperationBackup, Cluster: "main", Prefix: "nightly", TimeZone: "Europe/Berlin",
 		Slot: time.Date(2026, time.March, 29, 1, 30, 0, 0, time.UTC),
 		Entries: model.SlotEntries([]api.BackupScheduleEntry{
-			{Period: api.BackupPeriodDaily, Time: "02:30", Keep: 2},
-			{Period: api.BackupPeriodWeekly, Day: ptr.To(int32(0)), Time: "02:30", Keep: 1,
+			{Period: api.BackupPeriodDaily, Keep: 2},
+			{Period: api.BackupPeriodWeekly, Day: ptr.To(int32(0)), Keep: 1,
 				ConfigOverrides: []string{"S3_STORAGE_CLASS=GLACIER"}},
-		}, "Europe/Berlin"),
+		}, "02:30", "Europe/Berlin"),
 		BackupHosts:    []string{"h0"},
 		RetentionHosts: []string{"h0"},
 	}
@@ -784,8 +784,8 @@ func TestOrchestratorMakesIncrementalBackups(t *testing.T) {
 	spec := &model.RunSpec{
 		Operation: api.BackupRunOperationBackup, Cluster: "main", Prefix: "nightly",
 		Slot: time.Date(2026, time.November, 12, 3, 0, 0, 0, time.UTC),
-		Entries: model.SlotEntries([]api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Time: "03:00", Keep: 3,
-			Incremental: types.NewStringBool(true)}}, ""),
+		Entries: model.SlotEntries([]api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Keep: 3,
+			Incremental: types.NewStringBool(true)}}, "03:00", ""),
 		BackupHosts:    []string{"h0"},
 		RetentionHosts: []string{"h0"},
 	}
@@ -803,7 +803,7 @@ func TestOrchestratorNamesTheBackupOfEveryShard(t *testing.T) {
 		Operation: api.BackupRunOperationBackup, Cluster: "main", Prefix: "nightly",
 		Slot:        time.Date(2026, time.November, 12, 3, 0, 0, 0, time.UTC),
 		Naming:      model.Naming{Template: api.BackupNamingShardTime, Cluster: "main", Shards: []string{"0", "1"}, ShardOf: map[string]int{"h0": 0, "h1": 1}},
-		Entries:     model.SlotEntries([]api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Time: "03:00", Keep: 2}}, ""),
+		Entries:     model.SlotEntries([]api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Keep: 2}}, "03:00", ""),
 		BackupHosts: []string{"h0", "h1"},
 	}
 	outcome, _, _ := runOf(t, sc, spec, nil)
@@ -986,7 +986,7 @@ func TestOrchestratorListsTheSeriesRetentionKeeps(t *testing.T) {
 	spec := &model.RunSpec{
 		Operation: api.BackupRunOperationBackup, Cluster: "main", Prefix: "nightly",
 		Slot:           time.Date(2026, time.November, 12, 3, 0, 0, 0, time.UTC),
-		Entries:        model.SlotEntries([]api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Time: "03:00", Keep: 2}}, ""),
+		Entries:        model.SlotEntries([]api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Keep: 2}}, "03:00", ""),
 		BackupHosts:    []string{"h0", "h1"},
 		RetentionHosts: []string{"h0", "h1"},
 	}

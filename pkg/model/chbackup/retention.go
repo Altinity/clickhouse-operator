@@ -36,11 +36,11 @@ type SlotEntry struct {
 }
 
 // "" and an unknown zone mean UTC.
-func SlotEntries(entries []api.BackupScheduleEntry, zone string) []SlotEntry {
+func SlotEntries(entries []api.BackupScheduleEntry, scheduleTime, zone string) []SlotEntry {
 	location := loadZone(zone)
 	var resolved []SlotEntry
-	for _, entry := range api.ResolveScheduleTimes(entries) {
-		hour, minute, _ := entry.ParseTime()
+	for _, entry := range entries {
+		hour, minute, _ := api.ParseScheduleTime(scheduleTime)
 		if entry.Period == api.BackupPeriodMinute {
 			hour, minute = 0, 0
 		}
@@ -380,7 +380,7 @@ func (r Retention) heldExpiries(ordered []keyed) (held, byEntry map[string]time.
 			continue
 		}
 		location := cmp.Or(loadZone(change.TimeZone), time.UTC)
-		entries := SlotEntries(change.Schedules, change.TimeZone)
+		entries := SlotEntries(change.Schedules, change.Time, change.TimeZone)
 		longest := longestEntry(entries)
 		keys := map[string]string{}
 		for _, b := range before {

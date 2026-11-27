@@ -243,7 +243,8 @@ func newScheduleCR(name string) *api.ClickHouseBackupSchedule {
 	chbs.Namespace = testNamespace
 	chbs.UID = kubeTypes.UID(name + "-uid")
 	chbs.Spec.ClickHouseInstallation = testCHI
-	chbs.Spec.Schedules = []api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Time: "03:00", Keep: 1}}
+	chbs.Spec.Schedules = []api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Keep: 1}}
+	chbs.Spec.Time = "03:00"
 	return chbs
 }
 

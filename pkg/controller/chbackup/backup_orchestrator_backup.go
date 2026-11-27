@@ -151,16 +151,12 @@ func (o *orchestrator) planBackup(ctx context.Context) (*backupPlan, error) {
 	spec := o.spec
 	naming := spec.Naming
 	hosts := o.fallBackHosts(ctx)
-	for i := 1; i < len(hosts); i++ {
-		if slices.Contains(hosts[:i], hosts[i]) {
-			return nil, failf("the backup lists %s twice: hosts of one backup must not share a storage path", hosts[i])
-		}
-	}
 	slotTag := ""
 	if !spec.Slot.IsZero() {
 		slotTag = model.SlotTag(spec.Slot, spec.TimeZone)
 	}
 	plan := &backupPlan{hosts: hosts, commands: map[string]string{}}
+	// A ClickHouseBackup always has a name. A scheduled run has none: its name is the prefix and the slot time.
 	switch {
 	case spec.BackupName != "":
 		key, prefix, err := naming.Key("backup name", spec.BackupName, spec.Prefix)
@@ -169,14 +165,9 @@ func (o *orchestrator) planBackup(ctx context.Context) (*backupPlan, error) {
 		}
 		plan.key, plan.namingPrefix = key, prefix
 	case naming.IsTemplate():
-		if naming.HoldsPrefix() && (spec.Prefix == "") {
-			return nil, failf("the naming template '%s' holds {prefix}, which the backup name prefix gives", naming.Template)
-		}
 		plan.key, plan.namingPrefix = slotTag, spec.Prefix
-	case spec.Prefix != "":
-		plan.key = spec.Prefix + "-" + slotTag
 	default:
-		return nil, failf("the backup has no name")
+		plan.key = spec.Prefix + "-" + slotTag
 	}
 	for _, host := range hosts {
 		name, err := naming.HostName(host, plan.key, plan.namingPrefix)

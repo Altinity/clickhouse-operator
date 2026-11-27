@@ -40,11 +40,11 @@ var backupStringBoolFields = []struct {
 		return spec.SchemaOnly.IsTrue(), spec.Validate()
 	}},
 	{"suspend", false, func(t *testing.T, value string) (bool, error) {
-		spec := decodeBackupSpec[ClickHouseBackupScheduleSpec](t, `{"clickHouseInstallation":"chi","schedules":[{"period":"daily","time":"02:00","keep":1}],"suspend":`+value+`}`)
+		spec := decodeBackupSpec[ClickHouseBackupScheduleSpec](t, `{"clickHouseInstallation":"chi","schedules":[{"period":"daily","keep":1}],"time":"02:00","suspend":`+value+`}`)
 		return spec.IsSuspended(), spec.Validate()
 	}},
 	{"schemaOnly", false, func(t *testing.T, value string) (bool, error) {
-		spec := decodeBackupSpec[ClickHouseBackupScheduleSpec](t, `{"clickHouseInstallation":"chi","schedules":[{"period":"daily","time":"02:00","keep":1}],"schemaOnly":`+value+`}`)
+		spec := decodeBackupSpec[ClickHouseBackupScheduleSpec](t, `{"clickHouseInstallation":"chi","schedules":[{"period":"daily","keep":1}],"time":"02:00","schemaOnly":`+value+`}`)
 		return spec.SchemaOnly.IsTrue(), spec.Validate()
 	}},
 	{"schemaOnly", false, func(t *testing.T, value string) (bool, error) {

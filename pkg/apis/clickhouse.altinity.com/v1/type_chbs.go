@@ -103,8 +103,6 @@ func (p BackupPeriod) RequiresDay() bool {
 
 type BackupScheduleEntry struct {
 	Period BackupPeriod `json:"period" yaml:"period"`
-	// Time is "HH:MM" in the schedule time zone. All entries share one time, so entries due together make one backup.
-	Time string `json:"time,omitempty" yaml:"time,omitempty"`
 	// Day is 0..6 for weekly (0 = Sunday), 1..31 for monthly (clamped to the last day of the month).
 	Day *int32 `json:"day,omitempty" yaml:"day,omitempty"`
 	// Keep is how many newest backups of this entry retention keeps.
@@ -126,15 +124,16 @@ func (entry *BackupScheduleEntry) IsIncremental() bool {
 	return (entry != nil) && entry.Incremental.IsTrue()
 }
 
-func (entry *BackupScheduleEntry) ParseTime() (hour, minute int, err error) {
-	if (entry == nil) || (entry.Time == "") {
+// ParseScheduleTime parses the "HH:MM" time of a schedule. "" is 00:00.
+func ParseScheduleTime(scheduleTime string) (hour, minute int, err error) {
+	if scheduleTime == "" {
 		return 0, 0, nil
 	}
-	if !backupScheduleTimeRegexp.MatchString(entry.Time) {
-		return 0, 0, fmt.Errorf("%w: schedules[%s].time %q is not HH:MM", ErrInvalidBackupSpec, entry.Period, entry.Time)
+	if !backupScheduleTimeRegexp.MatchString(scheduleTime) {
+		return 0, 0, fmt.Errorf("%w: time %q is not HH:MM", ErrInvalidBackupSpec, scheduleTime)
 	}
-	hour = int(entry.Time[0]-'0')*10 + int(entry.Time[1]-'0')
-	minute = int(entry.Time[3]-'0')*10 + int(entry.Time[4]-'0')
+	hour = int(scheduleTime[0]-'0')*10 + int(scheduleTime[1]-'0')
+	minute = int(scheduleTime[3]-'0')*10 + int(scheduleTime[4]-'0')
 	return hour, minute, nil
 }
 
@@ -145,12 +144,6 @@ func (entry *BackupScheduleEntry) Validate() error {
 	if !entry.Period.IsValid() {
 		return fmt.Errorf("%w: schedules period %q is not one of %s, %s, %s, %s, %s, %s", ErrInvalidBackupSpec, entry.Period,
 			BackupPeriodMinute, BackupPeriodHour, BackupPeriod6Hours, BackupPeriodDaily, BackupPeriodWeekly, BackupPeriodMonthly)
-	}
-	if _, _, err := entry.ParseTime(); err != nil {
-		return err
-	}
-	if entry.Period.RequiresTime() && (entry.Time == "") {
-		return fmt.Errorf("%w: schedules[%s].time is required", ErrInvalidBackupSpec, entry.Period)
 	}
 	switch {
 	case entry.Period.RequiresDay() && (entry.Day == nil):
@@ -179,6 +172,9 @@ type ClickHouseBackupScheduleSpec struct {
 	Cluster string `json:"cluster,omitempty" yaml:"cluster,omitempty"`
 	// Schedules run at the slots of every entry. A run counts for every entry due at that time.
 	Schedules []BackupScheduleEntry `json:"schedules" yaml:"schedules"`
+	// Time is "HH:MM" in TimeZone, required for daily, weekly and monthly. An hour entry uses its minute,
+	// a 6hours entry its hour modulo 6 and its minute.
+	Time string `json:"time,omitempty" yaml:"time,omitempty"`
 	// TimeZone is an IANA name. Default UTC.
 	TimeZone string `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
 	// Suspend pauses new runs. A run in progress goes on.
@@ -312,36 +308,14 @@ func (spec *ClickHouseBackupScheduleSpec) IsSuspended() bool {
 	return (spec != nil) && spec.Suspend.IsTrue()
 }
 
-func SharedScheduleTime(entries []BackupScheduleEntry) string {
-	for i := range entries {
-		if entries[i].Time != "" {
-			return entries[i].Time
-		}
-	}
-	return ""
-}
-
-func ResolveScheduleTimes(entries []BackupScheduleEntry) []BackupScheduleEntry {
-	shared := SharedScheduleTime(entries)
-	if shared == "" {
-		shared = "00:00"
-	}
-	resolved := make([]BackupScheduleEntry, len(entries))
-	for i := range entries {
-		entries[i].DeepCopyInto(&resolved[i])
-		if resolved[i].Time == "" {
-			resolved[i].Time = shared
-		}
-	}
-	return resolved
-}
-
 func (spec *ClickHouseBackupScheduleSpec) validateSchedules() error {
 	if len(spec.Schedules) == 0 {
 		return fmt.Errorf("%w: schedules needs at least one entry", ErrInvalidBackupSpec)
 	}
+	if _, _, err := ParseScheduleTime(spec.Time); err != nil {
+		return err
+	}
 	periods := map[BackupPeriod]bool{}
-	sharedTime := ""
 	incremental := 0
 	for i := range spec.Schedules {
 		entry := &spec.Schedules[i]
@@ -352,12 +326,8 @@ func (spec *ClickHouseBackupScheduleSpec) validateSchedules() error {
 			return fmt.Errorf("%w: schedules has more than one %s entry", ErrInvalidBackupSpec, entry.Period)
 		}
 		periods[entry.Period] = true
-		if entry.Time != "" {
-			if (sharedTime != "") && (entry.Time != sharedTime) {
-				return fmt.Errorf("%w: schedules set times %s and %s: every entry that sets a time sets the same",
-					ErrInvalidBackupSpec, sharedTime, entry.Time)
-			}
-			sharedTime = entry.Time
+		if entry.Period.RequiresTime() && (spec.Time == "") {
+			return fmt.Errorf("%w: time is required for a %s entry", ErrInvalidBackupSpec, entry.Period)
 		}
 		if entry.IsIncremental() {
 			incremental++
@@ -462,6 +432,7 @@ type ScheduledRun struct {
 
 type ScheduleRetentionStatus struct {
 	AppliedSchedules []BackupScheduleEntry `json:"appliedSchedules,omitempty" yaml:"appliedSchedules,omitempty"`
+	AppliedTime      string                `json:"appliedTime,omitempty" yaml:"appliedTime,omitempty"`
 	AppliedTimeZone  string                `json:"appliedTimeZone,omitempty" yaml:"appliedTimeZone,omitempty"`
 	// Previous holds unreleased changes, oldest first. Retention keeps their backups until they expire under the old rules.
 	Previous []RetiredScheduleRules `json:"previous,omitempty" yaml:"previous,omitempty"`
@@ -480,6 +451,7 @@ type RetiredScheduleRules struct {
 	// ChangeID is the RFC 3339 UTC time of the change.
 	ChangeID  string                `json:"changeID" yaml:"changeID"`
 	Schedules []BackupScheduleEntry `json:"schedules,omitempty" yaml:"schedules,omitempty"`
+	Time      string                `json:"time,omitempty" yaml:"time,omitempty"`
 	TimeZone  string                `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
 	// KeepAll marks merged changes: every backup made before the change is held until Expires.
 	KeepAll bool `json:"keepAll,omitempty" yaml:"keepAll,omitempty"`

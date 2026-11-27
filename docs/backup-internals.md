@@ -739,7 +739,7 @@ Retention no longer finds them. Restore them by the names they have.
 3. Set `backup.naming: "shard{shardNum}-{YYYYMMDDHHIISS}"` on the CHI or the cluster. Use
    `{shardNum}` (the `shard_num` from 1 that this workflow uses in its names), not `{shard}` (the
    shard name from 0). Set `preferredReplica` to its `backupReplica`.
-4. Create a `ClickHouseBackupSchedule` with its entries and the same `time`s. Set `timeZone` to the
+4. Create a `ClickHouseBackupSchedule` with its entries and the same `time`. Set `timeZone` to the
    zone that its backend runs in, because its tags are wall times there. Keep the `keep` values.
    Retention then counts the backups it made, with the 30-minute tolerance.
 5. Copy the backups that it keeps by hand into `spec.retention.keepBackups` of the schedule, by their
@@ -1569,8 +1569,9 @@ select what to keep. A schedule does the same declaratively with `spec.retention
 
 ```yaml
 spec:
+  time: "03:00"                               # was 02:00
   schedules:
-    - {period: daily, time: "03:00", keep: 7}   # was 02:00, with a weekly entry keep 4
+    - {period: daily, keep: 7}                # was also a weekly entry keep 4
   retention:
     keepBackups:
       - name: default-backup-demo-nightly-20261001020000
@@ -1583,9 +1584,10 @@ status:
   retention:
     previous:
       - changeID: "2026-11-12T12:00:00Z"
+        time: "02:00"
         schedules:
-          - {period: weekly, day: 0, time: "02:00", keep: 4}
-          - {period: daily, time: "02:00", keep: 7}
+          - {period: weekly, day: 0, keep: 4}
+          - {period: daily, keep: 7}
         expires: "2026-12-10T12:00:00Z"
   clusters:
     - name: default
@@ -1596,8 +1598,8 @@ status:
           expires: "2026-11-29T02:00:00Z"
 ```
 
-**What is a change.** A change of the period, time, day or `keep` of an entry, of the list of entries,
-or of `timeZone`. A change of `incremental` is not a change.
+**What is a change.** A change of the period, day or `keep` of an entry, of the list of entries,
+of `time` or of `timeZone`. A change of `incremental` is not a change.
 
 * The operator keeps up to 16 changes. After that, it merges the oldest two into one. The merged
   change holds every backup made before the newer of the two, until the later of their `expires`.

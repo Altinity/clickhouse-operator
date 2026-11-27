@@ -24,14 +24,13 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
-// The entries of a schedule: at least one, one per period, a valid time required where the period needs one and shared
-// by every entry that sets one, a day exactly where the period needs one and in its range, keep at least 1, at most one
-// incremental entry.
+// The entries of a schedule: at least one, one per period, a day exactly where the period needs one and in its range,
+// keep at least 1, at most one incremental entry.
 func TestBackupScheduleEntriesValidate(t *testing.T) {
 	hour := BackupScheduleEntry{Period: BackupPeriodHour, Keep: 24}
-	daily := BackupScheduleEntry{Period: BackupPeriodDaily, Time: "02:30", Keep: 7}
-	weekly := BackupScheduleEntry{Period: BackupPeriodWeekly, Time: "02:30", Day: ptr.To(int32(0)), Keep: 4}
-	monthly := BackupScheduleEntry{Period: BackupPeriodMonthly, Time: "02:30", Day: ptr.To(int32(31)), Keep: 12}
+	daily := BackupScheduleEntry{Period: BackupPeriodDaily, Keep: 7}
+	weekly := BackupScheduleEntry{Period: BackupPeriodWeekly, Day: ptr.To(int32(0)), Keep: 4}
+	monthly := BackupScheduleEntry{Period: BackupPeriodMonthly, Day: ptr.To(int32(31)), Keep: 12}
 	with := func(entry BackupScheduleEntry, edit func(*BackupScheduleEntry)) BackupScheduleEntry {
 		edit(&entry)
 		return entry
@@ -52,21 +51,9 @@ func TestBackupScheduleEntriesValidate(t *testing.T) {
 		"monthly alone":                 {[]BackupScheduleEntry{monthly}, true},
 		"one of each":                   {[]BackupScheduleEntry{hour, daily, weekly, monthly, {Period: BackupPeriod6Hours, Keep: 4}}, true},
 		"hour alone, no time":           {[]BackupScheduleEntry{hour}, true},
-		"hour with a time":              {[]BackupScheduleEntry{with(hour, func(e *BackupScheduleEntry) { e.Time = "00:15" })}, true},
-		"6hours with a time":            {[]BackupScheduleEntry{{Period: BackupPeriod6Hours, Time: "13:45", Keep: 1}}, true},
-		"an unknown period":             {[]BackupScheduleEntry{{Period: "yearly", Time: "00:00", Keep: 1}}, false},
+		"hour with daily":               {[]BackupScheduleEntry{hour, daily}, true},
+		"an unknown period":             {[]BackupScheduleEntry{{Period: "yearly", Keep: 1}}, false},
 		"a period twice":                {[]BackupScheduleEntry{daily, daily}, false},
-		"daily without a time":          {[]BackupScheduleEntry{with(daily, func(e *BackupScheduleEntry) { e.Time = "" })}, false},
-		"weekly without a time":         {[]BackupScheduleEntry{with(weekly, func(e *BackupScheduleEntry) { e.Time = "" })}, false},
-		"monthly without a time":        {[]BackupScheduleEntry{with(monthly, func(e *BackupScheduleEntry) { e.Time = "" })}, false},
-		"a time of one digit":           {[]BackupScheduleEntry{with(daily, func(e *BackupScheduleEntry) { e.Time = "2:30" })}, false},
-		"a time past midnight":          {[]BackupScheduleEntry{with(daily, func(e *BackupScheduleEntry) { e.Time = "24:00" })}, false},
-		"a time with seconds":           {[]BackupScheduleEntry{with(daily, func(e *BackupScheduleEntry) { e.Time = "02:30:00" })}, false},
-		"a minute past the hour":        {[]BackupScheduleEntry{with(daily, func(e *BackupScheduleEntry) { e.Time = "02:60" })}, false},
-		"23:59":                         {[]BackupScheduleEntry{with(daily, func(e *BackupScheduleEntry) { e.Time = "23:59" })}, true},
-		"times that differ":             {[]BackupScheduleEntry{daily, with(weekly, func(e *BackupScheduleEntry) { e.Time = "03:00" })}, false},
-		"hour with another time":        {[]BackupScheduleEntry{with(hour, func(e *BackupScheduleEntry) { e.Time = "00:30" }), daily}, false},
-		"hour without a time":           {[]BackupScheduleEntry{hour, daily}, true},
 		"weekly without a day":          {[]BackupScheduleEntry{with(weekly, func(e *BackupScheduleEntry) { e.Day = nil })}, false},
 		"weekly on Saturday":            {[]BackupScheduleEntry{with(weekly, func(e *BackupScheduleEntry) { e.Day = ptr.To(int32(6)) })}, true},
 		"weekly on day 7":               {[]BackupScheduleEntry{with(weekly, func(e *BackupScheduleEntry) { e.Day = ptr.To(int32(7)) })}, false},
@@ -88,7 +75,7 @@ func TestBackupScheduleEntriesValidate(t *testing.T) {
 		"incremental that is no boolean": {[]BackupScheduleEntry{with(hour, func(e *BackupScheduleEntry) { e.Incremental = ptr.To(types.StringBool("maybe")) })}, false},
 	} {
 		t.Run(name, func(t *testing.T) {
-			err := (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: tc.entries}).Validate()
+			err := (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: tc.entries, Time: "02:30"}).Validate()
 			if tc.valid {
 				require.NoError(t, err)
 			} else {
@@ -96,6 +83,49 @@ func TestBackupScheduleEntriesValidate(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The schedule time: one for all entries, required for daily, weekly and monthly, always HH:MM.
+func TestBackupScheduleTimeValidate(t *testing.T) {
+	hour := BackupScheduleEntry{Period: BackupPeriodHour, Keep: 24}
+	daily := BackupScheduleEntry{Period: BackupPeriodDaily, Keep: 7}
+	weekly := BackupScheduleEntry{Period: BackupPeriodWeekly, Day: ptr.To(int32(0)), Keep: 4}
+	monthly := BackupScheduleEntry{Period: BackupPeriodMonthly, Day: ptr.To(int32(31)), Keep: 12}
+	for name, tc := range map[string]struct {
+		entries []BackupScheduleEntry
+		at      string
+		valid   bool
+	}{
+		"hour alone, no time":     {[]BackupScheduleEntry{hour}, "", true},
+		"hour with a time":        {[]BackupScheduleEntry{hour}, "00:15", true},
+		"6hours with a time":      {[]BackupScheduleEntry{{Period: BackupPeriod6Hours, Keep: 1}}, "13:45", true},
+		"minute with no time":     {[]BackupScheduleEntry{{Period: BackupPeriodMinute, Keep: 1}}, "", true},
+		"daily without a time":    {[]BackupScheduleEntry{daily}, "", false},
+		"weekly without a time":   {[]BackupScheduleEntry{weekly}, "", false},
+		"monthly without a time":  {[]BackupScheduleEntry{monthly}, "", false},
+		"hour and daily, no time": {[]BackupScheduleEntry{hour, daily}, "", false},
+		"a time of one digit":     {[]BackupScheduleEntry{daily}, "2:30", false},
+		"a time past midnight":    {[]BackupScheduleEntry{daily}, "24:00", false},
+		"a time with seconds":     {[]BackupScheduleEntry{daily}, "02:30:00", false},
+		"a minute past the hour":  {[]BackupScheduleEntry{daily}, "02:60", false},
+		"an invalid hour time":    {[]BackupScheduleEntry{hour}, "2:30", false},
+		"23:59":                   {[]BackupScheduleEntry{daily, weekly, monthly}, "23:59", true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: tc.entries, Time: tc.at}).Validate()
+			if tc.valid {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, ErrInvalidBackupSpec)
+			}
+		})
+	}
+	hourOf, minute, err := ParseScheduleTime("")
+	require.NoError(t, err)
+	require.Equal(t, []int{0, 0}, []int{hourOf, minute})
+	hourOf, minute, err = ParseScheduleTime("13:45")
+	require.NoError(t, err)
+	require.Equal(t, []int{13, 45}, []int{hourOf, minute})
 }
 
 func TestBackupScheduleSpecHelpers(t *testing.T) {
@@ -107,7 +137,7 @@ func TestBackupScheduleSpecHelpers(t *testing.T) {
 	spec.TimeZone = "Europe/Berlin"
 	spec.Schedules = []BackupScheduleEntry{
 		{Period: BackupPeriodHour, Keep: 24},
-		{Period: BackupPeriodDaily, Time: "02:30", Keep: 7, Incremental: types.NewStringBool(true)},
+		{Period: BackupPeriodDaily, Keep: 7, Incremental: types.NewStringBool(true)},
 	}
 	location, err = spec.GetLocation()
 	require.NoError(t, err)
@@ -116,25 +146,6 @@ func TestBackupScheduleSpecHelpers(t *testing.T) {
 	status := &ClickHouseBackupScheduleStatus{Entries: []ScheduleEntryStatus{{Period: BackupPeriodDaily, LastBackupName: "b"}}}
 	require.Equal(t, "b", status.GetEntry(BackupPeriodDaily).LastBackupName)
 	require.Nil(t, status.GetEntry(BackupPeriodHour))
-}
-
-// An hour or 6hours entry that sets no time takes the time the others share, so entries due together make one
-// backup; with no time set anywhere, 00:00. The entries given are left as they are.
-func TestResolveScheduleTimes(t *testing.T) {
-	entries := []BackupScheduleEntry{
-		{Period: BackupPeriodHour, Keep: 24},
-		{Period: BackupPeriod6Hours, Keep: 4},
-		{Period: BackupPeriodWeekly, Time: "13:45", Day: ptr.To(int32(0)), Keep: 4},
-	}
-	resolved := ResolveScheduleTimes(entries)
-	require.Equal(t, []string{"13:45", "13:45", "13:45"}, []string{resolved[0].Time, resolved[1].Time, resolved[2].Time})
-	require.Equal(t, "", entries[0].Time, "the entries given are left alone")
-	*resolved[2].Day = 3
-	require.Equal(t, int32(0), *entries[2].Day, "the copy owns its fields")
-
-	resolved = ResolveScheduleTimes([]BackupScheduleEntry{{Period: BackupPeriodHour, Keep: 1}})
-	require.Equal(t, "00:00", resolved[0].Time)
-	require.Empty(t, ResolveScheduleTimes(nil))
 }
 
 func TestOperationPhaseAbortedIsTerminal(t *testing.T) {

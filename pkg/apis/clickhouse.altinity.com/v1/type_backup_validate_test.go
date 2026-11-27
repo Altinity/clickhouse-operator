@@ -30,7 +30,7 @@ import (
 func TestBackupSpecValidate(t *testing.T) {
 	longName := strings.Repeat("a", BackupNameMaxLength+1)
 	longPrefix := strings.Repeat("a", BackupNamePrefixMaxLength+1)
-	daily := []BackupScheduleEntry{{Period: BackupPeriodDaily, Time: "02:00", Keep: 7}}
+	daily := []BackupScheduleEntry{{Period: BackupPeriodDaily, Keep: 7}}
 	for name, tc := range map[string]struct {
 		validate func() error
 		valid    bool
@@ -157,70 +157,70 @@ func TestBackupSpecValidate(t *testing.T) {
 			return (&ClickHouseBackupSpec{ClickHouseInstallation: "chi", BackupOptions: BackupOptions{ActiveDeadlineSeconds: ptr.To(int64(0))}}).Validate()
 		}, false},
 		"a schedule": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily}).Validate()
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, Time: "02:00"}).Validate()
 		}, true},
 		"a schedule without a schedule": {func() error {
 			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi"}).Validate()
 		}, false},
 		"a schedule in a time zone": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, TimeZone: "Europe/Berlin"}).Validate()
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, Time: "02:00", TimeZone: "Europe/Berlin"}).Validate()
 		}, true},
 		"a schedule in an unknown time zone": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, TimeZone: "Mars/Olympus"}).Validate()
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, Time: "02:00", TimeZone: "Mars/Olympus"}).Validate()
 		}, false},
 		"a negative starting deadline of a schedule": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, Time: "02:00",
 				StartingDeadlineSeconds: ptr.To(int64(-1))}).Validate()
 		}, false},
 		// The "-YYYYMMDDHHMMSS" suffix of a scheduled run must still fit the name.
 		"a prefix too long for the timestamp": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, Time: "02:00",
 				BackupNamePrefix: longPrefix}).Validate()
 		}, false},
 		"the longest prefix": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, Time: "02:00",
 				BackupNamePrefix: strings.Repeat("a", BackupNamePrefixMaxLength)}).Validate()
 		}, true},
 		"a dotted prefix": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, Time: "02:00",
 				BackupNamePrefix: "nightly.eu"}).Validate()
 		}, true},
 		"a prefix that is a command": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, Time: "02:00",
 				BackupNamePrefix: "x$(touch F)"}).Validate()
 		}, false},
 		"a prefix that reads as a flag": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, Time: "02:00",
 				BackupNamePrefix: "-nightly"}).Validate()
 		}, false},
 		"options of a schedule": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, Time: "02:00",
 				BackupOptions: BackupOptions{SchemaOnly: types.NewStringBool(true), ReplicaSelection: ReplicaSelectionAllReplicas,
 					Tables: []string{"db.*"}, SkipTables: []string{"db.tmp*"}, SkipTableEngines: []string{"Kafka"}, Partitions: []string{"202610"}, ActiveDeadlineSeconds: ptr.To(int64(3600))}}).Validate()
 		}, true},
 		"an unknown replica selection of a schedule": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, Time: "02:00",
 				BackupOptions: BackupOptions{ReplicaSelection: "Some"}}).Validate()
 		}, false},
 		"a table pattern of a schedule that reads as a flag": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, Time: "02:00",
 				BackupOptions: BackupOptions{Tables: []string{"-db.*"}}}).Validate()
 		}, false},
 		"a partition of a schedule with a space": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, Time: "02:00",
 				BackupOptions: BackupOptions{Partitions: []string{"2026 10"}}}).Validate()
 		}, false},
 		// status.recentRuns keeps at least one run of each outcome
 		"no successful run kept": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, Time: "02:00",
 				SuccessfulRunsHistoryLimit: ptr.To(int32(0))}).Validate()
 		}, false},
 		"no failed run kept": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, Time: "02:00",
 				FailedRunsHistoryLimit: ptr.To(int32(0))}).Validate()
 		}, false},
 		"one run of each kept": {func() error {
-			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily,
+			return (&ClickHouseBackupScheduleSpec{ClickHouseInstallation: "chi", Schedules: daily, Time: "02:00",
 				SuccessfulRunsHistoryLimit: ptr.To(int32(1)), FailedRunsHistoryLimit: ptr.To(int32(1))}).Validate()
 		}, true},
 		"a restore": {func() error {

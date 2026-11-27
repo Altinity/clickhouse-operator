@@ -28,10 +28,12 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// entriesOf parses entries written "period=daily time=02:00 day=0 keep=3 incremental=true", separated by ";".
-func entriesOf(t *testing.T, text string) []api.BackupScheduleEntry {
+// entriesOf parses entries written "period=daily time=02:00 day=0 keep=3 incremental=true", separated by ";", and the
+// schedule time, which every entry that sets time= sets the same.
+func entriesOf(t *testing.T, text string) ([]api.BackupScheduleEntry, string) {
 	t.Helper()
 	var entries []api.BackupScheduleEntry
+	at := ""
 	for _, item := range strings.Split(text, ";") {
 		if strings.TrimSpace(item) == "" {
 			continue
@@ -43,7 +45,8 @@ func entriesOf(t *testing.T, text string) []api.BackupScheduleEntry {
 			case "period":
 				entry.Period = api.BackupPeriod(value)
 			case "time":
-				entry.Time = value
+				require.True(t, (at == "") || (at == value), text)
+				at = value
 			case "day":
 				day, err := strconv.Atoi(value)
 				require.NoError(t, err)
@@ -59,7 +62,13 @@ func entriesOf(t *testing.T, text string) []api.BackupScheduleEntry {
 		require.NoError(t, entry.Validate(), item)
 		entries = append(entries, entry)
 	}
-	return entries
+	return entries, at
+}
+
+func slotEntriesOf(t *testing.T, text, zone string) []SlotEntry {
+	t.Helper()
+	entries, at := entriesOf(t, text)
+	return SlotEntries(entries, at, zone)
 }
 
 func ptrInt32(v int32) *int32 {
@@ -98,7 +107,7 @@ func TestSlotMatches(t *testing.T) {
 		{"period=monthly day=15 time=00:00 keep=1", "20260215000000", true},
 		{"period=monthly day=15 time=00:00 keep=1", "20260228000000", false},
 	} {
-		entry := SlotEntries(entriesOf(t, tc.entry), "")[0]
+		entry := slotEntriesOf(t, tc.entry, "")[0]
 		require.Equal(t, tc.match, SlotMatches(entry, tc.tag, 0), "%s at %s", tc.entry, tc.tag)
 	}
 }
@@ -106,27 +115,27 @@ func TestSlotMatches(t *testing.T) {
 // With a naming template a backup belongs to the slot of a schedule entry up to 30 minutes after the slot, as the
 // Altinity usual backup workflow names a scheduled backup after the time its run started, its seconds included.
 func TestSlotTolerance(t *testing.T) {
-	daily := SlotEntries(entriesOf(t, "period=daily time=02:00 keep=1"), "")[0]
+	daily := slotEntriesOf(t, "period=daily time=02:00 keep=1", "")[0]
 	for tag, match := range map[string]bool{
 		"20261112020000": true, "20261112022959": true, "20261112023000": false, "20261112015959": false,
 		// Past midnight, of a slot at 23:50
 	} {
 		require.Equal(t, match, SlotMatches(daily, tag, SlotTolerance), tag)
 	}
-	late := SlotEntries(entriesOf(t, "period=daily time=23:50 keep=1"), "")[0]
+	late := slotEntriesOf(t, "period=daily time=23:50 keep=1", "")[0]
 	require.True(t, SlotMatches(late, "20261113001959", SlotTolerance), "a run past midnight counts for the slot of the day before")
 	require.False(t, SlotMatches(late, "20261113002000", SlotTolerance))
 }
 
 // The heaviest entry of a slot wins: minute < hour < 6hours < daily < weekly < monthly; the operator agrees.
 func TestWinnerEntry(t *testing.T) {
-	entries := entriesOf(t, "period=minute keep=60;period=hour time=00:30 keep=24;period=6hours time=00:30 keep=4;"+
+	entries, at := entriesOf(t, "period=minute keep=60;period=hour keep=24;period=6hours keep=4;"+
 		"period=daily time=06:30 keep=7;period=weekly day=0 time=06:30 keep=4;period=monthly day=15 time=06:30 keep=12")
 	for tag, want := range map[string]string{
 		"20261112071700": "minute 0", "20261112073000": "hour 0 1", "20261112003000": "6hours 0 1 2",
 		"20261112063000": "daily 0 1 2 3", "20261122063000": "weekly 0 1 2 3 4", "20261215063000": "monthly 0 1 2 3 5",
 	} {
-		winner, matched := WinnerEntry(SlotEntries(entries, ""), tag, 0)
+		winner, matched := WinnerEntry(SlotEntries(entries, at, ""), tag, 0)
 		got := string(entries[winner].Period)
 		for _, i := range matched {
 			got += " " + strconv.Itoa(i)
@@ -160,7 +169,7 @@ func retentionOf(t *testing.T, schedules, made string, names, incomplete, empty,
 	for _, name := range keepBackups {
 		pins = append(pins, api.BackupRetentionPin{Name: name})
 	}
-	retention := Retention{Prefix: "d", Entries: SlotEntries(entriesOf(t, schedules), ""), Made: made,
+	retention := Retention{Prefix: "d", Entries: slotEntriesOf(t, schedules, ""), Made: made,
 		Pinned: PinnedKeys(Naming{}, "d", pins), Previous: previous}
 	plan := retention.Plan(names, sets)
 	return plan.Obsolete, heldNames(plan), plan.Keep
@@ -332,7 +341,8 @@ func changeAt(t *testing.T, at, zone, entries string) api.RetiredScheduleRules {
 	if entries == "*" {
 		return api.RetiredScheduleRules{ChangeID: at, TimeZone: zone, KeepAll: true}
 	}
-	return api.RetiredScheduleRules{ChangeID: at, TimeZone: zone, Schedules: entriesOf(t, entries)}
+	schedules, scheduleTime := entriesOf(t, entries)
+	return api.RetiredScheduleRules{ChangeID: at, TimeZone: zone, Schedules: schedules, Time: scheduleTime}
 }
 
 // dailyBackups returns the names of the backups of prefix d made every day at hhmmss from the first day of November
@@ -426,7 +436,7 @@ func TestRetentionOfTemplateNamedBackups(t *testing.T) {
 	for _, key := range keys {
 		sets.All[key], sets.Complete[key], sets.Sized[key] = true, true, true
 	}
-	retention := Retention{Naming: naming, Prefix: "nightly", Entries: SlotEntries(entriesOf(t, "period=daily time=02:00 keep=3"), ""),
+	retention := Retention{Naming: naming, Prefix: "nightly", Entries: slotEntriesOf(t, "period=daily time=02:00 keep=3", ""),
 		Pinned: PinnedKeys(naming, "nightly", []api.BackupRetentionPin{{Name: "shard2-20261111143000"}})}
 	require.Equal(t, []string{"20261109021733", "20261108020412"}, retention.Plan(keys, sets).Obsolete)
 }
@@ -577,7 +587,7 @@ func planOf(t *testing.T, schedules string, names, incomplete []string, previous
 	for _, name := range incomplete {
 		delete(sets.Complete, name)
 	}
-	retention := Retention{Prefix: "d", Entries: SlotEntries(entriesOf(t, schedules), ""), Pinned: PinnedKeys(Naming{}, "d", pins),
+	retention := Retention{Prefix: "d", Entries: slotEntriesOf(t, schedules, ""), Pinned: PinnedKeys(Naming{}, "d", pins),
 		Previous: previous, Now: now, Writing: writing}
 	return retention.Plan(names, sets)
 }
@@ -715,8 +725,8 @@ func TestRetentionOfIncompleteBackups(t *testing.T) {
 // A backup named after a slot whose time does not exist the day the clocks go forward, 02:30 in Berlin on 2026-03-29,
 // whose name tells 03:30, is a backup of the slot to the entries and to retention, which keeps it as it keeps any.
 func TestSlotMatchesInTheSpringForwardGap(t *testing.T) {
-	entries := entriesOf(t, "period=daily time=02:30 keep=2;period=weekly day=0 time=02:30 keep=1")
-	berlin := SlotEntries(entries, "Europe/Berlin")
+	entries, at := entriesOf(t, "period=daily time=02:30 keep=2;period=weekly day=0 time=02:30 keep=1")
+	berlin := SlotEntries(entries, at, "Europe/Berlin")
 	for tag, want := range map[string]string{
 		"20260329033000": "weekly", "20260330023000": "daily", "20260328023000": "daily",
 		"20260329033059": "weekly", "20260329033100": "", "20260329043000": "", "20260330033000": "",
@@ -732,7 +742,7 @@ func TestSlotMatchesInTheSpringForwardGap(t *testing.T) {
 	require.Equal(t, api.BackupPeriodWeekly, berlin[winner].Period)
 	require.Equal(t, []int{0, 1}, matched, "the slot is a slot of both entries")
 	// In UTC the zone has no gap: the slot is no slot of the entries
-	winner, _ = WinnerEntry(SlotEntries(entries, ""), "20260329033000", 0)
+	winner, _ = WinnerEntry(SlotEntries(entries, at, ""), "20260329033000", 0)
 	require.Equal(t, -1, winner)
 	// With the tolerance of a naming template, seconds after the slot as it is
 	require.True(t, SlotMatches(berlin[0], "20260329034959", SlotTolerance))

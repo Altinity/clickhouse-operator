@@ -139,7 +139,7 @@ func (c *ScheduleController) refreshEntries(chbs *api.ClickHouseBackupSchedule) 
 	byPeriod := map[api.BackupPeriod]*observed{}
 	for _, scheduled := range append(slices.Clone(chbs.Status.Active), chbs.Status.RecentRuns...) {
 		slot := scheduled.Slot.Time
-		for _, entry := range model.MatchingEntries(chbs.Spec.Schedules, slot.In(location)) {
+		for _, entry := range model.MatchingEntries(chbs.Spec.Schedules, chbs.Spec.Time, slot.In(location)) {
 			seen := byPeriod[entry.Period]
 			if seen == nil {
 				seen = &observed{}
@@ -306,8 +306,8 @@ func dueSlot(chbs *api.ClickHouseBackupSchedule, now time.Time) time.Time {
 		return time.Time{}
 	}
 	var latest time.Time
-	for _, entry := range api.ResolveScheduleTimes(chbs.Spec.Schedules) {
-		if slot := model.LatestSlot(entry, location, now); slot.After(latest) {
+	for _, entry := range chbs.Spec.Schedules {
+		if slot := model.LatestSlot(entry, chbs.Spec.Time, location, now); slot.After(latest) {
 			latest = slot
 		}
 	}
@@ -322,7 +322,7 @@ func missedSlots(chbs *api.ClickHouseBackupSchedule, after, slot time.Time) (int
 	if err != nil {
 		return 0, time.Time{}
 	}
-	entries := api.ResolveScheduleTimes(chbs.Spec.Schedules)
+	entries := chbs.Spec.Schedules
 	if created := chbs.GetCreationTimestamp().Time; after.Before(created) {
 		after = created.Add(-time.Nanosecond)
 	}
@@ -330,7 +330,7 @@ func missedSlots(chbs *api.ClickHouseBackupSchedule, after, slot time.Time) (int
 	for count < missedSlotsMax {
 		var next time.Time
 		for _, entry := range entries {
-			if candidate := model.NextSlot(entry, location, after); !candidate.IsZero() && (next.IsZero() || candidate.Before(next)) {
+			if candidate := model.NextSlot(entry, chbs.Spec.Time, location, after); !candidate.IsZero() && (next.IsZero() || candidate.Before(next)) {
 				next = candidate
 			}
 		}
@@ -786,7 +786,7 @@ func (c *ScheduleController) refreshNextScheduleTime(chbs *api.ClickHouseBackupS
 		return 0
 	}
 	now := c.clock.Now()
-	next := model.NextScheduleTime(chbs.Spec.Schedules, location, now)
+	next := model.NextScheduleTime(chbs.Spec.Schedules, chbs.Spec.Time, location, now)
 	if next.IsZero() {
 		return 0
 	}

@@ -262,6 +262,7 @@ func (c *BackupController) recordSchedule(ctx context.Context, chb *api.ClickHou
 		Cluster:                cluster,
 		BackupNamePrefix:       model.BackupNamePrefix(chbs),
 		Schedules:              chbs.Spec.DeepCopy().Schedules,
+		Time:                   chbs.Spec.Time,
 		TimeZone:               chbs.Spec.TimeZone,
 		KeepBackups:            slices.Clone(chbs.Spec.Retention.GetKeepBackups()),
 		PreviousSchedules:      chbs.Status.Retention.DeepCopy().GetPrevious(),

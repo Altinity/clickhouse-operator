@@ -15,6 +15,7 @@
 package chbackup
 
 import (
+	"cmp"
 	"fmt"
 	"regexp"
 	"slices"
@@ -88,8 +89,8 @@ func firstOccurrence(t time.Time) time.Time {
 }
 
 // t is in the schedule time zone.
-func matches(entry api.BackupScheduleEntry, t time.Time) bool {
-	hour, minute, err := entry.ParseTime()
+func matches(entry api.BackupScheduleEntry, scheduleTime string, t time.Time) bool {
+	hour, minute, err := api.ParseScheduleTime(scheduleTime)
 	if err != nil {
 		return false
 	}
@@ -119,23 +120,23 @@ func matches(entry api.BackupScheduleEntry, t time.Time) bool {
 }
 
 // t is in the schedule time zone. Only its hour, minute, weekday and day of month count.
-func MatchingEntries(entries []api.BackupScheduleEntry, t time.Time) []api.BackupScheduleEntry {
+func MatchingEntries(entries []api.BackupScheduleEntry, scheduleTime string, t time.Time) []api.BackupScheduleEntry {
 	var matched []api.BackupScheduleEntry
-	for _, entry := range api.ResolveScheduleTimes(entries) {
-		if matches(entry, t) {
+	for _, entry := range entries {
+		if matches(entry, scheduleTime, t) {
 			matched = append(matched, entry)
 		}
 	}
 	return matched
 }
 
-// tz nil means UTC. Resolve the entry time first. An invalid entry gives the zero time.
+// scheduleTime is spec.time. tz nil means UTC. An invalid time gives the zero time.
 // On a fall-back day only the first occurrence is a slot, because a second would get the same backup name.
-func LatestSlot(entry api.BackupScheduleEntry, tz *time.Location, now time.Time) time.Time {
+func LatestSlot(entry api.BackupScheduleEntry, scheduleTime string, tz *time.Location, now time.Time) time.Time {
 	if tz == nil {
 		tz = time.UTC
 	}
-	hour, minute, err := entry.ParseTime()
+	hour, minute, err := api.ParseScheduleTime(scheduleTime)
 	if err != nil {
 		return time.Time{}
 	}
@@ -187,12 +188,12 @@ func LatestSlot(entry api.BackupScheduleEntry, tz *time.Location, now time.Time)
 	return time.Time{}
 }
 
-// tz nil means UTC. An invalid entry gives the zero time.
-func NextSlot(entry api.BackupScheduleEntry, tz *time.Location, now time.Time) time.Time {
+// scheduleTime is spec.time. tz nil means UTC. An invalid time gives the zero time.
+func NextSlot(entry api.BackupScheduleEntry, scheduleTime string, tz *time.Location, now time.Time) time.Time {
 	if tz == nil {
 		tz = time.UTC
 	}
-	hour, minute, err := entry.ParseTime()
+	hour, minute, err := api.ParseScheduleTime(scheduleTime)
 	if err != nil {
 		return time.Time{}
 	}
@@ -206,7 +207,7 @@ func NextSlot(entry api.BackupScheduleEntry, tz *time.Location, now time.Time) t
 		}
 		return slot
 	case api.BackupPeriodHour:
-		if latest := LatestSlot(entry, tz, now); !latest.IsZero() {
+		if latest := LatestSlot(entry, scheduleTime, tz, now); !latest.IsZero() {
 			slot := latest.Add(time.Hour)
 			for {
 				if _, _, repeated := secondOccurrence(slot); !repeated {
@@ -262,10 +263,10 @@ func monthlySlot(year int, month time.Month, day, hour, minute int, tz *time.Loc
 }
 
 // Zero time means none.
-func NextScheduleTime(entries []api.BackupScheduleEntry, tz *time.Location, now time.Time) time.Time {
+func NextScheduleTime(entries []api.BackupScheduleEntry, scheduleTime string, tz *time.Location, now time.Time) time.Time {
 	var next time.Time
-	for _, entry := range api.ResolveScheduleTimes(entries) {
-		if slot := NextSlot(entry, tz, now); !slot.IsZero() && (next.IsZero() || slot.Before(next)) {
+	for _, entry := range entries {
+		if slot := NextSlot(entry, scheduleTime, tz, now); !slot.IsZero() && (next.IsZero() || slot.Before(next)) {
 			next = slot
 		}
 	}
@@ -273,13 +274,13 @@ func NextScheduleTime(entries []api.BackupScheduleEntry, tz *time.Location, now 
 }
 
 // A change of this string is a schedule change.
-func retentionRules(entries []api.BackupScheduleEntry, timeZone string) string {
+func retentionRules(entries []api.BackupScheduleEntry, scheduleTime, timeZone string) string {
 	var formatted []string
-	for _, entry := range api.ResolveScheduleTimes(entries) {
-		formatted = append(formatted, fmt.Sprintf("%s %s %d %d", entry.Period, entry.Time, entry.GetDay(), entry.Keep))
+	for _, entry := range entries {
+		formatted = append(formatted, fmt.Sprintf("%s %d %d", entry.Period, entry.GetDay(), entry.Keep))
 	}
 	slices.Sort(formatted)
-	return strings.Join(formatted, ";") + "|" + timeZone
+	return strings.Join(formatted, ";") + "|" + cmp.Or(scheduleTime, "00:00") + "|" + timeZone
 }
 
 // With onScheduleChange Hold, a change saves the old entries, so retention keeps their backups.
@@ -291,10 +292,10 @@ func TrackScheduleRetention(chbs *api.ClickHouseBackupSchedule, now time.Time) s
 		chbs.Status.Retention = status
 	}
 	held := ""
-	spec := retentionRules(chbs.Spec.Schedules, chbs.Spec.TimeZone)
+	spec := retentionRules(chbs.Spec.Schedules, chbs.Spec.Time, chbs.Spec.TimeZone)
 	switch {
 	case len(status.AppliedSchedules) == 0:
-	case retentionRules(status.AppliedSchedules, status.AppliedTimeZone) == spec:
+	case retentionRules(status.AppliedSchedules, status.AppliedTime, status.AppliedTimeZone) == spec:
 	case chbs.Spec.Retention.GetOnScheduleChange() == api.RetentionHold:
 		// A changeID is a time, always later than earlier changeIDs, so releasing an earlier change never releases it.
 		changed := now.UTC().Truncate(time.Second)
@@ -302,11 +303,13 @@ func TrackScheduleRetention(chbs *api.ClickHouseBackupSchedule, now time.Time) s
 			changed = latest.Add(time.Second)
 		}
 		held = changed.Format(time.RFC3339)
-		change := api.RetiredScheduleRules{ChangeID: held, Schedules: status.AppliedSchedules, TimeZone: status.AppliedTimeZone}
+		change := api.RetiredScheduleRules{ChangeID: held, Schedules: status.AppliedSchedules, Time: status.AppliedTime,
+			TimeZone: status.AppliedTimeZone}
 		change.Expires = formatHeldUntil(entriesExpiry(changed, change.Schedules))
 		status.Previous = append(status.Previous, change)
 	}
 	status.AppliedSchedules = slices.Clone(chbs.Spec.DeepCopy().Schedules)
+	status.AppliedTime = chbs.Spec.Time
 	status.AppliedTimeZone = chbs.Spec.TimeZone
 	if release, err := time.Parse(time.RFC3339, chbs.Spec.Retention.GetReleaseHeld()); err == nil {
 		status.Previous = slices.DeleteFunc(status.Previous, func(previous api.RetiredScheduleRules) bool {

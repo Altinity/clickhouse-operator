@@ -41,10 +41,6 @@ spec:
 
   # The periods of the backups. At most one entry per period:
   # minute (every minute, no time, for tests), hour, 6hours, daily, weekly, monthly.
-  # - time: HH:MM in spec.timeZone. Required for daily, weekly and monthly. All entries with a time
-  #   must use the same time. An hour or 6hours entry without a time uses it: hour uses only its
-  #   minute, 6hours uses its hour modulo 6 and its minute. Entries due at the same time make one
-  #   backup.
   # - day: required for weekly (0..6, 0 is Sunday) and monthly (1..31). In a shorter month, a day
   #   after the end means the last day.
   # - keep: how many of the newest backups of the runs that match the entry to keep. The newest
@@ -53,15 +49,18 @@ spec:
     - period: hour
       keep: 24
     - period: daily
-      time: "02:30"
       keep: 7
     - period: weekly
-      time: "02:30"
       day: 0
       keep: 4
       # At most one entry can make incremental backups, on the newest backup of the series. When the
       # chain of incremental backups is as long as keep, the next run makes a full backup.
       # incremental: true
+
+  # The time, HH:MM in timeZone, for all entries. Required with a daily, weekly or monthly entry. An hour
+  # entry uses only its minute, a 6hours entry its hour modulo 6 and its minute. Entries due at
+  # the same time make one backup.
+  time: "02:30"
 
   # The IANA time zone of the entries. Default: UTC
   # timeZone: Europe/Berlin

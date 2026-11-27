@@ -67,7 +67,7 @@ func TestValidateConfigOverrides(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			require.Equal(t, tc.valid, ValidateConfigOverrides("configOverrides", tc.items) == nil, "%v", tc.items)
-			entry := BackupScheduleEntry{Period: BackupPeriodDaily, Time: "03:00", Keep: 1, ConfigOverrides: tc.items}
+			entry := BackupScheduleEntry{Period: BackupPeriodDaily, Keep: 1, ConfigOverrides: tc.items}
 			require.Equal(t, tc.valid, entry.Validate() == nil)
 			backup := ClickHouseBackupSpec{ClickHouseInstallation: "chi", ConfigOverrides: tc.items}
 			require.Equal(t, tc.valid, backup.Validate() == nil)

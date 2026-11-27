@@ -73,7 +73,8 @@ func testSchedule(name string) *api.ClickHouseBackupSchedule {
 	chbs.Name = name
 	chbs.Namespace = testNamespace
 	chbs.Spec.ClickHouseInstallation = "demo"
-	chbs.Spec.Schedules = []api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Time: "03:00", Keep: 1}}
+	chbs.Spec.Schedules = []api.BackupScheduleEntry{{Period: api.BackupPeriodDaily, Keep: 1}}
+	chbs.Spec.Time = "03:00"
 	return chbs
 }
 

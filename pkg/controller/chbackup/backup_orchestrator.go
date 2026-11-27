@@ -409,11 +409,25 @@ func synchronous(command string) bool {
 	return strings.HasPrefix(command, commandDeleteLocal+" ") || strings.HasPrefix(command, commandDeleteRemote+" ")
 }
 
-func (o *orchestrator) lost(ctx context.Context, action *api.BackupRunAction, name string) (bool, bool, error) {
+// lostState is what happened to a command whose row is gone from system.backup_actions.
+type lostState int
+
+const (
+	// lostRunning: the sidecar runs the command again, in a new row.
+	lostRunning lostState = iota
+	// lostDone: the command finished before the sidecar restarted.
+	lostDone
+	// lostFailed: the outcome is unknown, so the command counts as failed.
+	lostFailed
+)
+
+// findLost checks a command whose row is gone. system.backup_actions lives in the sidecar memory,
+// so a sidecar restart removes the row.
+func (o *orchestrator) findLost(ctx context.Context, action *api.BackupRunAction, name string) (lostState, error) {
 	if rows, err := o.sc.Actions(ctx, action.Host, action.TimeFrom); err == nil {
 		for _, row := range rows {
 			if strings.HasSuffix(row.Command, " "+name) && row.running() {
-				return true, false, nil
+				return lostRunning, nil
 			}
 		}
 	}
@@ -424,14 +438,14 @@ func (o *orchestrator) lost(ctx context.Context, action *api.BackupRunAction, na
 	case strings.HasPrefix(action.Command, commandDownload):
 		where = "local"
 	default:
-		return false, false, fmt.Errorf("%s: the sidecar restarted during %s, which it does not resume: the %s is partially applied",
+		return lostFailed, fmt.Errorf("%s: the sidecar restarted during %s, which it does not resume: the %s is partially applied",
 			action.Host, action.Command, o.spec.Operation)
 	}
 	if usable, err := o.usable(ctx, action.Host, where, name); (err == nil) && usable {
 		o.logf("%s: %s completed before the sidecar restarted", action.Host, action.Command)
-		return false, true, nil
+		return lostDone, nil
 	}
-	return false, false, fmt.Errorf("%s: the sidecar restarted during %s and resumed nothing, the outcome is unknown", action.Host,
+	return lostFailed, fmt.Errorf("%s: the sidecar restarted during %s and resumed nothing, the outcome is unknown", action.Host,
 		action.Command)
 }
 
@@ -487,15 +501,15 @@ func (o *orchestrator) wait(ctx context.Context, actions []*api.BackupRunAction,
 					running = append(running, action)
 					continue
 				}
-				resumed, done, lostErr := o.lost(ctx, action, names[action.Host])
-				switch {
-				case resumed:
+				state, lostErr := o.findLost(ctx, action, names[action.Host])
+				switch state {
+				case lostRunning:
 					empty[action.Host] = 0
 					running = append(running, action)
-				case done:
+				case lostDone:
 					action.Status = actionSuccess
 					o.record(*action)
-				default:
+				case lostFailed:
 					failures[action.Host] = lostErr
 				}
 				continue
