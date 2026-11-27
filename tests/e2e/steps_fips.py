@@ -411,7 +411,8 @@ def fips_binary_argv(binary_path, args, env=None):
             dirs.add(path if os.path.isdir(path) else os.path.dirname(path))
     if getattr(context, "fips_local_openssl_tls_dir", None):
         dirs.add(context.fips_local_openssl_tls_dir)
-    argv = ["docker", "run", "--rm", "--network", "host", "--platform", context.fips_run_platform]
+    argv = ["docker", "run", "--rm", "--network", "host", "--platform", context.fips_run_platform,
+            "--user", f"{os.getuid()}:{os.getgid()}"]
     for directory in sorted(dirs):
         argv += ["-v", f"{directory}:{directory}"]
     for key, value in env.items():
