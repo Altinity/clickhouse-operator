@@ -17,8 +17,8 @@ REPO="github.com/altinity/clickhouse-operator"
 
 # 0.9.3
 VERSION=$(cd "${SRC_ROOT}" && cat release)
-# 885c3f7
-GIT_SHA=$(cd "${SRC_ROOT}" && git rev-parse --short HEAD)
+# 885c3f7. The image build passes it in, because the build context has no .git
+GIT_SHA="${GIT_SHA:-$(cd "${SRC_ROOT}" && git rev-parse --short HEAD)}"
 # 2020-03-07 14:54:56
 NOW=$(date "+%FT%T")
 # Which version of golang to use. Ex.: 1.23.0
