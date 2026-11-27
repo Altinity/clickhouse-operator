@@ -385,12 +385,54 @@ def fips_extract_shipped_binaries(self):
             time.sleep(attempt * 3)
 
     self.context.fips_extract_dir = extract_dir
+    self.context.fips_run_image = operator_image
+    # The image platform, so docker does not warn into the output when it differs from the host.
+    self.context.fips_run_platform = kubectl.run_host_cmd(
+        f"docker image inspect -f '{{{{.Os}}}}/{{{{.Architecture}}}}' {shlex.quote(operator_image)}"
+    ).strip()
     self.context.fips_op_bin = op_bin
     self.context.fips_me_bin = me_bin
     self.context.cleanup(cleanup_fips_extract_dir)
 
     note(f"extracted {operator_image} -> {op_bin}")
     note(f"extracted {metrics_exporter_image} -> {me_bin}")
+
+
+def fips_binary_argv(binary_path, args, env=None):
+    """Return the command that runs an extracted binary in a container of the operator image, on the host
+    network, with every directory it reads mounted at the same path. It works on any docker host."""
+    # The image sets GODEBUG. Empty it unless the caller sets it, so the binary runs as on a host without it.
+    env = {"GODEBUG": "", **{key: value for key, value in (env or {}).items() if os.environ.get(key) != value}}
+    context = current().context
+    dirs = {os.path.dirname(binary_path)}
+    for value in [*args, *env.values()]:
+        path = value.split("=", 1)[-1]
+        if path.startswith("/") and os.path.exists(path):
+            dirs.add(path if os.path.isdir(path) else os.path.dirname(path))
+    if getattr(context, "fips_local_openssl_tls_dir", None):
+        dirs.add(context.fips_local_openssl_tls_dir)
+    argv = ["docker", "run", "--rm", "--network", "host", "--platform", context.fips_run_platform]
+    for directory in sorted(dirs):
+        argv += ["-v", f"{directory}:{directory}"]
+    for key, value in env.items():
+        argv += ["-e", f"{key}={value}"]
+    return argv + ["--entrypoint", binary_path, context.fips_run_image, *args]
+
+
+def elf_section_offset(binary_path, name):
+    """Return the file offset of an ELF64 little-endian section, or None."""
+    with open(binary_path, "rb") as f:
+        data = f.read()
+    shoff, = struct.unpack_from("<Q", data, 0x28)
+    shentsize, shnum, shstrndx = struct.unpack_from("<HHH", data, 0x3A)
+    names_offset, = struct.unpack_from("<Q", data, shoff + shstrndx * shentsize + 0x18)
+    for i in range(shnum):
+        header = shoff + i * shentsize
+        name_index, = struct.unpack_from("<I", data, header)
+        end = data.index(b"\0", names_offset + name_index)
+        if data[names_offset + name_index:end].decode() == name:
+            return struct.unpack_from("<Q", data, header + 0x18)[0]
+    return None
 
 
 @TestStep(Then)
@@ -405,9 +447,7 @@ def check_binary_go_version(self, binary_path, version):
 @TestStep(Given)
 def run_fips_info(self, binary_path, env=None):
     """Run binary --fips-info and parse YAML output."""
-    env = env or {}
-    env_prefix = " ".join(f'{k}="{v}"' for k, v in env.items())
-    cmd = f"{env_prefix} {shlex.quote(binary_path)} --fips-info".strip()
+    cmd = " ".join(shlex.quote(arg) for arg in fips_binary_argv(binary_path, ["--fips-info"], env))
     return yaml.safe_load(kubectl.run_shell(cmd))
 
 
@@ -2617,12 +2657,7 @@ def run_binary_with_forced_fips_cast_failure(
 ):
     """Run binary with GODEBUG forcing the named FIPS CAST/PCT to fail."""
     result = subprocess.run(
-        [
-            "env",
-            f"GODEBUG=fips140=only,failfipscast={cast_name}",
-            binary_path,
-            "--version",
-        ],
+        fips_binary_argv(binary_path, ["--version"], {"GODEBUG": f"fips140=only,failfipscast={cast_name}"}),
         text=True,
         capture_output=True,
         check=False,
@@ -2702,14 +2737,10 @@ def _fips_hostrun_env(kubeconfig_path, namespace=None, operator_pod_name=None):
 def check_fips_integrity_failure(self, binary_path, binary_label):
     """Assert binary panics when the .go.fipsinfo HMAC is tampered with."""
 
-    cmd = f"readelf -S -W {shlex.quote(binary_path)}"
-    readelf_out = kubectl.run_shell(cmd)
-
-    match = re.search(r"\.go\.fipsinfo\s+\w+\s+\w+\s+([0-9a-fA-F]+)", readelf_out)
-    assert match, error(f"{binary_label}: .go.fipsinfo section not found in ELF headers")
+    section_offset = elf_section_offset(binary_path, ".go.fipsinfo")
+    assert section_offset is not None, error(f"{binary_label}: .go.fipsinfo section not found in ELF headers")
 
     with Given("I edit the binary to corrupt the .go.fipsinfo HMAC"):
-        section_offset = int(match.group(1), 16)
         hmac_byte_offset = section_offset + 16
 
         corrupted_bin = f"{binary_path}.corrupted"
@@ -2724,8 +2755,7 @@ def check_fips_integrity_failure(self, binary_path, binary_label):
 
     with When("I execute --version on a corrupted bin file"):
         result = subprocess.run(
-            [corrupted_bin, "--version"],
-            env={"GODEBUG": "fips140=on"},
+            fips_binary_argv(corrupted_bin, ["--version"], {"GODEBUG": "fips140=on"}),
             capture_output=True,
             text=True,
             check=False
@@ -2935,13 +2965,15 @@ def _run_fips_binary_until_tls_probe(
     max_wait_sec=45,
 ):
     process = subprocess.Popen(
-        [
+        fips_binary_argv(
             binary_path,
-            "-logtostderr=true",
-            "-v=2",
-            f"--config={config_path}",
-        ],
-        env=env,
+            [
+                "-logtostderr=true",
+                "-v=2",
+                f"--config={config_path}",
+            ],
+            env,
+        ),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
@@ -3172,7 +3204,8 @@ def assert_local_fake_k8s_tls_probe(
             with Then(f"check {binary_label} negotiates {cipher_suite}"):
                 cipher_line = f"CIPHER is {cipher_suite}"
                 assert cipher_suite and cipher_line in server_log, error(
-                    f"{binary_label} {label}: expected {cipher_suite!r} in server log, but none found"
+                    f"{binary_label} {label}: expected {cipher_suite!r} in server log, but none found\n"
+                    f"binary output tail:\n{output[-2000:]}"
                 )
                 note(f"cipher proof: {cipher_line} - found in logs")
         else:
@@ -4212,16 +4245,18 @@ def _run_metrics_exporter_against_local_fake_clickhouse(
         with Given(f"metrics-exporter listening on 127.0.0.1:{metrics_port}"):
             log_file = open(log_path, "w", encoding="utf-8")
             process = subprocess.Popen(
-                [
+                fips_binary_argv(
                     binary_path,
-                    "-logtostderr=true",
-                    "-v=1",
-                    f"--kubeconfig={kubeconfig_path}",
-                    f"--config={config_path}",
-                    f"--metrics-endpoint={metrics_endpoint}",
-                    f"--chi-list-endpoint={metrics_endpoint}",
-                ],
-                env=env,
+                    [
+                        "-logtostderr=true",
+                        "-v=1",
+                        f"--kubeconfig={kubeconfig_path}",
+                        f"--config={config_path}",
+                        f"--metrics-endpoint={metrics_endpoint}",
+                        f"--chi-list-endpoint={metrics_endpoint}",
+                    ],
+                    env,
+                ),
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
             )
@@ -4296,13 +4331,15 @@ def _run_operator_against_openssl_s_server(
         with When("clickhouse-operator starts"):
             log_file = open(log_path, "w", encoding="utf-8")
             process = subprocess.Popen(
-                [
+                fips_binary_argv(
                     binary_path,
-                    "-logtostderr=true",
-                    "-v=2",
-                    f"--config={config_path}",
-                ],
-                env=env,
+                    [
+                        "-logtostderr=true",
+                        "-v=2",
+                        f"--config={config_path}",
+                    ],
+                    env,
+                ),
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
             )
