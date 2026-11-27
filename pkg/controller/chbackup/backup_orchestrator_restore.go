@@ -61,14 +61,14 @@ func (o *orchestrator) restore(ctx context.Context) error {
 	}
 	if o.step() == "" {
 		if err := o.planRestore(ctx, hosts); err != nil {
-			if o.sourceEnv != "" {
+			if o.source.env != "" {
 				o.dropSourceCopies(context.WithoutCancel(ctx), false)
 			}
 			return err
 		}
 	}
 	plan := o.plan()
-	o.sourceEnv, o.sourceShown = plan.SourceEnv, plan.SourceShown
+	o.source.env, o.source.path = plan.SourceEnv, plan.SourceShown
 	name := spec.BackupName
 	hadLocal := plan.HadLocal
 
@@ -355,8 +355,8 @@ func (o *orchestrator) restoreEnv() string {
 	if overrides := configOverrides(spec.ConfigOverrides); overrides != "" {
 		flags = append(flags, strings.TrimSpace(overrides))
 	}
-	if o.sourceEnv != "" {
-		flags = append(flags, o.sourceEnv)
+	if o.source.env != "" {
+		flags = append(flags, o.source.env)
 	}
 	flags = append(flags, skipEnv(spec.SkipTables, spec.SkipTableEngines)...)
 	if len(spec.Partitions) > 0 {
@@ -386,12 +386,12 @@ func (o *orchestrator) planRestore(ctx context.Context, hosts restoreHosts) erro
 			return err
 		}
 	}
-	if o.sourceEnv != "" {
+	if o.source.env != "" {
 		for _, host := range hosts.all {
 			if err := o.refuseLocalCopy(ctx, host); err != nil {
 				return err
 			}
-			if !o.sourceOwnPath {
+			if !o.source.ownStoragePath {
 				if err := o.refuseOwnBackup(ctx, host); err != nil {
 					return err
 				}
@@ -405,10 +405,10 @@ func (o *orchestrator) planRestore(ctx context.Context, hosts restoreHosts) erro
 			backup := o.backupNames[host]
 			var row *backupRow
 			where := "the storage of " + host
-			if o.sourceEnv != "" {
-				where = fmt.Sprintf("the storage path '%s' of %s", o.sourceShown, host)
+			if o.source.env != "" {
+				where = fmt.Sprintf("the storage path '%s' of %s", o.source.path, host)
 				// A schema copy would overwrite the local copy and be deleted with it.
-				resumed := o.resumable[host]
+				resumed := o.source.resumesDownload[host]
 				if !resumed {
 					if err := o.sourceCopy(ctx, host); err != nil {
 						return err
@@ -426,10 +426,10 @@ func (o *orchestrator) planRestore(ctx context.Context, hosts restoreHosts) erro
 						"the backup in %s, is checked by its download, which resumes it", host, backup, where)
 					continue
 				}
-				if (row.Required != "") && o.ownBackups[host][row.Required] {
+				if (row.Required != "") && o.source.ownRemote[host][row.Required] {
 					return failf("preflight failed: backup %s is incremental from %s, and %s holds a backup %s at its own storage path "+
 						"too, which clickhouse-backup would take for the one at the storage path '%s', as it tells the backups of every "+
-						"path apart by name alone: delete that one first", backup, row.Required, host, row.Required, o.sourceShown)
+						"path apart by name alone: delete that one first", backup, row.Required, host, row.Required, o.source.path)
 				}
 			} else {
 				rows, err := o.list(ctx, host, "remote")
@@ -437,10 +437,10 @@ func (o *orchestrator) planRestore(ctx context.Context, hosts restoreHosts) erro
 					return failf("preflight failed on %s: %v", host, err)
 				}
 				if row = findBackup(rows, backup); row == nil {
-					if strings.Contains(o.pathResult.Path, "{replica}") {
+					if strings.Contains(o.storagePaths.Path, "{replica}") {
 						return failf("preflight failed: backup %s is missing in the storage of %s: the storage path '%s' holds {replica}, "+
 							"which gives every replica a path of its own, and the backup was made on the first replica of each shard only%s",
-							backup, host, o.pathResult.Path, hint)
+							backup, host, o.storagePaths.Path, hint)
 					}
 					return failf("preflight failed: backup %s is missing in the storage of %s%s", backup, host, hint)
 				}
@@ -464,7 +464,7 @@ func (o *orchestrator) planRestore(ctx context.Context, hosts restoreHosts) erro
 			schemaCopies = append(schemaCopies, host)
 		}
 	}
-	if o.sourceEnv == "" {
+	if o.source.env == "" {
 		for _, host := range hosts.all {
 			if slices.Contains(schemaCopies, host) {
 				continue
@@ -488,7 +488,7 @@ func (o *orchestrator) planRestore(ctx context.Context, hosts restoreHosts) erro
 			return err
 		}
 		for _, host := range hosts.all {
-			if o.resumable[host] && !slices.Contains(schemaCopies, host) {
+			if o.source.resumesDownload[host] && !slices.Contains(schemaCopies, host) {
 				resumed = append(resumed, host)
 			}
 		}
@@ -499,8 +499,8 @@ func (o *orchestrator) planRestore(ctx context.Context, hosts restoreHosts) erro
 	}
 	plan := api.BackupRunPlan{
 		ActionEnv:      o.restoreEnv(),
-		SourceEnv:      o.sourceEnv,
-		SourceShown:    o.sourceShown,
+		SourceEnv:      o.source.env,
+		SourceShown:    o.source.path,
 		HadLocal:       hadLocal,
 		Resumed:        resumed,
 		Replaced:       replaced,
@@ -523,17 +523,17 @@ func (o *orchestrator) planRestore(ctx context.Context, hosts restoreHosts) erro
 
 func (o *orchestrator) otherInstallationHint() string {
 	var macros, what, fields []string
-	if strings.Contains(o.pathResult.Path, "{installation}") {
+	if strings.Contains(o.storagePaths.Path, "{installation}") {
 		macros, what, fields = append(macros, "{installation}"), append(what, "name"), append(fields, "sourceInstallation")
 	}
-	if strings.Contains(o.pathResult.Path, "{namespace}") {
+	if strings.Contains(o.storagePaths.Path, "{namespace}") {
 		macros, what, fields = append(macros, "{namespace}"), append(what, "namespace"), append(fields, "sourceNamespace")
 	}
 	if len(macros) == 0 {
 		return ""
 	}
 	return fmt.Sprintf("; the storage path '%s' holds %s, which keeps apart the backups of installations of another %s: a backup "+
-		"made by one of them is found by naming that installation in the restore (%s)", o.pathResult.Path, strings.Join(macros, " and "),
+		"made by one of them is found by naming that installation in the restore (%s)", o.storagePaths.Path, strings.Join(macros, " and "),
 		strings.Join(what, " or "), strings.Join(fields, ", "))
 }
 
@@ -575,7 +575,7 @@ func (o *orchestrator) sourcePaths() error {
 		}
 		return nil
 	}
-	self := o.pathResult
+	self := o.storagePaths
 	if self.StoragePrefix == "" {
 		return failf("a restore from another installation needs the storage paths of the sidecars, which it reads the backup at with "+
 			"the {installation} and {namespace} of that installation, and the storage path check cannot tell them: %s", self.Unknown)
@@ -588,7 +588,7 @@ func (o *orchestrator) sourcePaths() error {
 		return nil
 	}
 	if sourcePath == self.Path {
-		o.sourceOwnPath = true
+		o.source.ownStoragePath = true
 	} else if (sourceObject != "") && (sourceObject == self.ObjectDiskPath) {
 		return failf("the object disk path '%s' of cluster %s holds no {installation} or {namespace} that tells the installation "+
 			"restore %s names apart from this one, while the storage path does: deleting the copy the restore downloads would delete "+
@@ -601,25 +601,25 @@ func (o *orchestrator) sourcePaths() error {
 				"restore: only a path of letters, digits and _ . / { } - can", value, name)
 		}
 	}
-	o.sourceEnv = fmt.Sprintf("--env=%s_PATH=%s", self.StoragePrefix, sourcePath)
+	o.source.env = fmt.Sprintf("--env=%s_PATH=%s", self.StoragePrefix, sourcePath)
 	if sourceObject != "" {
-		o.sourceEnv += fmt.Sprintf(" --env=%s_OBJECT_DISK_PATH=%s", self.StoragePrefix, sourceObject)
+		o.source.env += fmt.Sprintf(" --env=%s_OBJECT_DISK_PATH=%s", self.StoragePrefix, sourceObject)
 	}
 	if (installation != "") && strings.Contains(sourcePath, "{replica}") {
-		o.sourceHint = "; the storage path holds {replica}, the host name, which holds the name of the installation, so the hosts " +
+		o.source.missingHint = "; the storage path holds {replica}, the host name, which holds the name of the installation, so the hosts " +
 			"of installations of different names have different paths"
 	}
-	o.sourceShown = sourcePath
+	o.source.path = sourcePath
 	if expanded, unknown := model.ExpandMacros(sourcePath, check.Installation, check.Namespace, self.ClusterName, "{shard}"); unknown == "" {
-		o.sourceShown = expanded
+		o.source.path = expanded
 	}
-	o.logf("restore %s: reading the backup at the storage path '%s' of the installation it names", name, o.sourceShown)
+	o.logf("restore %s: reading the backup at the storage path '%s' of the installation it names", name, o.source.path)
 	return nil
 }
 
 // clickhouse-backup would restore a local copy instead of the other installation's backup.
 func (o *orchestrator) refuseLocalCopy(ctx context.Context, host string) error {
-	if o.noLocalCopy[host] {
+	if o.source.localChecked[host] {
 		return nil
 	}
 	name := o.backupNames[host]
@@ -630,19 +630,19 @@ func (o *orchestrator) refuseLocalCopy(ctx context.Context, host string) error {
 	if present && o.downloaded(host, name) {
 		o.logf("%s: holds the local copy of %s this restore downloaded, whose download it resumes", host, name)
 		if o.downloadedEarlier(host, name, false) {
-			if o.resumable == nil {
-				o.resumable = map[string]bool{}
+			if o.source.resumesDownload == nil {
+				o.source.resumesDownload = map[string]bool{}
 			}
-			o.resumable[host] = true
+			o.source.resumesDownload[host] = true
 		}
 	} else if present {
 		return failf("preflight failed: %s holds a local copy of %s, which a restore from the storage paths of another installation "+
 			"would restore in place of the backup there; delete it (clickhouse-backup delete local %s) and restore again", host, name, name)
 	}
-	if o.noLocalCopy == nil {
-		o.noLocalCopy = map[string]bool{}
+	if o.source.localChecked == nil {
+		o.source.localChecked = map[string]bool{}
 	}
-	o.noLocalCopy[host] = true
+	o.source.localChecked[host] = true
 	return nil
 }
 
@@ -709,43 +709,43 @@ func (o *orchestrator) refuseOwnBackup(ctx context.Context, host string) error {
 	if err != nil {
 		return failf("preflight failed on %s: %v", host, err)
 	}
-	if o.ownBackups == nil {
-		o.ownBackups = map[string]map[string]bool{}
+	if o.source.ownRemote == nil {
+		o.source.ownRemote = map[string]map[string]bool{}
 	}
-	o.ownBackups[host] = map[string]bool{}
+	o.source.ownRemote[host] = map[string]bool{}
 	for _, row := range rows {
-		o.ownBackups[host][row.Name] = true
+		o.source.ownRemote[host][row.Name] = true
 	}
 	name := o.backupNames[host]
-	if o.ownBackups[host][name] {
+	if o.source.ownRemote[host][name] {
 		return failf("preflight failed: %s holds a backup %s at its own storage path too, which clickhouse-backup would take for the "+
 			"one at the storage path '%s', as it tells the backups of every path apart by name alone: restore a backup of another name, "+
-			"or delete that one first", host, name, o.sourceShown)
+			"or delete that one first", host, name, o.source.path)
 	}
 	return nil
 }
 
 func (o *orchestrator) sourceCopy(ctx context.Context, host string) error {
-	if slices.Contains(o.sourceCopies, host) {
+	if slices.Contains(o.source.schemaCopies, host) {
 		return nil
 	}
 	if err := o.refuseLocalCopy(ctx, host); err != nil {
 		return err
 	}
-	o.sourceCopies = append(o.sourceCopies, host)
+	o.source.schemaCopies = append(o.source.schemaCopies, host)
 	name := o.backupNames[host]
-	if err := o.runOne(ctx, stepSource, host, "download --schema --rbac "+o.sourceEnv+" "+name, false); err != nil {
+	if err := o.runOne(ctx, stepSource, host, "download --schema --rbac "+o.source.env+" "+name, false); err != nil {
 		return failf("preflight failed: backup %s is missing in the storage path '%s' of %s, or cannot be read there: %v%s", name,
-			o.sourceShown, host, err, o.sourceHint)
+			o.source.path, host, err, o.source.missingHint)
 	}
 	return nil
 }
 
 // The restore would treat a schema copy as its own, so strict deletes them before it.
 func (o *orchestrator) dropSourceCopies(ctx context.Context, strict bool) error {
-	hosts := slices.Clone(o.sourceCopies)
+	hosts := slices.Clone(o.source.schemaCopies)
 	if !strict {
-		o.sourceCopies = nil
+		o.source.schemaCopies = nil
 		o.bestEffort = true
 		defer func() { o.bestEffort = false }()
 	}
@@ -768,7 +768,7 @@ func (o *orchestrator) dropSourceCopies(ctx context.Context, strict bool) error 
 				"left: %v; delete it by hand with %s", host, name, err, deleteByHand(name))
 		}
 		if strict {
-			o.sourceCopies = o.sourceCopies[1:]
+			o.source.schemaCopies = o.source.schemaCopies[1:]
 		}
 	}
 	return nil

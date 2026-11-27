@@ -116,22 +116,42 @@ type orchestrator struct {
 	clock     clock.WithTicker
 	poll      time.Duration
 	startedAt time.Time
-	resumed   bool
-	elapsed   time.Duration
+	// resumed is true when the run goes on after an operator restart.
+	resumed bool
+	// elapsed is the run time before that restart. It counts against the deadline.
+	elapsed time.Duration
 
-	lastWarning   string
-	bestEffort    bool
-	outcome       runOutcome
-	sourceEnv     string
-	sourceShown   string
-	sourceOwnPath bool
-	sourceHint    string
-	sourceCopies  []string
-	noLocalCopy   map[string]bool
-	ownBackups    map[string]map[string]bool
-	pathResult    model.PathCheckResult
-	backupNames   map[string]string
-	resumable     map[string]bool
+	outcome runOutcome
+	// lastWarning is the last message of warnf, for the event that follows it.
+	lastWarning string
+	// bestEffort makes a failed command a warning, and the run goes on.
+	bestEffort bool
+	// backupNames maps a host to the name of its backup.
+	backupNames map[string]string
+	// storagePaths is the result of the storage path check.
+	storagePaths model.PathCheckResult
+	// source is set when a restore reads the backup of another installation.
+	source restoreSource
+}
+
+// restoreSource is the storage path of another installation that a restore reads the backup from.
+type restoreSource struct {
+	// env holds the --env flags that point clickhouse-backup to that storage path.
+	env string
+	// path is that storage path, for messages.
+	path string
+	// ownStoragePath is true when only the object disk path differs from the path of this installation.
+	ownStoragePath bool
+	// missingHint is added to the error when the backup is missing.
+	missingHint string
+	// schemaCopies are the hosts where the preflight downloaded the schema. They are deleted before the restore.
+	schemaCopies []string
+	// localChecked are the hosts checked to hold no local copy that clickhouse-backup would restore instead.
+	localChecked map[string]bool
+	// resumesDownload are the hosts that hold a local copy an earlier run of this restore downloaded.
+	resumesDownload map[string]bool
+	// ownRemote maps a host to the backups at its own storage path. A backup of the same name hides the source one.
+	ownRemote map[string]map[string]bool
 }
 
 func (o *orchestrator) logf(format string, args ...any) {
@@ -675,7 +695,7 @@ func (o *orchestrator) run(ctx context.Context) runOutcome {
 		err = failf("unknown operation %q", o.spec.Operation)
 	}
 	if err != nil {
-		if o.sourceEnv != "" && len(o.sourceCopies) > 0 {
+		if o.source.env != "" && len(o.source.schemaCopies) > 0 {
 			o.dropSourceCopies(context.WithoutCancel(ctx), false)
 		}
 		o.outcome.failed = true
@@ -756,7 +776,7 @@ func (o *orchestrator) checkPaths() error {
 		return nil
 	}
 	result, err := o.spec.PathCheck.Check()
-	o.pathResult = result
+	o.storagePaths = result
 	for _, advice := range result.Advice {
 		o.logf("WARNING: %s", advice)
 		o.eventf(core.EventTypeWarning, "OrchestratorStoragePathAdvice", "%s", advice)
