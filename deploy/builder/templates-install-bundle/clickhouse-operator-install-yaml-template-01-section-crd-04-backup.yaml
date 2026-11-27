@@ -515,51 +515,7 @@ spec:
                           plan:
                             type: object
                             nullable: true
-                            properties:
-                              backupName:
-                                type: string
-                              key:
-                                type: string
-                              namingPrefix:
-                                type: string
-                              sourceEnv:
-                                type: string
-                              sourceShown:
-                                type: string
-                              actionEnv:
-                                type: string
-                              hadLocal:
-                                type: array
-                                items:
-                                  type: string
-                              resumed:
-                                type: array
-                                items:
-                                  type: string
-                              replaced:
-                                type: array
-                                items:
-                                  type: string
-                              schemaCopies:
-                                type: array
-                                items:
-                                  type: string
-                              dataHosts:
-                                type: array
-                                items:
-                                  type: string
-                              copyHosts:
-                                type: array
-                                items:
-                                  type: string
-                              copyToDetached:
-                                type: boolean
-                              listed:
-                                type: boolean
-                              holdsRBAC:
-                                type: boolean
-                              giveUp:
-                                type: boolean
+                            x-kubernetes-preserve-unknown-fields: true
                 startTime:
                   type: string
                   format: date-time
@@ -1368,51 +1324,7 @@ spec:
                           plan:
                             type: object
                             nullable: true
-                            properties:
-                              backupName:
-                                type: string
-                              key:
-                                type: string
-                              namingPrefix:
-                                type: string
-                              sourceEnv:
-                                type: string
-                              sourceShown:
-                                type: string
-                              actionEnv:
-                                type: string
-                              hadLocal:
-                                type: array
-                                items:
-                                  type: string
-                              resumed:
-                                type: array
-                                items:
-                                  type: string
-                              replaced:
-                                type: array
-                                items:
-                                  type: string
-                              schemaCopies:
-                                type: array
-                                items:
-                                  type: string
-                              dataHosts:
-                                type: array
-                                items:
-                                  type: string
-                              copyHosts:
-                                type: array
-                                items:
-                                  type: string
-                              copyToDetached:
-                                type: boolean
-                              listed:
-                                type: boolean
-                              holdsRBAC:
-                                type: boolean
-                              giveUp:
-                                type: boolean
+                            x-kubernetes-preserve-unknown-fields: true
                 recentRuns:
                   type: array
                   nullable: true
@@ -1510,51 +1422,7 @@ spec:
                           plan:
                             type: object
                             nullable: true
-                            properties:
-                              backupName:
-                                type: string
-                              key:
-                                type: string
-                              namingPrefix:
-                                type: string
-                              sourceEnv:
-                                type: string
-                              sourceShown:
-                                type: string
-                              actionEnv:
-                                type: string
-                              hadLocal:
-                                type: array
-                                items:
-                                  type: string
-                              resumed:
-                                type: array
-                                items:
-                                  type: string
-                              replaced:
-                                type: array
-                                items:
-                                  type: string
-                              schemaCopies:
-                                type: array
-                                items:
-                                  type: string
-                              dataHosts:
-                                type: array
-                                items:
-                                  type: string
-                              copyHosts:
-                                type: array
-                                items:
-                                  type: string
-                              copyToDetached:
-                                type: boolean
-                              listed:
-                                type: boolean
-                              holdsRBAC:
-                                type: boolean
-                              giveUp:
-                                type: boolean
+                            x-kubernetes-preserve-unknown-fields: true
                 backups:
                   type: array
                   nullable: true
@@ -1971,51 +1839,7 @@ spec:
                           plan:
                             type: object
                             nullable: true
-                            properties:
-                              backupName:
-                                type: string
-                              key:
-                                type: string
-                              namingPrefix:
-                                type: string
-                              sourceEnv:
-                                type: string
-                              sourceShown:
-                                type: string
-                              actionEnv:
-                                type: string
-                              hadLocal:
-                                type: array
-                                items:
-                                  type: string
-                              resumed:
-                                type: array
-                                items:
-                                  type: string
-                              replaced:
-                                type: array
-                                items:
-                                  type: string
-                              schemaCopies:
-                                type: array
-                                items:
-                                  type: string
-                              dataHosts:
-                                type: array
-                                items:
-                                  type: string
-                              copyHosts:
-                                type: array
-                                items:
-                                  type: string
-                              copyToDetached:
-                                type: boolean
-                              listed:
-                                type: boolean
-                              holdsRBAC:
-                                type: boolean
-                              giveUp:
-                                type: boolean
+                            x-kubernetes-preserve-unknown-fields: true
                 startTime:
                   type: string
                   format: date-time
