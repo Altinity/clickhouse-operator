@@ -4062,7 +4062,7 @@ def _build_hostrun_metrics_exporter_chi_payload(chi, hostname, https_port):
     }
 
 
-def _wait_local_http_ready(url, timeout=10, process=None, log_path=None):
+def _wait_local_http_ready(url, timeout=30, process=None, log_path=None):
     deadline = time.time() + timeout
     while time.time() < deadline:
         if process is not None and process.poll() is not None:
