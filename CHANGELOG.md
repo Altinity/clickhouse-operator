@@ -68,6 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **Operator API packages can now be imported as a Go module without additional dependency overrides.** The fork-specific `mergo` implementation is included in `pkg/util/mergo`, removing the need for downstream consumers to add their own `mergo` `replace` directive to build against the operator's Go API packages. by [@sks](https://github.com/sks) in [#2160](https://github.com/Altinity/clickhouse-operator/pull/2160). Fixes [#2150](https://github.com/Altinity/clickhouse-operator/issues/2150)
 
+* **A host that is about to restart is now deprioritized in `remote_servers`.** Marking a host low priority stored nothing, so its `<replica>` entry never received `<priority>1000</priority>`: the common ConfigMap was rendered unchanged, peers had nothing to pick up and kept sending Distributed subqueries to the host at normal priority while it went down. Rolling restarts now render the deprioritization, so each host restart updates the common ConfigMap twice, on exclude and on include. by [@Savid](https://github.com/Savid) in [#2177](https://github.com/Altinity/clickhouse-operator/pull/2177)
+
 * **Malformed boolean-like configuration values no longer interrupt reconciliation** of other resources. by [@sunsingerus](https://github.com/sunsingerus)
 
 * **Corrected ClickHouse container detection** when logging or backup sidecars appear first in a pod template. by [@sunsingerus](https://github.com/sunsingerus)
