@@ -52,7 +52,9 @@ func (o *orchestrator) backup(ctx context.Context) error {
 			status.Hosts = hosts
 			status.Step = stepCreate
 		})
-		o.setPlan(map[string]string{planBackupName: plan.name, planKey: plan.key, planNamingPrefix: plan.namingPrefix})
+		o.setPlan(func(p *api.BackupRunPlan) {
+			p.BackupName, p.Key, p.NamingPrefix = plan.name, plan.key, plan.namingPrefix
+		})
 		for _, host := range plan.hosts {
 			o.record(api.BackupRunAction{Step: stepCreate, Host: host, Command: plan.commands[host]})
 		}
@@ -65,7 +67,7 @@ func (o *orchestrator) backup(ctx context.Context) error {
 		hostNames = append(hostNames, host.Host)
 		o.backupNames[host.Host] = host.Backup
 	}
-	name := o.plan(planBackupName)
+	name := o.plan().BackupName
 	o.outcome.backupName = name
 	if !slices.Equal(hostNames, o.spec.BackupHosts) {
 		o.outcome.hostsUsed = hostNames
@@ -530,7 +532,7 @@ func storedBackups(sets model.BackupSets, keys []string, nameOf func(key string)
 func (o *orchestrator) reportData(ctx context.Context, hosts []string, name string) {
 	o.bestEffort = true
 	defer func() { o.bestEffort = false }()
-	key := o.plan(planKey)
+	key := o.plan().Key
 	sets, unlisted := o.listAll(ctx, hosts, func(host, backup string) (string, bool) {
 		return key, backup == o.backupNames[host]
 	}, nil)
@@ -589,7 +591,7 @@ func (o *orchestrator) writing(ctx context.Context, sets model.BackupSets, made 
 			return writing
 		}
 		for _, key := range incomplete {
-			name, err := spec.Naming.HostName(host, key, o.plan(planNamingPrefix))
+			name, err := spec.Naming.HostName(host, key, o.plan().NamingPrefix)
 			if err != nil {
 				continue
 			}
@@ -642,7 +644,7 @@ func (o *orchestrator) retention(ctx context.Context) {
 		Naming:   naming,
 		Prefix:   spec.Prefix,
 		Entries:  spec.Entries,
-		Made:     o.plan(planKey),
+		Made:     o.plan().Key,
 		Pinned:   model.PinnedKeys(naming, spec.Prefix, spec.KeepBackups),
 		Previous: spec.Previous,
 		Now:      o.clock.Now(),
@@ -651,7 +653,7 @@ func (o *orchestrator) retention(ctx context.Context) {
 	plan := retention.Plan(util.MapGetSortedKeys(sets.All), sets)
 	nameOf := func(key string) string {
 		if naming.IsTemplate() {
-			if rendered, err := naming.FirstName(key, o.plan(planNamingPrefix)); err == nil {
+			if rendered, err := naming.FirstName(key, o.plan().NamingPrefix); err == nil {
 				return rendered
 			}
 		}
@@ -711,7 +713,7 @@ func (o *orchestrator) retention(ctx context.Context) {
 			continue
 		}
 		for _, key := range obsolete {
-			name, err := naming.HostName(host, key, o.plan(planNamingPrefix))
+			name, err := naming.HostName(host, key, o.plan().NamingPrefix)
 			if (err != nil) || (findBackup(rows, name) == nil) {
 				continue
 			}

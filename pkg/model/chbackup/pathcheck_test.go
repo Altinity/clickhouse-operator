@@ -60,7 +60,7 @@ func storageSettings(storage string, settings ...string) map[string]string {
 
 // pathCheckOf returns the storage path check of an operation on the first of the clusters, of an installation demo
 // of the namespace testPathNamespace whose sidecars take the default paths of the operator configuration
-func pathCheckOf(operation string, env map[string]string, clusters ...pathCluster) PathCheck {
+func pathCheckOf(operation api.BackupRunOperation, env map[string]string, clusters ...pathCluster) PathCheck {
 	check := PathCheck{
 		Installation:          "demo",
 		Namespace:             testPathNamespace,
@@ -126,7 +126,7 @@ func TestStoragePathCheck(t *testing.T) {
 	for name, tc := range map[string]struct {
 		clusters  []pathCluster
 		env       map[string]string
-		operation string
+		operation api.BackupRunOperation
 		// refused is the reason the Job fails for, empty when it runs
 		refused string
 		warned  string

@@ -82,8 +82,8 @@ func TestRestoreRerunFromAnotherInstallationResumesItsDownload(t *testing.T) {
 		"h0: restore --data=1 --ignore-dependencies " + foreignEnv + " b1",
 		"h0: delete local b1", "h1: delete local b1",
 	}, sc.commands())
-	require.Equal(t, "h0", status.Plan[planResumed])
-	require.Empty(t, status.Plan[planReplaced])
+	require.Equal(t, []string{"h0"}, status.Plan.Resumed)
+	require.Empty(t, status.Plan.Replaced)
 	require.NotContains(t, reasonsOf(events), "OrchestratorRerunReplaced")
 	require.Contains(t, eventsOf(events, "OrchestratorHostStepSucceeded"), "h0: download b1 succeeded, resuming the local copy the host held")
 	require.Contains(t, eventsOf(events, "OrchestratorHostStepSucceeded"), "h1: download b1 succeeded")
@@ -113,8 +113,8 @@ func TestRestoreRerunFromAnotherInstallationStartsOver(t *testing.T) {
 		"h0: delete local b1", "h1: delete local b1",
 		"h0: " + foreignDownload, "h1: " + foreignDownload,
 	}, sc.commands()[:7])
-	require.Equal(t, "h0", status.Plan[planReplaced])
-	require.Empty(t, status.Plan[planResumed])
+	require.Equal(t, []string{"h0"}, status.Plan.Replaced)
+	require.Empty(t, status.Plan.Resumed)
 	require.Equal(t, []string{"h0: the local copy of b1 an earlier run of the restore downloaded deleted, the download starts over"},
 		eventsOf(events, "OrchestratorRerunReplaced"))
 	require.Contains(t, eventsOf(events, "OrchestratorHostStepSucceeded"),
@@ -143,7 +143,7 @@ func TestRestoreRerunStartsOverWithoutResumeDownload(t *testing.T) {
 		"h0: delete local b1", "h1: delete local b1",
 		"h0: download --hardlink-exists-files b1", "h1: download --hardlink-exists-files b1",
 	}, sc.commands()[:4])
-	require.Equal(t, "h0 h1", status.Plan[planReplaced])
+	require.Equal(t, []string{"h0", "h1"}, status.Plan.Replaced)
 	require.Len(t, eventsOf(events, "OrchestratorRerunReplaced"), 2)
 
 	spec.ResumeDownload = true
@@ -152,7 +152,7 @@ func TestRestoreRerunStartsOverWithoutResumeDownload(t *testing.T) {
 	require.False(t, outcome.failed, outcome.message)
 	require.Equal(t, []string{"h0: download --hardlink-exists-files b1"}, commandsHolding(sc, "download"),
 		"the incomplete copy is resumed, the complete one kept")
-	require.Equal(t, "h0", status.Plan[planResumed])
+	require.Equal(t, []string{"h0"}, status.Plan.Resumed)
 	require.Empty(t, eventsOf(events, "OrchestratorRerunReplaced"))
 }
 
@@ -172,7 +172,7 @@ func TestRestoreFirstRunIgnoresResumeDownload(t *testing.T) {
 			spec.ResumeDownload = resume
 			outcome, status, events := runOf(t, sc, spec, nil)
 			require.False(t, outcome.failed, outcome.message)
-			require.Empty(t, status.Plan[planReplaced])
+			require.Empty(t, status.Plan.Replaced)
 			require.Empty(t, eventsOf(events, "OrchestratorRerunReplaced"))
 			commands = append(commands, sc.commands())
 		}

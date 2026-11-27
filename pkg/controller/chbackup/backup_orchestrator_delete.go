@@ -26,18 +26,16 @@ import (
 )
 
 const (
-	operationDelete = "delete"
-	commandKill     = "kill"
-	stepKill        = "kill"
-	stepDelete      = "delete"
-	planGiveUp      = "giveUp"
+	commandKill                   = "kill"
+	stepKill    api.BackupRunStep = "kill"
+	stepDelete  api.BackupRunStep = "delete"
 )
 
 func (o *orchestrator) deleteUnfinished(ctx context.Context) error {
 	o.mu.Lock()
 	hosts := slices.Clone(o.status.Hosts)
 	o.mu.Unlock()
-	o.bestEffort = o.plan(planGiveUp) != ""
+	o.bestEffort = o.plan().GiveUp
 	defer func() { o.bestEffort = false }()
 	deletedRemote := map[string]bool{}
 	var left []string

@@ -413,7 +413,7 @@ func (c *ScheduleController) runDueSlot(
 
 func scheduledRunKey(chbs *api.ClickHouseBackupSchedule, cluster string, slot time.Time) runKey {
 	return runKeyOf(chbs, api.ClickHouseBackupScheduleCRDResourceKind, cluster,
-		api.BackupRunOperationBackup+"@"+strconv.FormatInt(slot.Unix(), 10))
+		api.BackupRunOperationBackup+api.BackupRunOperation("@"+strconv.FormatInt(slot.Unix(), 10)))
 }
 
 func (c *ScheduleController) refusedPaths(

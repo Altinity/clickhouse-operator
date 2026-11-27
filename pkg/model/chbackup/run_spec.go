@@ -25,7 +25,7 @@ import (
 
 // The operator builds it again on resume.
 type RunSpec struct {
-	Operation    string
+	Operation    api.BackupRunOperation
 	Cluster      string
 	ConfigSecret string
 	Naming       Naming
@@ -79,7 +79,7 @@ type RunSpec struct {
 	PreviousActions []api.BackupRunAction
 }
 
-func newRunSpec(operation string, topology *Topology, deadline int64) *RunSpec {
+func newRunSpec(operation api.BackupRunOperation, topology *Topology, deadline int64) *RunSpec {
 	return &RunSpec{
 		Operation:    operation,
 		Cluster:      topology.Cluster(),

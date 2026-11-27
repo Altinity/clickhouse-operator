@@ -501,7 +501,7 @@ func (t *Topology) RunNaming() Naming {
 // SettingResolver returns false for an optional source that does not have the key.
 type SettingResolver func(source core.EnvVar) (string, bool, error)
 
-func (t *Topology) PathCheck(operation string, selection api.ReplicaSelection, resolve SettingResolver) (*PathCheck, error) {
+func (t *Topology) PathCheck(operation api.BackupRunOperation, selection api.ReplicaSelection, resolve SettingResolver) (*PathCheck, error) {
 	check := &PathCheck{
 		Installation:          t.installation,
 		Namespace:             t.namespace,

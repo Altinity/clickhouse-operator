@@ -79,21 +79,61 @@ type OperationClusterStatus struct {
 	Run *BackupRunStatus `json:"run,omitempty" yaml:"run,omitempty"`
 }
 
+// BackupRunOperation is what a run does on the sidecars of a cluster.
+type BackupRunOperation string
+
 const (
-	BackupRunOperationBackup  = "backup"
-	BackupRunOperationRestore = "restore"
+	BackupRunOperationBackup  BackupRunOperation = "backup"
+	BackupRunOperationRestore BackupRunOperation = "restore"
+	BackupRunOperationDelete  BackupRunOperation = "delete"
 )
 
+// BackupRunStep is the step of a run, such as create, upload or download.
+type BackupRunStep string
+
 type BackupRunStatus struct {
-	Operation string `json:"operation" yaml:"operation"`
-	Step      string `json:"step,omitempty" yaml:"step,omitempty"`
+	Operation BackupRunOperation `json:"operation" yaml:"operation"`
+	Step      BackupRunStep      `json:"step,omitempty" yaml:"step,omitempty"`
 	// Mutated is true when a command that changes state may have reached a sidecar.
 	Mutated bool            `json:"mutated,omitempty" yaml:"mutated,omitempty"`
 	Hosts   []BackupRunHost `json:"hosts,omitempty" yaml:"hosts,omitempty"`
 	// Actions keep the last command per host and step.
 	Actions []BackupRunAction `json:"actions,omitempty" yaml:"actions,omitempty"`
 	// Plan holds decisions made before anything changed, so steps after a restart follow them.
-	Plan map[string]string `json:"plan,omitempty" yaml:"plan,omitempty"`
+	Plan *BackupRunPlan `json:"plan,omitempty" yaml:"plan,omitempty"`
+}
+
+// BackupRunPlan holds the decisions a run made before it changed anything.
+type BackupRunPlan struct {
+	// BackupName, Key and NamingPrefix name the backup a backup run makes.
+	BackupName   string `json:"backupName,omitempty" yaml:"backupName,omitempty"`
+	Key          string `json:"key,omitempty" yaml:"key,omitempty"`
+	NamingPrefix string `json:"namingPrefix,omitempty" yaml:"namingPrefix,omitempty"`
+	// SourceEnv points a restore at the storage path of the installation that made the backup.
+	SourceEnv string `json:"sourceEnv,omitempty" yaml:"sourceEnv,omitempty"`
+	// SourceShown is that storage path, as shown in logs and events.
+	SourceShown string `json:"sourceShown,omitempty" yaml:"sourceShown,omitempty"`
+	// ActionEnv holds the --env flags every restore command gets.
+	ActionEnv string `json:"actionEnv,omitempty" yaml:"actionEnv,omitempty"`
+	// HadLocal are the hosts that held a complete local copy, so they skip the download.
+	HadLocal []string `json:"hadLocal,omitempty" yaml:"hadLocal,omitempty"`
+	// Resumed are the hosts that resume a partial local copy.
+	Resumed []string `json:"resumed,omitempty" yaml:"resumed,omitempty"`
+	// Replaced are the hosts that download again over a copy an earlier run left.
+	Replaced []string `json:"replaced,omitempty" yaml:"replaced,omitempty"`
+	// SchemaCopies are the hosts that hold a local copy of the schema alone.
+	SchemaCopies []string `json:"schemaCopies,omitempty" yaml:"schemaCopies,omitempty"`
+	// DataHosts restore the data of their shard. CopyHosts copy it to detached.
+	DataHosts []string `json:"dataHosts,omitempty" yaml:"dataHosts,omitempty"`
+	CopyHosts []string `json:"copyHosts,omitempty" yaml:"copyHosts,omitempty"`
+	// CopyToDetached is true when the replicas of a shard copy its data to detached.
+	CopyToDetached bool `json:"copyToDetached,omitempty" yaml:"copyToDetached,omitempty"`
+	// Listed is true when the copies of the backup in the storage were listed, so HoldsRBAC is known.
+	Listed bool `json:"listed,omitempty" yaml:"listed,omitempty"`
+	// HoldsRBAC is true when the backup holds access entities.
+	HoldsRBAC bool `json:"holdsRBAC,omitempty" yaml:"holdsRBAC,omitempty"`
+	// GiveUp is true when a delete run goes on past failures, as the installation is deleted.
+	GiveUp bool `json:"giveUp,omitempty" yaml:"giveUp,omitempty"`
 }
 
 type BackupRunHost struct {
@@ -104,9 +144,9 @@ type BackupRunHost struct {
 }
 
 type BackupRunAction struct {
-	Step    string `json:"step" yaml:"step"`
-	Host    string `json:"host" yaml:"host"`
-	Command string `json:"command" yaml:"command"`
+	Step    BackupRunStep `json:"step" yaml:"step"`
+	Host    string        `json:"host" yaml:"host"`
+	Command string        `json:"command" yaml:"command"`
 	// TimeFrom is the host ClickHouse time (UTC) just before the insert; the command row is the first at or after it.
 	TimeFrom string `json:"timeFrom" yaml:"timeFrom"`
 	Status   string `json:"status,omitempty" yaml:"status,omitempty"`

@@ -74,7 +74,7 @@ type PathCheck struct {
 	Self         int
 	Installation string
 	Namespace    string
-	Operation    string
+	Operation    api.BackupRunOperation
 	// ReplicaSelection is empty for a restore.
 	ReplicaSelection api.ReplicaSelection
 	ValidateTopology bool

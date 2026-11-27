@@ -61,36 +61,18 @@ const (
 )
 
 const (
-	stepCreate        = "create"
-	stepReport        = "report"
-	stepDownload      = "download"
-	stepSchema        = "schema"
-	stepCopy          = "copyToDetached"
-	stepData          = "data"
-	stepCleanup       = "cleanup"
-	stepRetention     = "retention"
-	stepDropFailed    = "dropFailed"
-	stepSource        = "source"
-	stepReplaceLocal  = "replaceLocal"
-	stepReplaceRemote = "replaceRemote"
-)
-
-const (
-	planBackupName     = "backupName"
-	planKey            = "key"
-	planNamingPrefix   = "namingPrefix"
-	planSourceEnv      = "sourceEnv"
-	planActionEnv      = "actionEnv"
-	planHadLocal       = "hadLocal"
-	planResumed        = "resumed"
-	planHoldsRBAC      = "holdsRBAC"
-	planListed         = "listed"
-	planSourceShown    = "sourceShown"
-	planReplaced       = "replaced"
-	planCopyToDetached = "copyToDetached"
-	planDataHosts      = "dataHosts"
-	planCopyHosts      = "copyHosts"
-	planSchemaCopies   = "schemaCopies"
+	stepCreate        api.BackupRunStep = "create"
+	stepReport        api.BackupRunStep = "report"
+	stepDownload      api.BackupRunStep = "download"
+	stepSchema        api.BackupRunStep = "schema"
+	stepCopy          api.BackupRunStep = "copyToDetached"
+	stepData          api.BackupRunStep = "data"
+	stepCleanup       api.BackupRunStep = "cleanup"
+	stepRetention     api.BackupRunStep = "retention"
+	stepDropFailed    api.BackupRunStep = "dropFailed"
+	stepSource        api.BackupRunStep = "source"
+	stepReplaceLocal  api.BackupRunStep = "replaceLocal"
+	stepReplaceRemote api.BackupRunStep = "replaceRemote"
 )
 
 type runOutcome struct {
@@ -176,34 +158,32 @@ func (o *orchestrator) update(change func(status *api.BackupRunStatus)) {
 	}
 }
 
-func (o *orchestrator) plan(key string) string {
+// plan returns a copy of the plan. Its slices are shared, so callers must not change them.
+func (o *orchestrator) plan() api.BackupRunPlan {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	return o.status.Plan[key]
+	if o.status.Plan == nil {
+		return api.BackupRunPlan{}
+	}
+	return *o.status.Plan
 }
 
-func (o *orchestrator) setPlan(values map[string]string) {
+func (o *orchestrator) setPlan(change func(plan *api.BackupRunPlan)) {
 	o.update(func(status *api.BackupRunStatus) {
 		if status.Plan == nil {
-			status.Plan = map[string]string{}
+			status.Plan = &api.BackupRunPlan{}
 		}
-		for key, value := range values {
-			if value == "" {
-				delete(status.Plan, key)
-				continue
-			}
-			status.Plan[key] = value
-		}
+		change(status.Plan)
 	})
 }
 
-func (o *orchestrator) step() string {
+func (o *orchestrator) step() api.BackupRunStep {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	return o.status.Step
 }
 
-func (o *orchestrator) setStep(step string) {
+func (o *orchestrator) setStep(step api.BackupRunStep) {
 	o.update(func(status *api.BackupRunStatus) { status.Step = step })
 }
 
@@ -266,7 +246,7 @@ func (o *orchestrator) retry(ctx context.Context, host, what string, f func() er
 	}
 }
 
-func (o *orchestrator) recorded(step, host, command string) *api.BackupRunAction {
+func (o *orchestrator) recorded(step api.BackupRunStep, host, command string) *api.BackupRunAction {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	for i := range o.status.Actions {
@@ -296,7 +276,7 @@ func (o *orchestrator) adoptFrom() string {
 	return o.startedAt.Add(-resumeAdoptWindow).UTC().Format(clickHouseTimeLayout)
 }
 
-func (o *orchestrator) submit(ctx context.Context, step, host, command string, mutates bool) (*api.BackupRunAction, error) {
+func (o *orchestrator) submit(ctx context.Context, step api.BackupRunStep, host, command string, mutates bool) (*api.BackupRunAction, error) {
 	o.lastWarning = ""
 	// An action recorded without a time was planned but never inserted.
 	if action := o.recorded(step, host, command); (action != nil) && (action.TimeFrom != "") {
@@ -547,7 +527,7 @@ func (o *orchestrator) wait(ctx context.Context, actions []*api.BackupRunAction,
 	return failures
 }
 
-func (o *orchestrator) runAll(ctx context.Context, step string, hosts []string, mutates bool,
+func (o *orchestrator) runAll(ctx context.Context, step api.BackupRunStep, hosts []string, mutates bool,
 	command func(host string) string) ([]string, []string) {
 	var actions []*api.BackupRunAction
 	var failed, failures []string
@@ -564,7 +544,7 @@ func (o *orchestrator) runAll(ctx context.Context, step string, hosts []string, 
 	return o.waitAll(ctx, step, hosts, actions, failed, failures)
 }
 
-func (o *orchestrator) waitAll(ctx context.Context, step string, hosts []string, actions []*api.BackupRunAction,
+func (o *orchestrator) waitAll(ctx context.Context, step api.BackupRunStep, hosts []string, actions []*api.BackupRunAction,
 	failed, failures []string) ([]string, []string) {
 	results := o.wait(ctx, actions, o.backupNames)
 	for _, host := range hosts {
@@ -579,7 +559,7 @@ func (o *orchestrator) waitAll(ctx context.Context, step string, hosts []string,
 	return failed, failures
 }
 
-func (o *orchestrator) runOne(ctx context.Context, step, host, command string, mutates bool) error {
+func (o *orchestrator) runOne(ctx context.Context, step api.BackupRunStep, host, command string, mutates bool) error {
 	failed, failures := o.runAll(ctx, step, []string{host}, mutates, func(string) string { return command })
 	if len(failed) > 0 {
 		return errors.New(strings.Join(failures, "; "))
@@ -617,7 +597,7 @@ func (o *orchestrator) usable(ctx context.Context, host, location, name string) 
 	return (row != nil) && !row.broken(), nil
 }
 
-func (o *orchestrator) deleteBackup(ctx context.Context, step, host, location, name string) error {
+func (o *orchestrator) deleteBackup(ctx context.Context, step api.BackupRunStep, host, location, name string) error {
 	command := commandDeleteLocal + " " + name
 	if location == "remote" {
 		command = commandDeleteRemote + " " + name
@@ -626,11 +606,11 @@ func (o *orchestrator) deleteBackup(ctx context.Context, step, host, location, n
 }
 
 // cleanup is bounded, so the run always ends, even if ctx is never cancelled.
-func (o *orchestrator) cleanup(ctx context.Context, step, host, name string) error {
+func (o *orchestrator) cleanup(ctx context.Context, step api.BackupRunStep, host, name string) error {
 	return o.cleanupCommand(ctx, step, host, commandDeleteLocal+" "+name)
 }
 
-func (o *orchestrator) cleanupCommand(ctx context.Context, step, host, command string) error {
+func (o *orchestrator) cleanupCommand(ctx context.Context, step api.BackupRunStep, host, command string) error {
 	busy, err := o.sc.Busy(ctx, host)
 	switch {
 	case err != nil:
@@ -689,7 +669,7 @@ func (o *orchestrator) run(ctx context.Context) runOutcome {
 		err = o.backup(ctx)
 	case api.BackupRunOperationRestore:
 		err = o.restore(ctx)
-	case operationDelete:
+	case api.BackupRunOperationDelete:
 		err = o.deleteUnfinished(ctx)
 	default:
 		err = failf("unknown operation %q", o.spec.Operation)
@@ -721,7 +701,7 @@ func (o *orchestrator) shardOf(host string) string {
 	return host
 }
 
-func (o *orchestrator) succeeded(step, host string) bool {
+func (o *orchestrator) succeeded(step api.BackupRunStep, host string) bool {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	for _, action := range o.status.Actions {
@@ -732,11 +712,11 @@ func (o *orchestrator) succeeded(step, host string) bool {
 	return false
 }
 
-func operationTitle(operation string) string {
+func operationTitle(operation api.BackupRunOperation) string {
 	switch operation {
 	case api.BackupRunOperationBackup:
 		return "Backup"
-	case operationDelete:
+	case api.BackupRunOperationDelete:
 		return "Deletion"
 	}
 	return "Restore"

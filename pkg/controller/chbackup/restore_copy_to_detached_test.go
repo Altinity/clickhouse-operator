@@ -79,8 +79,8 @@ func TestRestoreCopiesTheDataToDetachedBeforeTheFirstReplicaRestoresIt(t *testin
 	slowCopy := rowOf(t, sc, "h1", copyCommand)
 	require.Less(t, rowOf(t, sc, "h2", copyCommand).Start, slowCopy.Finish, "the replicas copy at once")
 	require.Less(t, slowCopy.Finish, rowOf(t, sc, "h0", dataCommand).Start, "the first replica restores once they copied")
-	require.Equal(t, "h0 h3", status.Plan[planDataHosts])
-	require.Equal(t, "h1 h2", status.Plan[planCopyHosts])
+	require.Equal(t, []string{"h0", "h3"}, status.Plan.DataHosts)
+	require.Equal(t, []string{"h1", "h2"}, status.Plan.CopyHosts)
 	var copied []string
 	for _, action := range status.Actions {
 		if action.Step == stepCopy {
@@ -120,8 +120,8 @@ func TestRestoreWithoutCopyDownloadsTheSchemaAloneOnTheOtherReplicas(t *testing.
 		"h0: restore --data=1 --ignore-dependencies --tables=db.* b1", "h3: restore --data=1 --ignore-dependencies --tables=db.* b1",
 		"h0: delete local b1", "h1: delete local b1", "h2: delete local b1", "h3: delete local b1",
 	}, sc.commands())
-	require.Empty(t, status.Plan[planCopyToDetached])
-	require.Empty(t, status.Plan[planDataHosts])
+	require.False(t, status.Plan.CopyToDetached)
+	require.Empty(t, status.Plan.DataHosts)
 }
 
 // A first replica that does not answer as the restore comes to copy the data leaves the restore of the data of its
@@ -130,12 +130,12 @@ func TestRestoreFallsBackToTheNextReplicaWhenTheFirstDoesNotAnswer(t *testing.T)
 	sc := copySidecars()
 	sc.hosts["h0"].notReady = errors.New("connection refused")
 	status := &api.BackupRunStatus{Operation: api.BackupRunOperationRestore, Step: stepCopy,
-		Plan: map[string]string{planCopyToDetached: "true"}}
+		Plan: &api.BackupRunPlan{CopyToDetached: true}}
 	outcome, status, events := runOf(t, sc, copySpec(true), status)
 	require.False(t, outcome.failed, outcome.message)
 	require.Equal(t, []string{"h2: " + copyCommand, "h1: " + dataCommand, "h3: " + dataCommand}, sc.commands())
-	require.Equal(t, "h1 h3", status.Plan[planDataHosts])
-	require.Equal(t, "h2", status.Plan[planCopyHosts])
+	require.Equal(t, []string{"h1", "h3"}, status.Plan.DataHosts)
+	require.Equal(t, []string{"h2"}, status.Plan.CopyHosts)
 	require.Contains(t, reasonsOf(events), "OrchestratorReplicaFallback")
 }
 
@@ -148,7 +148,7 @@ func TestRestoreFallsBackToAReplicaThatCopiedTheData(t *testing.T) {
 	require.False(t, outcome.failed, outcome.message)
 	restores := slices.DeleteFunc(sc.commands(), func(command string) bool { return !strings.Contains(command, "--data=1") })
 	require.Equal(t, []string{"h1: " + copyCommand, "h2: " + copyCommand, "h1: " + dataCommand, "h3: " + dataCommand}, restores)
-	require.Equal(t, "h1 h3", status.Plan[planDataHosts])
+	require.Equal(t, []string{"h1", "h3"}, status.Plan.DataHosts)
 	require.Contains(t, reasonsOf(events), "OrchestratorReplicaFallback")
 
 	// with no replica that copied the data, the restore fails
@@ -167,7 +167,7 @@ func TestRestoreResumesInTheMiddleOfTheCopyToDetached(t *testing.T) {
 		Status: actionSuccess}}
 	sc.seconds = 10
 	status := &api.BackupRunStatus{Operation: api.BackupRunOperationRestore, Step: stepCopy,
-		Plan: map[string]string{planCopyToDetached: "true", planDataHosts: "h0 h3", planCopyHosts: "h1 h2"},
+		Plan: &api.BackupRunPlan{CopyToDetached: true, DataHosts: []string{"h0", "h3"}, CopyHosts: []string{"h1", "h2"}},
 		Actions: []api.BackupRunAction{{Step: stepCopy, Host: "h1", Command: copyCommand, TimeFrom: "2026-11-12 00:00:01",
 			Status: actionInProgress}}}
 	outcome, status, _ := runOf(t, sc, copySpec(true), status)
@@ -196,6 +196,6 @@ func TestRestoreDownloadsWholeTheSchemaCopiesOfAnEarlierRun(t *testing.T) {
 		"h1: delete local b1", "h1: download --hardlink-exists-files b1",
 		"h2: download --hardlink-exists-files b1", "h3: download --hardlink-exists-files b1",
 	}, sc.commands()[:4])
-	require.Equal(t, "h1", status.Plan[planSchemaCopies])
-	require.Equal(t, "h0", status.Plan[planHadLocal])
+	require.Equal(t, []string{"h1"}, status.Plan.SchemaCopies)
+	require.Equal(t, []string{"h0"}, status.Plan.HadLocal)
 }

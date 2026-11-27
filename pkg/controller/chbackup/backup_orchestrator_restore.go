@@ -67,9 +67,10 @@ func (o *orchestrator) restore(ctx context.Context) error {
 			return err
 		}
 	}
-	o.sourceEnv, o.sourceShown = o.plan(planSourceEnv), o.plan(planSourceShown)
+	plan := o.plan()
+	o.sourceEnv, o.sourceShown = plan.SourceEnv, plan.SourceShown
 	name := spec.BackupName
-	hadLocal := strings.Fields(o.plan(planHadLocal))
+	hadLocal := plan.HadLocal
 
 	if o.step() == stepDownload {
 		var downloads []string
@@ -101,10 +102,10 @@ func (o *orchestrator) restore(ctx context.Context) error {
 	}
 	if o.step() == stepCopy {
 		if o.copiesToDetached() && (len(hosts.data) > 0) {
-			if o.plan(planDataHosts) == "" {
+			if len(o.plan().DataHosts) == 0 {
 				o.chooseDataHosts(ctx)
 			}
-			if copies := strings.Fields(o.plan(planCopyHosts)); len(copies) > 0 {
+			if copies := o.plan().CopyHosts; len(copies) > 0 {
 				failed, failures := o.runAll(ctx, stepCopy, copies, true, o.commandOf(stepCopy))
 				if len(failed) > 0 {
 					o.keepDownloads()
@@ -142,7 +143,7 @@ func (o *orchestrator) restore(ctx context.Context) error {
 }
 
 func (o *orchestrator) copiesToDetached() bool {
-	return o.plan(planCopyToDetached) != ""
+	return o.plan().CopyToDetached
 }
 
 func (o *orchestrator) restoreShards() [][]string {
@@ -196,7 +197,7 @@ func (o *orchestrator) downloadedSchema(host, name string) bool {
 
 // The download would treat a schema-only copy as complete, so it is deleted first.
 func (o *orchestrator) dropSchemaCopies(ctx context.Context, downloads []string) error {
-	for _, host := range strings.Fields(o.plan(planSchemaCopies)) {
+	for _, host := range o.plan().SchemaCopies {
 		name := o.backupNames[host]
 		if !slices.Contains(downloads, host) || (o.recorded(stepDownload, host, o.restoreCommand(stepDownload, host)) != nil) {
 			continue
@@ -237,18 +238,18 @@ func (o *orchestrator) chooseDataHosts(ctx context.Context) {
 		data = append(data, shard[chosen])
 		copies = append(copies, shard[chosen+1:]...)
 	}
-	o.setPlan(map[string]string{planDataHosts: strings.Join(data, " "), planCopyHosts: strings.Join(copies, " ")})
+	o.setPlan(func(plan *api.BackupRunPlan) { plan.DataHosts, plan.CopyHosts = data, copies })
 }
 
-func (o *orchestrator) commandOf(step string) func(host string) string {
+func (o *orchestrator) commandOf(step api.BackupRunStep) func(host string) string {
 	return func(host string) string { return o.restoreCommand(step, host) }
 }
 
 func (o *orchestrator) runData(ctx context.Context, hosts []string) ([]string, []string) {
-	if !o.copiesToDetached() || (o.plan(planDataHosts) == "") {
+	if !o.copiesToDetached() || (len(o.plan().DataHosts) == 0) {
 		return o.runAll(ctx, stepData, hosts, true, o.commandOf(stepData))
 	}
-	data := strings.Fields(o.plan(planDataHosts))
+	data := slices.Clone(o.plan().DataHosts)
 	var actions []*api.BackupRunAction
 	var failed, failures []string
 submit:
@@ -270,14 +271,15 @@ submit:
 			o.eventf(core.EventTypeNormal, "OrchestratorReplicaFallback", "%s does not take the restore of the data, the data of its "+
 				"shard is restored on %s, over its copy of it to detached", host, next)
 			data[i] = next
-			o.setPlan(map[string]string{planDataHosts: strings.Join(data, " ")})
+			dataHosts := slices.Clone(data)
+			o.setPlan(func(plan *api.BackupRunPlan) { plan.DataHosts = dataHosts })
 		}
 	}
 	return o.waitAll(ctx, stepData, data, actions, failed, failures)
 }
 
 func (o *orchestrator) dataFallback(host string) string {
-	copies := strings.Fields(o.plan(planCopyHosts))
+	copies := o.plan().CopyHosts
 	for _, shard := range o.restoreShards() {
 		at := slices.Index(shard, host)
 		if at < 0 {
@@ -295,16 +297,16 @@ func (o *orchestrator) dataFallback(host string) string {
 func (o *orchestrator) reportRBAC() {
 	switch {
 	case o.spec.RestoreRBAC:
-	case o.plan(planListed) == "":
+	case !o.plan().Listed:
 		o.logf("whether %s holds access entities is unknown: its copies in the storage were not listed", o.spec.BackupName)
-	case o.plan(planHoldsRBAC) != "":
+	case o.plan().HoldsRBAC:
 		o.warnf("%s holds access entities - users, roles, grants - which this restore did not restore", o.spec.BackupName)
 		o.eventf(core.EventTypeWarning, "OrchestratorRBACNotRestored", "%s", o.lastWarning)
 		o.outcome.rbacNotRestored = true
 	}
 }
 
-func (o *orchestrator) restoreCommand(step, host string) string {
+func (o *orchestrator) restoreCommand(step api.BackupRunStep, host string) string {
 	spec := o.spec
 	var flags []string
 	switch step {
@@ -334,7 +336,7 @@ func (o *orchestrator) restoreCommand(step, host string) string {
 	if len(spec.Partitions) > 0 {
 		flags = append(flags, "--partitions="+strings.Join(spec.Partitions, ","))
 	}
-	if env := o.plan(planActionEnv); env != "" {
+	if env := o.plan().ActionEnv; env != "" {
 		flags = append(flags, env)
 	}
 	if (spec.DatabaseMapping != "") && (step != stepDownload) {
@@ -495,25 +497,19 @@ func (o *orchestrator) planRestore(ctx context.Context, hosts restoreHosts) erro
 		o.logf("restore of %s: made with the config overrides%s", o.spec.BackupName, flags)
 		o.eventf(core.EventTypeNormal, "OrchestratorConfigOverrides", "restore of %s is made with the config overrides%s", o.spec.BackupName, flags)
 	}
-	plan := map[string]string{
-		planActionEnv:    o.restoreEnv(),
-		planSourceEnv:    o.sourceEnv,
-		planSourceShown:  o.sourceShown,
-		planHadLocal:     strings.Join(hadLocal, " "),
-		planResumed:      strings.Join(resumed, " "),
-		planReplaced:     strings.Join(replaced, " "),
-		planSchemaCopies: strings.Join(schemaCopies, " "),
+	plan := api.BackupRunPlan{
+		ActionEnv:      o.restoreEnv(),
+		SourceEnv:      o.sourceEnv,
+		SourceShown:    o.sourceShown,
+		HadLocal:       hadLocal,
+		Resumed:        resumed,
+		Replaced:       replaced,
+		SchemaCopies:   schemaCopies,
+		CopyToDetached: copies,
+		HoldsRBAC:      holdsRBAC,
+		Listed:         spec.ValidateTopology,
 	}
-	if copies {
-		plan[planCopyToDetached] = "true"
-	}
-	if holdsRBAC {
-		plan[planHoldsRBAC] = "true"
-	}
-	if spec.ValidateTopology {
-		plan[planListed] = "true"
-	}
-	o.setPlan(plan)
+	o.setPlan(func(p *api.BackupRunPlan) { *p = plan })
 	hostsOf := slices.Clone(hosts.all)
 	o.update(func(status *api.BackupRunStatus) {
 		status.Hosts = nil
@@ -697,12 +693,12 @@ func (o *orchestrator) replaceEarlierDownloads(ctx context.Context, hosts []stri
 	return replaced, nil
 }
 
-func (o *orchestrator) downloadNote(step, host string) string {
+func (o *orchestrator) downloadNote(step api.BackupRunStep, host string) string {
 	switch {
 	case step != stepDownload:
-	case slices.Contains(strings.Fields(o.plan(planResumed)), host):
+	case slices.Contains(o.plan().Resumed, host):
 		return ", resuming the local copy the host held"
-	case slices.Contains(strings.Fields(o.plan(planReplaced)), host):
+	case slices.Contains(o.plan().Replaced, host):
 		return ", downloaded again in place of the local copy an earlier run of the restore downloaded"
 	}
 	return ""

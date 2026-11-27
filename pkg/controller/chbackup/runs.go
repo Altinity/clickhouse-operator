@@ -36,7 +36,7 @@ type runKey struct {
 	name      string
 	uid       kubeTypes.UID
 	cluster   string
-	operation string
+	operation api.BackupRunOperation
 }
 
 func (k runKey) String() string {
@@ -176,7 +176,7 @@ func (r *runRegistry) stopOwner(kind string, uid kubeTypes.UID) bool {
 	defer r.mu.Unlock()
 	running := false
 	for key, run := range r.runs {
-		if (key.kind != kind) || (key.uid != uid) || (key.operation == operationDelete) {
+		if (key.kind != kind) || (key.uid != uid) || (key.operation == api.BackupRunOperationDelete) {
 			continue
 		}
 		run.cancel()

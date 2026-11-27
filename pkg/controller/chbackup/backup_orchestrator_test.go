@@ -523,7 +523,7 @@ func retentionOn(t *testing.T, sc *fakeSidecars, made string, pins []api.BackupR
 	var events []postedEvent
 	spec := &model.RunSpec{Operation: api.BackupRunOperationBackup, Cluster: "main", Prefix: "d", RetentionHosts: hosts,
 		Entries: []model.SlotEntry{{Period: api.BackupPeriodDaily, Hour: 2, Day: -1, Keep: 1}}, KeepBackups: pins}
-	o := &orchestrator{spec: spec, sc: sc, mu: &sync.Mutex{}, status: &api.BackupRunStatus{Plan: map[string]string{planKey: made}},
+	o := &orchestrator{spec: spec, sc: sc, mu: &sync.Mutex{}, status: &api.BackupRunStatus{Plan: &api.BackupRunPlan{Key: made}},
 		event: func(eventType, reason, message string) {
 			events = append(events, postedEvent{eventType, reason, message})
 		},
@@ -658,7 +658,7 @@ func TestOrchestratorResumesACommandItRecorded(t *testing.T) {
 		Operation: api.BackupRunOperationBackup, Step: stepCreate, Mutated: true,
 		Hosts:   []api.BackupRunHost{{Host: "h0", Backup: "b1"}},
 		Actions: []api.BackupRunAction{{Step: stepCreate, Host: "h0", Command: "create_remote --rbac b1", TimeFrom: timeFrom}},
-		Plan:    map[string]string{planBackupName: "b1", planKey: "b1"},
+		Plan:    &api.BackupRunPlan{BackupName: "b1", Key: "b1"},
 	}
 	outcome, _, _ := runOf(t, sc, backupSpec("b1", "h0"), status)
 	require.False(t, outcome.failed, outcome.message)

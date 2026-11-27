@@ -163,7 +163,7 @@ func (c *BackupController) finalize(ctx context.Context, chb *api.ClickHouseBack
 		if len(hosts) == 0 {
 			continue
 		}
-		key := runKeyOf(chb, kind, cluster.Name, operationDelete)
+		key := runKeyOf(chb, kind, cluster.Name, api.BackupRunOperationDelete)
 		run := runs.get(key)
 		if run == nil {
 			var err error
@@ -288,11 +288,11 @@ func (c *BackupController) startDeletion(
 		return nil, &deletionGivenUp{why: wait.message}
 	}
 	spec := model.BackupRunSpec(chb, target.topology)
-	spec.Operation = operationDelete
+	spec.Operation = api.BackupRunOperationDelete
 	spec.Deadline = 0
-	status := &api.BackupRunStatus{Operation: operationDelete, Hosts: hosts}
+	status := &api.BackupRunStatus{Operation: api.BackupRunOperationDelete, Hosts: hosts}
 	if deleting(target.chi) {
-		status.Plan = map[string]string{planGiveUp: "true"}
+		status.Plan = &api.BackupRunPlan{GiveUp: true}
 	}
 	run, err := runs.start(key, chb.TargetInstallation(), chb, spec, status, c.clock.Now(), 0, c.postRunEvent)
 	switch {

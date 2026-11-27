@@ -55,7 +55,7 @@ func (g *startGate) lockedSources() []string {
 	return g.sources
 }
 
-func runKeyOf(owner client.Object, kind, cluster, operation string) runKey {
+func runKeyOf(owner client.Object, kind, cluster string, operation api.BackupRunOperation) runKey {
 	return runKey{kind: kind, namespace: owner.GetNamespace(), name: owner.GetName(), uid: owner.GetUID(), cluster: cluster,
 		operation: operation}
 }
@@ -314,7 +314,7 @@ func observeOn(cluster *api.OperationClusterStatus, run *run) (runOutcome, bool)
 	return run.finished()
 }
 
-func outcomeReason(outcome runOutcome, operation string) string {
+func outcomeReason(outcome runOutcome, operation api.BackupRunOperation) string {
 	switch {
 	case outcome.deadline:
 		return api.BackupReasonDeadlineExceeded
