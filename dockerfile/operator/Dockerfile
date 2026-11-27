@@ -11,6 +11,7 @@ ARG TARGETARCH
 ARG BUILDARCH=amd64
 ARG GCFLAGS
 ARG GOFIPS140
+ARG GIT_SHA
 
 # Install required packages
 RUN apt-get update && \
@@ -35,6 +36,7 @@ ENV GOOS="${TARGETOS}"
 ENV GOARCH="${TARGETARCH}"
 ENV GCFLAGS="${GCFLAGS}"
 ENV GOFIPS140="${GOFIPS140}"
+ENV GIT_SHA="${GIT_SHA}"
 
 # Build operator binary with explicitly specified output
 RUN OPERATOR_BIN=/tmp/clickhouse-operator bash -xe ./dev/go_build_operator.sh

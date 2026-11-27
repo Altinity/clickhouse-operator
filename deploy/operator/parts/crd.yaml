@@ -9487,14 +9487,19 @@ spec:
                   properties:
                     revisionHistoryLimit:
                       type: integer
-                      description: "revisionHistoryLimit is the maximum number of revisions that will be\nmaintained in the StatefulSet's revision history.                         \nLook details in `statefulset.spec.revisionHistoryLimit`\n"
+                      description: |
+                        revisionHistoryLimit is the maximum number of revisions that will be
+                        maintained in the StatefulSet's revision history.                         
+                        Look details in `statefulset.spec.revisionHistoryLimit`
                 pod:
                   type: object
                   description: "define pod specific parameters"
                   properties:
                     terminationGracePeriod:
                       type: integer
-                      description: "Optional duration in seconds the pod needs to terminate gracefully. \nLook details in `pod.spec.terminationGracePeriodSeconds`\n"
+                      description: |
+                        Optional duration in seconds the pod needs to terminate gracefully. 
+                        Look details in `pod.spec.terminationGracePeriodSeconds`
                 backup:
                   type: object
                   description: "EXPERIMENTAL. Defaults of operator-managed backup, see docs/backup.md"
