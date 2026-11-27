@@ -4062,7 +4062,6 @@ def _build_hostrun_metrics_exporter_chi_payload(chi, hostname, https_port):
     }
 
 
-# The timeout includes docker run of the binary, slow when many tests run in parallel.
 def _wait_local_http_ready(url, timeout=30, process=None, log_path=None):
     deadline = time.time() + timeout
     while time.time() < deadline:
