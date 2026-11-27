@@ -130,28 +130,19 @@ type orchestrator struct {
 	backupNames map[string]string
 	// storagePaths is the result of the storage path check.
 	storagePaths model.PathCheckResult
-	// source is set when a restore reads the backup of another installation.
-	source restoreSource
+	source       restoreSource
 }
 
-// restoreSource is the storage path of another installation that a restore reads the backup from.
+// restoreSource is set when a restore reads the backup of another installation.
 type restoreSource struct {
-	// env holds the --env flags that point clickhouse-backup to that storage path.
+	// env holds the --env flags that point clickhouse-backup to the storage path of that installation.
 	env string
-	// path is that storage path, for messages.
-	path string
-	// ownStoragePath is true when only the object disk path differs from the path of this installation.
-	ownStoragePath bool
-	// missingHint is added to the error when the backup is missing.
-	missingHint string
-	// schemaCopies are the hosts where the preflight downloaded the schema. They are deleted before the restore.
+	// schemaCopies are the hosts where the preflight downloaded the schema to check the backup.
 	schemaCopies []string
-	// localChecked are the hosts checked to hold no local copy that clickhouse-backup would restore instead.
+	// localChecked are the hosts checked to hold no local copy of the same name.
 	localChecked map[string]bool
-	// resumesDownload are the hosts that hold a local copy an earlier run of this restore downloaded.
+	// resumesDownload are the hosts that resume a download of an earlier run.
 	resumesDownload map[string]bool
-	// ownRemote maps a host to the backups at its own storage path. A backup of the same name hides the source one.
-	ownRemote map[string]map[string]bool
 }
 
 func (o *orchestrator) logf(format string, args ...any) {

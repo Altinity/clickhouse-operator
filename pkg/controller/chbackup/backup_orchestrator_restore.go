@@ -24,7 +24,6 @@ import (
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chbackup"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -68,7 +67,7 @@ func (o *orchestrator) restore(ctx context.Context) error {
 		}
 	}
 	plan := o.plan()
-	o.source.env, o.source.path = plan.SourceEnv, plan.SourceShown
+	o.source.env = plan.SourceEnv
 	name := spec.BackupName
 	hadLocal := plan.HadLocal
 
@@ -391,11 +390,6 @@ func (o *orchestrator) planRestore(ctx context.Context, hosts restoreHosts) erro
 			if err := o.refuseLocalCopy(ctx, host); err != nil {
 				return err
 			}
-			if !o.source.ownStoragePath {
-				if err := o.refuseOwnBackup(ctx, host); err != nil {
-					return err
-				}
-			}
 		}
 	}
 	holdsRBAC := false
@@ -406,7 +400,7 @@ func (o *orchestrator) planRestore(ctx context.Context, hosts restoreHosts) erro
 			var row *backupRow
 			where := "the storage of " + host
 			if o.source.env != "" {
-				where = fmt.Sprintf("the storage path '%s' of %s", o.source.path, host)
+				where = fmt.Sprintf("the storage of installation %s on %s", o.sourceName(), host)
 				// A schema copy would overwrite the local copy and be deleted with it.
 				resumed := o.source.resumesDownload[host]
 				if !resumed {
@@ -425,11 +419,6 @@ func (o *orchestrator) planRestore(ctx context.Context, hosts restoreHosts) erro
 					o.logf("%s: the incomplete local copy of %s an earlier run of this restore downloaded, after its preflight found "+
 						"the backup in %s, is checked by its download, which resumes it", host, backup, where)
 					continue
-				}
-				if (row.Required != "") && o.source.ownRemote[host][row.Required] {
-					return failf("preflight failed: backup %s is incremental from %s, and %s holds a backup %s at its own storage path "+
-						"too, which clickhouse-backup would take for the one at the storage path '%s', as it tells the backups of every "+
-						"path apart by name alone: delete that one first", backup, row.Required, host, row.Required, o.source.path)
 				}
 			} else {
 				rows, err := o.list(ctx, host, "remote")
@@ -500,7 +489,6 @@ func (o *orchestrator) planRestore(ctx context.Context, hosts restoreHosts) erro
 	plan := api.BackupRunPlan{
 		ActionEnv:      o.restoreEnv(),
 		SourceEnv:      o.source.env,
-		SourceShown:    o.source.path,
 		HadLocal:       hadLocal,
 		Resumed:        resumed,
 		Replaced:       replaced,
@@ -587,9 +575,7 @@ func (o *orchestrator) sourcePaths() error {
 			"names apart from this one, so it reads them as they are: '%s'", self.ClusterName, name, self.Path)
 		return nil
 	}
-	if sourcePath == self.Path {
-		o.source.ownStoragePath = true
-	} else if (sourceObject != "") && (sourceObject == self.ObjectDiskPath) {
+	if (sourcePath != self.Path) && (sourceObject != "") && (sourceObject == self.ObjectDiskPath) {
 		return failf("the object disk path '%s' of cluster %s holds no {installation} or {namespace} that tells the installation "+
 			"restore %s names apart from this one, while the storage path does: deleting the copy the restore downloads would delete "+
 			"the object disk data of the backup; give the object disk path the macros of the storage path", self.ObjectDiskPath,
@@ -605,15 +591,7 @@ func (o *orchestrator) sourcePaths() error {
 	if sourceObject != "" {
 		o.source.env += fmt.Sprintf(" --env=%s_OBJECT_DISK_PATH=%s", self.StoragePrefix, sourceObject)
 	}
-	if (installation != "") && strings.Contains(sourcePath, "{replica}") {
-		o.source.missingHint = "; the storage path holds {replica}, the host name, which holds the name of the installation, so the hosts " +
-			"of installations of different names have different paths"
-	}
-	o.source.path = sourcePath
-	if expanded, unknown := model.ExpandMacros(sourcePath, check.Installation, check.Namespace, self.ClusterName, "{shard}"); unknown == "" {
-		o.source.path = expanded
-	}
-	o.logf("restore %s: reading the backup at the storage path '%s' of the installation it names", name, o.source.path)
+	o.logf("restore %s: reading the backup at the storage path '%s' of installation %s", name, sourcePath, o.sourceName())
 	return nil
 }
 
@@ -704,27 +682,6 @@ func (o *orchestrator) downloadNote(step api.BackupRunStep, host string) string 
 	return ""
 }
 
-func (o *orchestrator) refuseOwnBackup(ctx context.Context, host string) error {
-	rows, err := o.list(ctx, host, "remote")
-	if err != nil {
-		return failf("preflight failed on %s: %v", host, err)
-	}
-	if o.source.ownRemote == nil {
-		o.source.ownRemote = map[string]map[string]bool{}
-	}
-	o.source.ownRemote[host] = map[string]bool{}
-	for _, row := range rows {
-		o.source.ownRemote[host][row.Name] = true
-	}
-	name := o.backupNames[host]
-	if o.source.ownRemote[host][name] {
-		return failf("preflight failed: %s holds a backup %s at its own storage path too, which clickhouse-backup would take for the "+
-			"one at the storage path '%s', as it tells the backups of every path apart by name alone: restore a backup of another name, "+
-			"or delete that one first", host, name, o.source.path)
-	}
-	return nil
-}
-
 func (o *orchestrator) sourceCopy(ctx context.Context, host string) error {
 	if slices.Contains(o.source.schemaCopies, host) {
 		return nil
@@ -735,8 +692,8 @@ func (o *orchestrator) sourceCopy(ctx context.Context, host string) error {
 	o.source.schemaCopies = append(o.source.schemaCopies, host)
 	name := o.backupNames[host]
 	if err := o.runOne(ctx, stepSource, host, "download --schema --rbac "+o.source.env+" "+name, false); err != nil {
-		return failf("preflight failed: backup %s is missing in the storage path '%s' of %s, or cannot be read there: %v%s", name,
-			o.source.path, host, err, o.source.missingHint)
+		return failf("preflight failed: backup %s is missing in the storage of installation %s on %s, or cannot be read there: %v",
+			name, o.sourceName(), host, err)
 	}
 	return nil
 }
@@ -794,4 +751,11 @@ func (o *orchestrator) keepDownloads() {
 	o.eventf(core.EventTypeWarning, "OrchestratorRestoreDownloadsKept", "the failed restore keeps the local copies of the backup it "+
 		"downloaded, to look into and for a restore of the backup again to resume their download, on %s; delete each by hand on "+
 		"its host with %s", strings.Join(copies, " "), deleteByHand("<backup>"))
+}
+
+func (o *orchestrator) sourceName() string {
+	if o.spec.SourceNamespace == "" {
+		return o.spec.SourceInstallation
+	}
+	return o.spec.SourceNamespace + "/" + o.spec.SourceInstallation
 }

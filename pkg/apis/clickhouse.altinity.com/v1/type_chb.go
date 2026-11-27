@@ -111,8 +111,6 @@ type BackupRunPlan struct {
 	NamingPrefix string `json:"namingPrefix,omitempty" yaml:"namingPrefix,omitempty"`
 	// SourceEnv points a restore at the storage path of the installation that made the backup.
 	SourceEnv string `json:"sourceEnv,omitempty" yaml:"sourceEnv,omitempty"`
-	// SourceShown is that storage path, as shown in logs and events.
-	SourceShown string `json:"sourceShown,omitempty" yaml:"sourceShown,omitempty"`
 	// ActionEnv holds the --env flags every restore command gets.
 	ActionEnv string `json:"actionEnv,omitempty" yaml:"actionEnv,omitempty"`
 	// HadLocal are the hosts that held a complete local copy, so they skip the download.

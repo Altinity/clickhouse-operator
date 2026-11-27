@@ -606,14 +606,8 @@ these macros give. It overrides both paths for its own `clickhouse-backup` comma
 * You cannot restore an `AllReplicas` backup into a CHI with another name, because `{replica}` (the
   host name) is different there.
 
-clickhouse-backup tells backups apart by name alone, whatever their path, in the cache where it
-keeps what it read of them, and reuses a local copy of a backup it is to download. Before anything
-changes, such a restore therefore refuses a host that holds a local copy of the backup, or a backup
-of the same name at its own storage path - unless both CHIs have one storage path, their object disk
-paths alone differing - or, unless `validateTopology` is `false`, a backup named as the one the
-backup is incremental from: the host would restore that one in place of the backup it reads. Keep
-the backup names of the two CHIs apart, as the default `backupNamePrefix` of their schedules does,
-unless their names joined with dashes coincide.
+clickhouse-backup reuses a local copy of a backup it is to download. Before anything changes, such a
+restore therefore refuses a host that holds a local copy of the backup.
 It also refuses an object disk path that is the same for both CHIs while the storage path is not:
 deleting the copy it downloads would delete the object disk data of the backup.
 
