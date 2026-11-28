@@ -23,6 +23,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 )
 
@@ -81,4 +82,90 @@ func TestRunTimeoutsPrecedence(t *testing.T) {
 // dur returns a duration of a spec.
 func dur(d time.Duration) *meta.Duration {
 	return &meta.Duration{Duration: d}
+}
+
+// A backup runs on the preferred replica of every shard, falling back to the first one, and a restore restores the schema on every replica and the data on the first of every
+// shard, every one of them bounded by its deadline.
+func TestRunSpecsTargetTheHostsOfTheirOperation(t *testing.T) {
+	topology := testTopology()
+	topology.clusters[0].preferredReplica = 1
+	topology.enabled = topology.clusters
+	chb := testBackup("b1")
+	chb.Spec.BackupName = "manual"
+	chb.Spec.DiffFromRemote = "base"
+	chb.Spec.ConfigOverrides = []string{"--env=S3_STORAGE_CLASS=GLACIER"}
+	chb.Spec.ActiveDeadlineSeconds = ptrInt64(3600)
+	backup := BackupRunSpec(chb, topology)
+	require.Equal(t, api.BackupRunOperationBackup, backup.Operation)
+	require.Equal(t, "main", backup.Cluster)
+	require.Equal(t, []string{"chi-demo-main-0-1", "chi-demo-main-1-1"}, backup.BackupHosts)
+	require.Equal(t, []string{"chi-demo-main-0-0", "chi-demo-main-1-0"}, backup.FallbackHosts)
+	require.Equal(t, "manual", backup.BackupName)
+	require.Equal(t, "base", backup.DiffFromRemote)
+	require.Equal(t, []string{"S3_STORAGE_CLASS=GLACIER"}, backup.ConfigOverrides)
+	require.Equal(t, time.Hour, backup.Deadline)
+	require.Empty(t, backup.Entries, "a one-off backup runs no retention")
+	require.Equal(t, backup.BackupHosts, backup.Hosts())
+
+	chb.Spec.ReplicaSelection = api.ReplicaSelectionAllReplicas
+	require.Equal(t, topology.AllReplicas(), BackupRunSpec(chb, topology).BackupHosts)
+	require.Empty(t, BackupRunSpec(chb, topology).FallbackHosts)
+
+	chr := testRestore("r1")
+	chr.Spec.Overwrite = types.NewStringBool(true)
+	chr.Spec.DatabaseMapping = map[string]string{"b": "c", "a": "d"}
+	restore := RestoreRunSpec(chr, topology)
+	require.Equal(t, topology.AllReplicas(), restore.SchemaHosts)
+	require.Equal(t, []string{"chi-demo-main-0-0", "chi-demo-main-1-0"}, restore.DataHosts)
+	require.True(t, restore.Overwrite)
+	require.True(t, restore.ValidateTopology)
+	require.Equal(t, "a:d,b:c", restore.DatabaseMapping)
+	require.Equal(t, 24*time.Hour, restore.Deadline)
+	require.True(t, restore.ReplicatedCopyToDetached, "the replicas copy the data to detached by default")
+	chr.Spec.ReplicatedCopyToDetached = types.NewStringBool(false)
+	require.False(t, RestoreRunSpec(chr, topology).ReplicatedCopyToDetached)
+}
+
+// A scheduled run names its backup after its scheduled time, in the zone of the schedule, and prunes on every host it backs up
+func TestScheduledRunSpec(t *testing.T) {
+	chbs := testSchedule("nightly")
+	chbs.Spec.TimeZone = "Europe/Berlin"
+	chbs.Spec.Retention = &api.BackupRetention{KeepBackups: []api.BackupRetentionPin{{Name: "x", Until: "2026-12-31T00:00:00Z"}}}
+	slot := time.Date(2026, time.November, 12, 2, 0, 0, 0, time.UTC)
+	spec := ScheduledRunSpec(chbs, testTopology(), slot)
+	require.Equal(t, BackupNamePrefix(chbs), spec.Prefix)
+	require.Equal(t, slot, spec.Slot)
+	require.Equal(t, "Europe/Berlin", spec.TimeZone)
+	require.Equal(t, []api.BackupRetentionPin{{Name: "x", Until: "2026-12-31T00:00:00Z"}}, spec.KeepBackups)
+	require.Len(t, spec.Entries, 1)
+	require.Equal(t, []string{"chi-demo-main-0-0", "chi-demo-main-1-0"}, spec.RetentionHosts)
+	require.Equal(t, "20261112030000", SlotTag(slot, chbs.Spec.TimeZone))
+}
+
+// A backup run now from a schedule runs its retention with the backups the schedule pins and holds, as recorded,
+// and stays out of its series by its name.
+func TestRunNowCarriesTheRetentionOfItsSchedule(t *testing.T) {
+	chb := testBackup("now")
+	chb.Spec.ScheduleRef = &api.BackupScheduleRef{Name: "s1"}
+	chb.Status.BackupName = "nightly-20260101T120000"
+	previous := []api.RetiredScheduleRules{{ChangeID: "2026-01-01T00:00:00Z", Schedules: testSchedule("s1").Spec.Schedules}}
+	chb.Status.Schedule = &api.BackupScheduleRecord{
+		Name: "s1", BackupNamePrefix: "nightly", Schedules: testSchedule("s1").Spec.Schedules,
+		KeepBackups:       []api.BackupRetentionPin{{Name: "nightly-20251201000000"}, {Name: "nightly-20251202000000"}},
+		PreviousSchedules: previous,
+	}
+	spec := BackupRunSpec(chb, testTopology())
+	require.True(t, spec.RunsSchedule)
+	require.Equal(t, "nightly", spec.Prefix)
+	require.Equal(t, []api.BackupRetentionPin{{Name: "nightly-20251201000000"}, {Name: "nightly-20251202000000"}}, spec.KeepBackups)
+	require.Equal(t, previous, spec.Previous)
+	require.Equal(t, "nightly-20260101T120000", spec.BackupName)
+	_, inSeries := Naming{}.SeriesKey("h", spec.BackupName, "nightly")
+	require.True(t, inSeries, "the series of the schedule holds it, which retention keeps as made at once")
+	_, atOnce := Naming{}.KeyTime(spec.BackupName, "nightly")
+	require.True(t, atOnce)
+}
+
+func ptrInt64(v int64) *int64 {
+	return &v
 }

@@ -8648,7 +8648,7 @@ def test_010086_1(self, version_from="0.27.4", version_to=None):
 #
 
 # Kinds, labels and annotations of operator-managed backup, mirrored from pkg/apis/clickhouse.altinity.com/v1
-# and pkg/model/chbackup/builder.go.
+# and pkg/model/chbackup/recovery.go.
 backup_kind = "clickhousebackup"
 restore_kind = "clickhouserestore"
 schedule_kind = "clickhousebackupschedule"
@@ -9860,7 +9860,7 @@ def test_010088(self):
 
     def default_prefix(schedule):
         # The default backup name prefix of a schedule of the new installation, see BackupNamePrefix in
-        # pkg/model/chbackup/builder.go.
+        # pkg/model/chbackup/naming.go.
         return f"{current().context.test_namespace}-{recovered_chi}-{schedule}"
 
     def check_held_for_prefix(schedule):
