@@ -163,7 +163,7 @@ func (c *BackupController) validate(ctx context.Context, chb *api.ClickHouseBack
 	if err != nil {
 		return ctrl.Result{}, false, err
 	}
-	var target *target
+	var target *backupTarget
 	if wait == nil {
 		target, wait, err = c.resolveTarget(ctx, chb.GetNamespace(), chb.TargetInstallation(), chb.TargetCluster(), true)
 		if err != nil {

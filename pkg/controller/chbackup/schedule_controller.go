@@ -201,7 +201,7 @@ func (c *ScheduleController) reconcile(ctx context.Context, chbs *api.ClickHouse
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	var target *target
+	var target *backupTarget
 	if wait == nil {
 		if target, wait, err = newTarget(chi, chbs.Spec.Cluster); err != nil {
 			return ctrl.Result{}, err
@@ -373,7 +373,7 @@ func (c *ScheduleController) warnMissedSlots(
 func (c *ScheduleController) runDueSlot(
 	ctx context.Context,
 	chbs *api.ClickHouseBackupSchedule,
-	target *target,
+	target *backupTarget,
 	clusters []string,
 	holds map[string]*pending,
 	out *announcements,
@@ -419,7 +419,7 @@ func scheduledRunKey(chbs *api.ClickHouseBackupSchedule, cluster string, slot ti
 func (c *ScheduleController) refusedPaths(
 	ctx context.Context,
 	chbs *api.ClickHouseBackupSchedule,
-	target *target,
+	target *backupTarget,
 	clusters []string,
 ) (string, error) {
 	resolve := c.settingResolver(ctx, chbs.GetNamespace())
@@ -443,7 +443,7 @@ func (c *ScheduleController) refusedPaths(
 func (c *ScheduleController) startScheduledRun(
 	ctx context.Context,
 	chbs *api.ClickHouseBackupSchedule,
-	target *target,
+	target *backupTarget,
 	cluster string,
 	slot time.Time,
 	out *announcements,
@@ -799,7 +799,7 @@ func (c *ScheduleController) refreshNextScheduleTime(chbs *api.ClickHouseBackupS
 // restored from a backup typically shares the storage path of the installation the backup came from,
 // where retention tells the backups of the two apart by their name prefix alone, and a schedule of every cluster
 // leaves out the clusters that turn backup on without a storage.
-func (c *ScheduleController) validated(chbs *api.ClickHouseBackupSchedule, target *target, out *announcements) {
+func (c *ScheduleController) validated(chbs *api.ClickHouseBackupSchedule, target *backupTarget, out *announcements) {
 	reason, message := api.BackupReasonValidated, messageValidated
 	if recoveredFrom := target.chi.GetAnnotations()[api.AnnotationRecoveredFrom]; recoveredFrom != "" {
 		reason = api.BackupReasonCHIRecovered

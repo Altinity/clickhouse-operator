@@ -27,8 +27,8 @@ import (
 	model "github.com/altinity/clickhouse-operator/pkg/model/chbackup"
 )
 
-// target is the installation an operation runs on and the hosts it drives.
-type target struct {
+// backupTarget is the installation an operation runs on and the hosts it drives.
+type backupTarget struct {
 	chi      *api.ClickHouseInstallation
 	topology *model.Topology
 }
@@ -129,7 +129,7 @@ func (r *reconciler) resolveTarget(
 	chiName string,
 	cluster string,
 	requireReady bool,
-) (*target, *pending, error) {
+) (*backupTarget, *pending, error) {
 	chi, wait, err := r.readInstallation(ctx, namespace, chiName, requireReady)
 	if (err != nil) || (wait != nil) {
 		return nil, wait, err
@@ -139,12 +139,12 @@ func (r *reconciler) resolveTarget(
 
 // newTarget resolves the hosts an operation on cluster of an installation read by readInstallation
 // targets, "" standing for every backup-enabled cluster.
-func newTarget(chi *api.ClickHouseInstallation, cluster string) (*target, *pending, error) {
+func newTarget(chi *api.ClickHouseInstallation, cluster string) (*backupTarget, *pending, error) {
 	topology, err := model.NewTopology(chi.GetAncestorT(), cluster)
 	if err != nil {
 		return nil, topologyPending(chi.GetName(), err), ignoreTopologyError(err)
 	}
-	return &target{chi: chi, topology: topology}, nil, nil
+	return &backupTarget{chi: chi, topology: topology}, nil, nil
 }
 
 // topologyPending explains why a topology cannot be targeted, nil for an error that tells nothing
@@ -177,7 +177,7 @@ func topologyPending(chiName string, err error) *pending {
 // leftOutWithoutStorage tells which clusters an operation of every cluster of the installation leaves out
 // as they turn backup on without a storage, "" when it leaves out none, or targets one cluster: a cluster
 // whose spec asks for backup would otherwise go without one unnoticed.
-func leftOutWithoutStorage(target *target, specCluster string) string {
+func leftOutWithoutStorage(target *backupTarget, specCluster string) string {
 	clusters := target.topology.ClustersWithoutStorage()
 	if (specCluster != "") || (len(clusters) == 0) {
 		return ""
@@ -213,7 +213,7 @@ func (r *reconciler) newTargetResolver(ctx context.Context, namespace, chiName s
 }
 
 // forCluster returns the target of one cluster, or why that cluster cannot be targeted.
-func (t *targetResolver) forCluster(cluster string) (*target, *pending, error) {
+func (t *targetResolver) forCluster(cluster string) (*backupTarget, *pending, error) {
 	if !t.resolved {
 		t.chi, t.wait, t.err = t.read()
 		t.resolved = true
