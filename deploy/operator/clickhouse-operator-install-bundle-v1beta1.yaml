@@ -6394,7 +6394,7 @@ spec:
           jsonPath: .status.conditions[?(@.type=="Ready")].reason
         - name: last-schedule
           type: date
-          description: "Last time a run was due"
+          description: "Scheduled start time of the last backup"
           jsonPath: .status.lastScheduleTime
         - name: last-success
           type: date
@@ -6723,7 +6723,7 @@ spec:
                         type: string
                         format: date-time
                         nullable: true
-                        description: "Last time a run that matches the entry was due. The run can also be for a longer entry that matches too."
+                        description: "Scheduled start time of the last backup for this period. A backup of a longer period at the same time counts too."
                       lastBackupName:
                         type: string
                         description: "Backup of the last successful run that matches the entry."
@@ -6750,7 +6750,7 @@ spec:
                         type: string
                         format: date-time
                         nullable: true
-                        description: "Last time a run was due on the cluster."
+                        description: "Scheduled start time of the last backup of the cluster."
                       lastSuccessfulTime:
                         type: string
                         format: date-time
@@ -6808,7 +6808,7 @@ spec:
                   type: string
                   format: date-time
                   nullable: true
-                  description: "Last time a run was due on any cluster."
+                  description: "Scheduled start time of the last backup of any cluster."
                 lastSuccessfulTime:
                   type: string
                   format: date-time
