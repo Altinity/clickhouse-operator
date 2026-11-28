@@ -37,7 +37,7 @@ type RunSpec struct {
 	// Timeouts are merged by field: resource, then schedule, then operator configuration, then default
 	Timeouts *api.BackupTimeouts
 
-	// With a template, BackupName is the name on any shard. It is empty for a scheduled run, named after its slot
+	// With a template, BackupName is the name on any shard. It is empty for a scheduled run, named after its scheduled time
 	BackupName string
 
 	Prefix      string

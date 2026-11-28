@@ -36,10 +36,10 @@ const (
 	targetRequeueInterval   = time.Minute
 	runningRequeueInterval  = 30 * time.Second
 	topologyRecheckInterval = 10 * time.Minute
-	// dueRecheckDelay places the recheck of a backup waiting for the time it is due, or for its starting
+	// dueRecheckDelay places the recheck of a backup waiting for its scheduled time, or for its starting
 	// deadline, just past that time, so that the recheck finds it passed.
 	dueRecheckDelay = time.Second
-	// dueRecheckCap bounds the wait for the time a backup is due between two rechecks: a timer measures
+	// dueRecheckCap bounds the wait for the scheduled time of a backup between two rechecks: a timer measures
 	// the time that passes, and the wall clock may jump meanwhile.
 	dueRecheckCap = time.Hour
 )

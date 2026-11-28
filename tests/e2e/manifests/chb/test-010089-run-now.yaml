@@ -1,5 +1,5 @@
 # test_010089
-# Makes the backup of schedule keep-backups once, now: named with the schedule's prefix and the time it is due as
+# Makes the backup of schedule keep-backups once, now: named with the schedule's prefix and its scheduled time as
 # YYYYMMDDTHHMMSS, a run-now backup, which retention keeps while it is pinned without until.
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseBackup"

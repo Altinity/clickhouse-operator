@@ -5,7 +5,7 @@
 # resources are tied by spec.scheduleRef.name alone, neither owns the other:
 #
 # - The schedule makes its own backups without a ClickHouseBackup. The operator runs it on each
-#   cluster at its slots, and the schedule status shows the runs. These backups are the series that
+#   cluster at its scheduled times, and the schedule status shows the runs. These backups are the series that
 #   its retention deletes from. The schedule status never shows this backup.
 #
 # - This backup is a ClickHouseBackup like 02-backup-once.yaml, with its own status and runs. But
@@ -24,18 +24,18 @@
 #
 # - It is always named <prefix>-YYYYMMDDTHHMMSS: the schedule's prefix - its spec.backupNamePrefix
 #   or, unset, <namespace>-<installation>-<schedule> - as status.schedule.backupNamePrefix records
-#   it, and the UTC time it is due, here for instance default-backup-demo-nightly-20261012T101507,
+#   it, and its UTC scheduled time, here for instance default-backup-demo-nightly-20261012T101507,
 #   shown in status.backupName: spec.backupName is refused with spec.scheduleRef. The "T" keeps it
-#   out of the schedule slots. Schedule retention deletes it once it is older than the oldest backup
+#   out of the scheduled times of the schedule. Schedule retention deletes it once it is older than the oldest backup
 #   the schedule keeps. Deleting this resource does not delete the backup. Creating this resource again later makes
 #   another backup only without spec.scheduledTime; with it, the backup gets the same name again,
 #   and fails before changing anything while the backup of that name is still in the storage.
 #
 # - It runs while the schedule is suspended or held for a restore too, but on each cluster it waits
 #   for any backup or restore running there, a run of the schedule included (OperationInProgress).
-#   A run of the schedule due meanwhile waits on each host until this backup is done there.
+#   A run of the schedule whose scheduled time comes meanwhile waits on each host until this backup is done there.
 #
-# - Two of them due in the same second get one name, and the second fails before it changes
+# - Two of them with the same scheduled second get one name, and the second fails before it changes
 #   anything: create the failed one anew, without spec.scheduledTime, so that its new creation time
 #   gives it a new name, or give each its own spec.scheduledTime.
 apiVersion: "clickhouse.altinity.com/v1"
@@ -61,7 +61,7 @@ spec:
   # be created again later. See 03-backup-later.yaml.
   # scheduledTime: "2026-10-20T02:00:00+02:00"
 
-  # The maximum delay, in seconds, from the due time (creation, or spec.scheduledTime) to the start.
+  # The maximum delay, in seconds, from the scheduled time (creation, or spec.scheduledTime) to the start.
   # The run of a cluster can wait, for example until the installation completes its reconcile and no
   # other backup or restore runs on the cluster.
   # After the deadline, these fail with the reason StartingDeadlineExceeded, which tells what they
@@ -69,7 +69,7 @@ spec:
   # - a backup that is not validated yet (for example, with an invalid spec)
   # - each cluster whose run did not start yet
   # Runs that started continue. If unset, the backup waits with no limit. The operator checks one
-  # second after the due time, so set 60 or more. The run time limit is spec.activeDeadlineSeconds:
+  # second after the scheduled time, so set 60 or more. The run time limit is spec.activeDeadlineSeconds:
   # of the backup, or of the schedule with spec.scheduleRef.
   # startingDeadlineSeconds: 3600
 

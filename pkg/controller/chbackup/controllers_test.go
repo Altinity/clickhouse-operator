@@ -156,8 +156,8 @@ func TestBackupWaitsForARestoreOfItsCluster(t *testing.T) {
 	require.Empty(t, sc.commands())
 }
 
-// A schedule runs at the slots of all its entries on every cluster it backs up, no resource made for a run: the run
-// lives in status.active, then in status.recentRuns, and the status of its cluster tells the backup it made. A slot
+// A schedule runs at the scheduled times of all its entries on every cluster it backs up, no resource made for a run: the run
+// lives in status.active, then in status.recentRuns, and the status of its cluster tells the backup it made. A scheduled time
 // before the schedule was created never runs.
 func TestScheduleRunsAtItsSlots(t *testing.T) {
 	sc := newFakeSidecars()
@@ -174,7 +174,7 @@ func TestScheduleRunsAtItsSlots(t *testing.T) {
 	reconcile := func() (ctrl.Result, error) { return controller.Reconcile(context.Background(), request("nightly")) }
 	result, err := reconcile()
 	require.NoError(t, err)
-	require.Empty(t, getSchedule(t, c, "nightly").Status.Active, "the slot of 03:00 is not due yet")
+	require.Empty(t, getSchedule(t, c, "nightly").Status.Active, "the scheduled time 03:00 has not come yet")
 	require.Equal(t, time.Date(2026, time.November, 12, 3, 0, 0, 0, time.UTC), getSchedule(t, c, "nightly").Status.NextScheduleTime.Time.UTC())
 	require.Greater(t, result.RequeueAfter, time.Duration(0))
 
@@ -197,7 +197,7 @@ func TestScheduleRunsAtItsSlots(t *testing.T) {
 	require.Equal(t, api.BackupReasonCompleted, condition(t, got.Status.Conditions, api.BackupConditionLastBackupSucceeded).Reason)
 	require.Equal(t, []string{"chi-demo-main-0-0: create_remote --rbac nightly-20261112030000"}, sc.commands())
 
-	// The slot that ran never runs again; the next one does
+	// The scheduled time that ran never runs again. The next one does.
 	_, err = reconcile()
 	require.NoError(t, err)
 	require.Len(t, sc.commands(), 1)
@@ -208,7 +208,7 @@ func TestScheduleRunsAtItsSlots(t *testing.T) {
 	require.Equal(t, "nightly-20261113030000", recent[0].BackupName, "newest first")
 }
 
-// The night the clocks go back, an hourly schedule of a zone that repeats a wall-clock hour runs the slots of that hour
+// The night the clocks go back, an hourly schedule of a zone that repeats a wall-clock hour runs the scheduled times of that hour
 // once, the first occurrence: the second would make a backup of the name of the first, which the preflight refuses.
 func TestScheduleRunsTheRepeatedWallClockHourOnce(t *testing.T) {
 	sc := newFakeSidecars()
@@ -241,7 +241,7 @@ func TestScheduleRunsTheRepeatedWallClockHourOnce(t *testing.T) {
 	require.Empty(t, got.Status.Active, "the second 02:00 starts no run")
 	require.Len(t, got.Status.RecentRuns, 1)
 	require.Len(t, sc.commands(), 1)
-	require.Equal(t, time.Date(2026, time.October, 25, 2, 0, 0, 0, time.UTC), got.Status.NextScheduleTime.Time.UTC(), "the next slot is 03:00")
+	require.Equal(t, time.Date(2026, time.October, 25, 2, 0, 0, 0, time.UTC), got.Status.NextScheduleTime.Time.UTC(), "the next scheduled time is 03:00")
 
 	clock.SetTime(time.Date(2026, time.October, 25, 2, 0, 5, 0, time.UTC))
 	reconcileUntil(t, reconcile, func() bool { return len(getSchedule(t, c, "nightly").Status.RecentRuns) == 2 })
@@ -251,7 +251,7 @@ func TestScheduleRunsTheRepeatedWallClockHourOnce(t *testing.T) {
 	}
 }
 
-// A schedule held by a restore of its cluster runs no slot; a slot missed by more than startingDeadlineSeconds is
+// A schedule held by a restore of its cluster runs nothing. A scheduled time missed by more than startingDeadlineSeconds is
 // skipped.
 func TestScheduleHoldsForARestoreAndSkipsLateSlots(t *testing.T) {
 	sc := newFakeSidecars()
@@ -279,14 +279,14 @@ func TestScheduleHoldsForARestoreAndSkipsLateSlots(t *testing.T) {
 	_, err = controller.Reconcile(context.Background(), request("nightly"))
 	require.NoError(t, err)
 	got = getSchedule(t, c, "nightly")
-	require.Empty(t, got.Status.Active, "the slot is past its starting deadline")
+	require.Empty(t, got.Status.Active, "the scheduled time is past its starting deadline")
 	require.Equal(t, time.Date(2026, time.November, 12, 3, 0, 0, 0, time.UTC), got.Status.Clusters[0].LastScheduleTime.Time.UTC())
 	require.NotEmpty(t, eventMessages(t, c, reasonScheduledRunSkipped))
 	require.Empty(t, sc.commands())
 }
 
-// The slots missed since the last slot of a cluster, as the operator did not run, are told by a ScheduledRunSkipped
-// warning when the latest due slot runs; a run of the next slot tells none.
+// The scheduled times missed since the last scheduled time of a cluster, as the operator did not run, are told by a ScheduledRunSkipped
+// warning when the latest scheduled time runs. A run of the next scheduled time tells none.
 func TestScheduleWarnsOfMissedSlots(t *testing.T) {
 	sc := newFakeSidecars()
 	sc.any = true
@@ -306,8 +306,8 @@ func TestScheduleWarnsOfMissedSlots(t *testing.T) {
 
 	messages := eventMessages(t, c, reasonScheduledRunSkipped)
 	require.Len(t, messages, 1)
-	require.Contains(t, messages[0], "2 slot(s) of cluster main from 2026-11-10T03:00:00Z were missed")
-	require.Contains(t, messages[0], "only the latest due slot 2026-11-12T03:00:00Z runs")
+	require.Contains(t, messages[0], "2 scheduled time(s) of cluster main from 2026-11-10T03:00:00Z were missed")
+	require.Contains(t, messages[0], "only the latest scheduled time 2026-11-12T03:00:00Z runs")
 	require.Equal(t, time.Date(2026, time.November, 12, 3, 0, 0, 0, time.UTC),
 		getSchedule(t, c, "nightly").Status.Clusters[0].LastScheduleTime.Time.UTC())
 }
@@ -318,11 +318,11 @@ func TestMissedSlots(t *testing.T) {
 	slot := time.Date(2026, time.November, 14, 3, 0, 0, 0, time.UTC)
 
 	count, first := missedSlots(chbs, time.Date(2026, time.November, 13, 3, 0, 0, 0, time.UTC), slot)
-	require.Zero(t, count, "the slot right after the last one misses none")
+	require.Zero(t, count, "the scheduled time right after the last one misses none")
 	require.True(t, first.IsZero())
 
 	count, first = missedSlots(chbs, time.Date(2026, time.November, 1, 3, 0, 0, 0, time.UTC), slot)
-	require.Equal(t, 3, count, "slots before the schedule was created are not missed")
+	require.Equal(t, 3, count, "scheduled times before the schedule was created are not missed")
 	require.Equal(t, time.Date(2026, time.November, 11, 3, 0, 0, 0, time.UTC), first)
 
 	chbs.Spec.Schedules = []api.BackupScheduleEntry{{Period: api.BackupPeriodMinute, Keep: 1}}

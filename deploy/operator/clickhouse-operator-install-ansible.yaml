@@ -5829,7 +5829,7 @@ spec:
                 backupName: &TypeBackupName
                   type: string
                   description: |
-                    Backup name. Empty generates a name from the resource name and the due time.
+                    Backup name. Empty generates a name from the resource name and the scheduled time.
                     The name must not end like a schedule backup name (-YYYYMMDDHHMMSS). Not allowed with scheduleRef.
                   maxLength: 128
                   pattern: '^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$'
@@ -5845,7 +5845,7 @@ spec:
                   minimum: 0
                   maximum: 2147483647
                   description: |
-                    Maximum delay in seconds after the due time to start the backup.
+                    Maximum delay in seconds after the scheduled time to start the backup.
                     A cluster that does not start by then fails. The backup fails if it is not validated by then. Unset means no limit.
                 diffFromRemote:
                   <<: *TypeBackupName
@@ -6512,7 +6512,7 @@ spec:
                   type: array
                   minItems: 1
                   description: |
-                    Backup entries, at most one per period. One run makes one backup, which counts for every entry due at that time.
+                    Backup entries, at most one per period. One run makes one backup, which counts for every entry with that scheduled time.
                     All entries that set time must set the same time.
                     See docs/backup.md.
                   x-kubernetes-list-type: map
@@ -6526,7 +6526,7 @@ spec:
                     properties:
                       period:
                         type: string
-                        description: "How often the entry is due. A minute entry is due every minute and ignores time."
+                        description: "How often the entry runs. A minute entry runs every minute and ignores time."
                         enum:
                           - minute
                           - hour
@@ -6561,7 +6561,7 @@ spec:
                         description: |
                           clickhouse-backup settings for the runs of this entry that replace the sidecar settings.
                           Each item is KEY=VALUE, where KEY is the env var of the setting, e.g. S3_STORAGE_CLASS=GLACIER_IR. A leading --env= is removed.
-                          If a slot matches more than one entry, the entry with the longest period applies.
+                          If a scheduled time matches more than one entry, the entry with the longest period applies.
                           You cannot override the settings that the operator sets: storage location, API and secrets.
                         items:
                           type: string
@@ -6587,7 +6587,7 @@ spec:
                   format: int64
                   minimum: 0
                   maximum: 2147483647
-                  description: "Maximum delay in seconds to start a run after its due time."
+                  description: "Maximum delay in seconds to start a run after its scheduled time."
                 successfulRunsHistoryLimit:
                   type: integer
                   format: int32
@@ -6681,7 +6681,7 @@ spec:
                 backupNamePrefix:
                   type: string
                   description: |
-                    Prefix of the backup names. Each run adds its due time as -YYYYMMDDHHMMSS.
+                    Prefix of the backup names. Each run adds its scheduled time as -YYYYMMDDHHMMSS.
                     Retention deletes only backups with this prefix and such a time.
                     Default: "<namespace>-<installation>-<schedule>", shortened with a hash if too long. At most 112 characters, so the full name fits in 128.
                     You can set it only once, also after creation. After that it is immutable, because retention does not delete backups of an old prefix.
@@ -6759,7 +6759,7 @@ spec:
                   type: string
                   format: date-time
                   nullable: true
-                  description: "Next time a run is due."
+                  description: "Next scheduled time of a run."
                 entries:
                   type: array
                   description: "Run state of each entry."
@@ -6976,7 +6976,7 @@ spec:
                       slot:
                         type: string
                         format: date-time
-                        description: "Due time of the run."
+                        description: "Scheduled time of the run."
                       backupName:
                         type: string
                         description: "Backup of the run. With a naming template, the backup of the first shard."
@@ -7116,7 +7116,7 @@ spec:
                       slot:
                         type: string
                         format: date-time
-                        description: "Due time of the run."
+                        description: "Scheduled time of the run."
                       backupName:
                         type: string
                         description: "Backup of the run. With a naming template, the backup of the first shard."

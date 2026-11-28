@@ -72,7 +72,7 @@ func joinName(parts ...string) string {
 }
 
 // ResolveBackupName returns the backup name of a one-off backup. A generated name is derived from the
-// time the backup is due, not the time of the reconcile, so every reconcile resolves the same name. A
+// scheduled time, not the time of the reconcile, so every reconcile resolves the same name. A
 // backup that runs a schedule, which takes no explicit name, is named with the backup name prefix it
 // recorded of the schedule: the prefix lets the recovery prefix guard tell where it came from, and the
 // form of the time keeps it out of the series the schedule's retention prunes. Any other backup takes

@@ -179,7 +179,7 @@ const (
 	// BackupReasonWaitingForScheduledTime: the backup waits for the time it is scheduled at.
 	BackupReasonWaitingForScheduledTime = "WaitingForScheduledTime"
 	// BackupReasonStartingDeadlineExceeded: the backup did not start within startingDeadlineSeconds of the
-	// time it was due.
+	// scheduled time.
 	BackupReasonStartingDeadlineExceeded = "StartingDeadlineExceeded"
 	// BackupReasonCHINotReady: the target installation has not completed its reconcile.
 	BackupReasonCHINotReady = "CHINotReady"
@@ -262,8 +262,8 @@ const (
 	// the CRD schema maximum mirrors it, which the API server enforces before the operator reads a spec.
 	BackupStartingDeadlineMaxSeconds = math.MaxInt32
 	BackupActiveDeadlineMaxSeconds   = math.MaxInt32 // mirrored by the CRD schema maximum
-	// BackupNameScheduleSuffix is the form of the suffix a scheduled run appends to the backup name prefix, the time
-	// the run was due, as messages tell it.
+	// BackupNameScheduleSuffix is the form of the suffix a scheduled run appends to the backup name prefix, the
+	// scheduled time of the run, as messages tell it.
 	BackupNameScheduleSuffix = "-YYYYMMDDHHMMSS"
 	// BackupNameScheduleSuffixLength is the length of the suffix a scheduled run appends.
 	BackupNameScheduleSuffixLength = len(BackupNameScheduleSuffix)
@@ -467,17 +467,17 @@ type ClickHouseBackupSpec struct {
 	// Cluster is immutable. Empty backs up every backup-enabled cluster. With ScheduleRef, it must be a schedule cluster.
 	Cluster string `json:"cluster,omitempty" yaml:"cluster,omitempty"`
 	// BackupName is the optional explicit backup name. When empty the operator generates a
-	// deterministic name from the CR name and the time the backup is due. A name ending like the backups of a
+	// deterministic name from the CR name and the scheduled time. A name ending like the backups of a
 	// schedule, "-YYYYMMDDHHMMSS", is refused, and so is any name with ScheduleRef: such a backup is always named
 	// with the schedule's backup name prefix, which keeps it recognizable as the schedule's.
 	BackupName string `json:"backupName,omitempty" yaml:"backupName,omitempty"`
 	// DiffFromRemote, when set to the name of a backup in the storage, makes this an
 	// incremental backup (clickhouse-backup --diff-from-remote).
 	DiffFromRemote string `json:"diffFromRemote,omitempty" yaml:"diffFromRemote,omitempty"`
-	// ScheduledTime is the RFC 3339 time, with its offset, the backup is due at. Empty makes it due when it is
-	// created. It can be changed until the backup is validated, at that time or later.
+	// ScheduledTime is the RFC 3339 time, with its offset, the backup is scheduled at. Empty makes the time it is
+	// created the scheduled time. It can be changed until the backup is validated, at that time or later.
 	ScheduledTime string `json:"scheduledTime,omitempty" yaml:"scheduledTime,omitempty"`
-	// StartingDeadlineSeconds counts from the due time. A cluster not started by then fails. Unset means no limit.
+	// StartingDeadlineSeconds counts from the scheduled time. A cluster not started by then fails. Unset means no limit.
 	StartingDeadlineSeconds *int64 `json:"startingDeadlineSeconds,omitempty" yaml:"startingDeadlineSeconds,omitempty"`
 	// ConfigOverrides are KEY=VALUE clickhouse-backup env vars for this backup, such as S3_STORAGE_CLASS=STANDARD_IA.
 	ConfigOverrides []string        `json:"configOverrides,omitempty" yaml:"configOverrides,omitempty"`
@@ -618,7 +618,7 @@ type ClickHouseBackupStatus struct {
 	DurationSeconds int64 `json:"durationSeconds,omitempty" yaml:"durationSeconds,omitempty"`
 	// Conditions represent the latest available observations of the backup state.
 	Conditions []meta.Condition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
-	// RerunTime is the due time set by the last spec.taskID rerun.
+	// RerunTime is the scheduled time set by the last spec.taskID rerun.
 	RerunTime *meta.Time `json:"rerunTime,omitempty" yaml:"rerunTime,omitempty"`
 	// PreviousBackupNames stay in the storage until retention or a manual delete removes them.
 	PreviousBackupNames []string            `json:"previousBackupNames,omitempty" yaml:"previousBackupNames,omitempty"`

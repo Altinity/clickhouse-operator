@@ -320,7 +320,7 @@ func TestOrchestratorRerunReplacesOnlyWhatEarlierRunsLeft(t *testing.T) {
 }
 
 // A new spec.taskID of an aborted schedule resets it: it is validated again at once, its abort, which holds still,
-// told anew; once its spec is fixed it is active. It runs no slot by itself.
+// told anew; once its spec is fixed it is active. It runs nothing by itself.
 func TestTaskIDResetsAnAbortedSchedule(t *testing.T) {
 	sc := newFakeSidecars()
 	sc.any = true
@@ -355,7 +355,7 @@ func TestTaskIDResetsAnAbortedSchedule(t *testing.T) {
 	require.Equal(t, api.SchedulePhaseActive, got.Status.Phase)
 	require.Len(t, eventMessages(t, c, reasonTaskIDReset), 2)
 	require.Equal(t, []string{"t2", "t1"}, got.Status.TaskIDsCompleted)
-	require.Empty(t, sc.commands(), "the reset runs no slot")
+	require.Empty(t, sc.commands(), "the reset runs nothing")
 
 	// A taskID of an active schedule is recorded, and resets nothing
 	setTaskID(t, c, &api.ClickHouseBackupSchedule{}, "nightly", "t3")

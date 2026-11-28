@@ -21,7 +21,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-// SlotTolerance is in seconds. A templated name uses the run start time, which can be later than the slot.
+// SlotTolerance is in seconds. A templated name uses the run start time, which can be later than the scheduled time.
 const SlotTolerance = 1800
 
 // Without a template the key is the backup name, with one it is the tag (YYYYMMDDHHMMSS or YYYYMMDDTHHMMSS).

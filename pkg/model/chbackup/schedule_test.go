@@ -199,17 +199,17 @@ func TestLatestSlot(t *testing.T) {
 		"weekly in a zone, before fall-back ": {entry(api.BackupPeriodWeekly, 1), "02:00", berlin, utc(2026, 10, 25, 0, 0, 0), utc(2026, 10, 19, 0, 0, 0)},
 
 		// monthly: day 31 is the last day of a shorter month
-		"monthly 31 in February":           {entry(api.BackupPeriodMonthly, 31), "02:00", nil, utc(2026, 3, 5, 0, 0, 0), utc(2026, 2, 28, 2, 0, 0)},
-		"monthly 31 in a leap February":    {entry(api.BackupPeriodMonthly, 31), "02:00", nil, utc(2028, 3, 5, 0, 0, 0), utc(2028, 2, 29, 2, 0, 0)},
-		"monthly 31, February not yet due": {entry(api.BackupPeriodMonthly, 31), "02:00", nil, utc(2026, 2, 28, 1, 0, 0), utc(2026, 1, 31, 2, 0, 0)},
-		"monthly 31 in April":              {entry(api.BackupPeriodMonthly, 31), "02:00", nil, utc(2026, 4, 30, 3, 0, 0), utc(2026, 4, 30, 2, 0, 0)},
-		"monthly 31 in May, before it":     {entry(api.BackupPeriodMonthly, 31), "02:00", nil, utc(2026, 5, 15, 0, 0, 0), utc(2026, 4, 30, 2, 0, 0)},
-		"monthly 30 in March":              {entry(api.BackupPeriodMonthly, 30), "02:00", nil, utc(2026, 3, 31, 0, 0, 0), utc(2026, 3, 30, 2, 0, 0)},
-		"monthly 1, across a year":         {entry(api.BackupPeriodMonthly, 1), "00:00", nil, utc(2026, 12, 31, 23, 59, 0), utc(2026, 12, 1, 0, 0, 0)},
-		"monthly 1, January":               {entry(api.BackupPeriodMonthly, 1), "00:00", nil, utc(2027, 1, 1, 0, 0, 0), utc(2027, 1, 1, 0, 0, 0)},
-		"monthly in a zone":                {entry(api.BackupPeriodMonthly, 1), "00:30", berlin, utc(2026, 11, 30, 23, 0, 0), utc(2026, 10, 31, 23, 30, 0)},
+		"monthly 31 in February":                 {entry(api.BackupPeriodMonthly, 31), "02:00", nil, utc(2026, 3, 5, 0, 0, 0), utc(2026, 2, 28, 2, 0, 0)},
+		"monthly 31 in a leap February":          {entry(api.BackupPeriodMonthly, 31), "02:00", nil, utc(2028, 3, 5, 0, 0, 0), utc(2028, 2, 29, 2, 0, 0)},
+		"monthly 31, February not yet scheduled": {entry(api.BackupPeriodMonthly, 31), "02:00", nil, utc(2026, 2, 28, 1, 0, 0), utc(2026, 1, 31, 2, 0, 0)},
+		"monthly 31 in April":                    {entry(api.BackupPeriodMonthly, 31), "02:00", nil, utc(2026, 4, 30, 3, 0, 0), utc(2026, 4, 30, 2, 0, 0)},
+		"monthly 31 in May, before it":           {entry(api.BackupPeriodMonthly, 31), "02:00", nil, utc(2026, 5, 15, 0, 0, 0), utc(2026, 4, 30, 2, 0, 0)},
+		"monthly 30 in March":                    {entry(api.BackupPeriodMonthly, 30), "02:00", nil, utc(2026, 3, 31, 0, 0, 0), utc(2026, 3, 30, 2, 0, 0)},
+		"monthly 1, across a year":               {entry(api.BackupPeriodMonthly, 1), "00:00", nil, utc(2026, 12, 31, 23, 59, 0), utc(2026, 12, 1, 0, 0, 0)},
+		"monthly 1, January":                     {entry(api.BackupPeriodMonthly, 1), "00:00", nil, utc(2027, 1, 1, 0, 0, 0), utc(2027, 1, 1, 0, 0, 0)},
+		"monthly in a zone":                      {entry(api.BackupPeriodMonthly, 1), "00:30", berlin, utc(2026, 11, 30, 23, 0, 0), utc(2026, 10, 31, 23, 30, 0)},
 
-		// an entry or a time that does not validate has no slot
+		// an entry or a time that does not validate has no scheduled time
 		"a time that is no time": {entry(api.BackupPeriodDaily), "25:00", nil, utc(2026, 11, 12, 0, 0, 0), time.Time{}},
 		"an unknown period":      {entry("yearly"), "00:00", nil, utc(2026, 11, 12, 0, 0, 0), time.Time{}},
 	} {
@@ -218,20 +218,20 @@ func TestLatestSlot(t *testing.T) {
 			require.True(t, tc.want.Equal(got), "want %s, got %s", tc.want.UTC(), got.UTC())
 			if !got.IsZero() {
 				require.False(t, got.After(tc.now))
-				require.True(t, got.Equal(LatestSlot(tc.entry, tc.at, tc.tz, got)), "a slot is its own latest slot")
+				require.True(t, got.Equal(LatestSlot(tc.entry, tc.at, tc.tz, got)), "a scheduled time is its own latest scheduled time")
 			}
 		})
 	}
 }
 
-// 02:30 happens twice on the night clocks fall back: the slot is taken once, at the wall-clock time of the entry.
+// 02:30 happens twice on the night clocks fall back: the scheduled time is taken once, at the wall-clock time of the entry.
 func TestLatestSlotInTheFallBackOverlap(t *testing.T) {
 	berlin := mustLocation(t, "Europe/Berlin")
 	daily := entry(api.BackupPeriodDaily)
 	slot := LatestSlot(daily, "02:30", berlin, utc(2026, 10, 25, 3, 0, 0))
 	require.Equal(t, "2026-10-25 02:30", slot.In(berlin).Format("2006-01-02 15:04"))
 	for now := slot; now.Before(utc(2026, 10, 25, 23, 0, 0)); now = now.Add(10 * time.Minute) {
-		require.True(t, slot.Equal(LatestSlot(daily, "02:30", berlin, now)), "the slot of the day stays the same at %s", now)
+		require.True(t, slot.Equal(LatestSlot(daily, "02:30", berlin, now)), "the scheduled time of the day stays the same at %s", now)
 	}
 }
 
@@ -249,7 +249,7 @@ func TestNextSlot(t *testing.T) {
 		"minute, within the minute":    {entry(api.BackupPeriodMinute), "", nil, utc(2026, 11, 12, 10, 30, 30), utc(2026, 11, 12, 10, 31, 0)},
 		"hour at :30, just before":     {entry(api.BackupPeriodHour), "00:30", nil, utc(2026, 11, 12, 10, 29, 0), utc(2026, 11, 12, 10, 30, 0)},
 		"6hours":                       {entry(api.BackupPeriod6Hours), "05:00", nil, utc(2026, 11, 12, 23, 0, 0), utc(2026, 11, 13, 5, 0, 0)},
-		"daily, at its slot":           {entry(api.BackupPeriodDaily), "02:00", nil, utc(2026, 11, 12, 2, 0, 0), utc(2026, 11, 13, 2, 0, 0)},
+		"daily, at its scheduled time": {entry(api.BackupPeriodDaily), "02:00", nil, utc(2026, 11, 12, 2, 0, 0), utc(2026, 11, 13, 2, 0, 0)},
 		"daily into the gap":           {entry(api.BackupPeriodDaily), "02:30", berlin, utc(2026, 3, 28, 12, 0, 0), utc(2026, 3, 29, 1, 30, 0)},
 		"weekly on Sunday":             {entry(api.BackupPeriodWeekly, 0), "02:00", nil, utc(2026, 11, 12, 0, 0, 0), utc(2026, 11, 15, 2, 0, 0)},
 		"weekly on Sunday, at its own": {entry(api.BackupPeriodWeekly, 0), "02:00", nil, utc(2026, 11, 15, 2, 0, 0), utc(2026, 11, 22, 2, 0, 0)},
@@ -261,7 +261,7 @@ func TestNextSlot(t *testing.T) {
 			got := NextSlot(tc.entry, tc.at, tc.tz, tc.now)
 			require.True(t, tc.want.Equal(got), "want %s, got %s", tc.want.UTC(), got.UTC())
 			if !got.IsZero() {
-				require.True(t, got.Equal(LatestSlot(tc.entry, tc.at, tc.tz, got)), "the next slot is a slot")
+				require.True(t, got.Equal(LatestSlot(tc.entry, tc.at, tc.tz, got)), "the next scheduled time is a scheduled time")
 				require.True(t, LatestSlot(tc.entry, tc.at, tc.tz, got.Add(-time.Second)).Before(got))
 			}
 		})
@@ -369,7 +369,7 @@ func TestExpireScheduleRetention(t *testing.T) {
 	require.Nil(t, chbs.Status.Retention.Previous)
 }
 
-// The slot of a daily, weekly or monthly entry whose time does not exist the day the clocks go forward, 02:30 in
+// The scheduled time of a daily, weekly or monthly entry whose time does not exist the day the clocks go forward, 02:30 in
 // Berlin on 2026-03-29, is the time the zone moves it to, 03:30, which the entries still recognize it by.
 func TestMatchingEntriesInTheSpringForwardGap(t *testing.T) {
 	berlin := mustLocation(t, "Europe/Berlin")
@@ -377,28 +377,28 @@ func TestMatchingEntriesInTheSpringForwardGap(t *testing.T) {
 	slot := LatestSlot(entries[1], "02:30", berlin, utc(2026, 3, 29, 12, 0, 0))
 	require.Equal(t, "20260329033000", SlotTag(slot, "Europe/Berlin"), "Go normalizes the time that does not exist")
 	require.Equal(t, []api.BackupPeriod{api.BackupPeriodDaily, api.BackupPeriodWeekly}, periodsOf(MatchingEntries(entries, "02:30", slot.In(berlin))))
-	// The other days are as they were: 03:30 is no slot of the entries
+	// The other days are as they were: 03:30 is no scheduled time of the entries
 	require.Empty(t, MatchingEntries(entries, "02:30", utc(2026, 3, 30, 1, 30, 0).In(berlin)))
 	require.Equal(t, []api.BackupPeriod{api.BackupPeriodDaily}, periodsOf(MatchingEntries(entries, "02:30", utc(2026, 3, 30, 0, 30, 0).In(berlin))))
-	// Not 03:30 of the next day, nor an hour that is no slot
+	// Not 03:30 of the next day, nor an hour that is no scheduled time
 	require.Empty(t, MatchingEntries(entries, "02:30", utc(2026, 3, 29, 2, 30, 0).In(berlin)))
 }
 
-// The second occurrence of a wall-clock time the zone repeats as it sets the clock back is no slot: the backup of a slot
-// is named after its wall-clock time, and two slots would make two of a name. The slots of every entry are the first
+// The second occurrence of a wall-clock time the zone repeats as it sets the clock back is no scheduled time: the backup of a scheduled time
+// is named after its wall-clock time, and two scheduled times would make two of a name. The scheduled times of every entry are the first
 // occurrences, on 2026-10-25 in Berlin, where 02:00 to 03:00 happens twice.
 func TestSlotsSkipTheRepeatedWallClockTime(t *testing.T) {
 	berlin := mustLocation(t, "Europe/Berlin")
 	// 2026-10-25 00:00Z is 02:00 CEST, 01:00Z is 02:00 CET, 02:00Z is 03:00 CET
 	hourly := entry(api.BackupPeriodHour)
-	require.True(t, utc(2026, 10, 25, 0, 30, 0).Equal(LatestSlot(hourly, "00:30", berlin, utc(2026, 10, 25, 1, 45, 0))), "the second 02:30 is no slot")
+	require.True(t, utc(2026, 10, 25, 0, 30, 0).Equal(LatestSlot(hourly, "00:30", berlin, utc(2026, 10, 25, 1, 45, 0))), "the second 02:30 is no scheduled time")
 	require.True(t, utc(2026, 10, 25, 1, 30, 0).Equal(NextSlot(hourly, "00:30", berlin, utc(2026, 10, 25, 0, 45, 0)).Add(-time.Hour)),
-		"the slot after the first 02:30 is 03:30")
+		"the scheduled time after the first 02:30 is 03:30")
 	minutely := entry(api.BackupPeriodMinute)
 	require.True(t, utc(2026, 10, 25, 0, 59, 0).Equal(LatestSlot(minutely, "", berlin, utc(2026, 10, 25, 1, 15, 0))))
 	require.True(t, utc(2026, 10, 25, 2, 0, 0).Equal(NextSlot(minutely, "", berlin, utc(2026, 10, 25, 0, 59, 30))))
 	daily := entry(api.BackupPeriodDaily)
-	// Go takes 02:30 of the repeated hour for its second occurrence: the slot is the first
+	// Go takes 02:30 of the repeated hour for its second occurrence: the scheduled time is the first
 	require.True(t, utc(2026, 10, 25, 0, 30, 0).Equal(LatestSlot(daily, "02:30", berlin, utc(2026, 10, 25, 1, 35, 0))))
 	require.True(t, utc(2026, 10, 26, 1, 30, 0).Equal(NextSlot(daily, "02:30", berlin, utc(2026, 10, 25, 0, 40, 0))), "it ran at 00:30Z, the next is tomorrow's")
 
@@ -410,7 +410,7 @@ func TestSlotsSkipTheRepeatedWallClockTime(t *testing.T) {
 			seen := map[string]bool{}
 			for slot := NextSlot(tc.e, tc.at, berlin, utc(2026, 10, 24, 21, 0, 0)); slot.Before(utc(2026, 10, 25, 4, 0, 0)); slot = NextSlot(tc.e, tc.at, berlin, slot) {
 				tag := SlotTag(slot, "Europe/Berlin")
-				require.False(t, seen[tag], "two slots are named %s", tag)
+				require.False(t, seen[tag], "two scheduled times are named %s", tag)
 				seen[tag] = true
 			}
 			require.NotEmpty(t, seen)

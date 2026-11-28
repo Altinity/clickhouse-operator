@@ -1,7 +1,7 @@
 # EXPERIMENTAL: operator-managed backup, see docs/backup.md
 #
 # A one-off backup of the "backup-demo" ClickHouseInstallation
-# (docs/chb-examples/01-chi-with-backup.yaml) due once at a later time: before a maintenance window,
+# (docs/chb-examples/01-chi-with-backup.yaml) scheduled once at a later time: before a maintenance window,
 # say. Until then it stays Pending, its Validated condition False with the reason
 # WaitingForScheduledTime and the time in UTC; spec.scheduledTime can still be changed, or the
 # backup deleted. At that time it is validated against the installation as it is then, runs as any
@@ -12,7 +12,7 @@
 # reconciles, or another backup or restore runs on a cluster. Then it starts as soon as it can.
 # If spec.startingDeadlineSeconds passes first, the backup (or each cluster whose run did not start)
 # fails with StartingDeadlineExceeded, which tells what it waited for. Set a deadline of 60 seconds
-# or more, because the operator checks one second after the due time. A backup in git that you
+# or more, because the operator checks one second after the scheduled time. A backup in git that you
 # apply after its spec.scheduledTime runs at once, if its deadline did not pass.
 #
 # For recurring backups, use a schedule (04); for the backup a schedule makes, at a later time, add
@@ -31,7 +31,7 @@ spec:
 
   # The name of the backup in the storage, the same on every cluster. A restore, or the
   # spec.diffFromRemote of an incremental backup, uses this name.
-  # If empty, the operator makes the name from metadata.name and the Unix time when the backup is due
+  # If empty, the operator makes the name from metadata.name and the scheduled Unix time of the backup
   # (its creation, or spec.scheduledTime), here backup-demo-later-1792454400.
   # It shows the name in status.backupName.
   # If you create this resource again later, it makes a new backup only without spec.backupName and
@@ -52,7 +52,7 @@ spec:
   # be created again later.
   scheduledTime: "2026-10-20T02:00:00+02:00"
 
-  # The maximum delay, in seconds, from the due time (creation, or spec.scheduledTime) to the start.
+  # The maximum delay, in seconds, from the scheduled time (creation, or spec.scheduledTime) to the start.
   # The run of a cluster can wait, for example until the installation completes its reconcile and no
   # other backup or restore runs on the cluster.
   # After the deadline, these fail with the reason StartingDeadlineExceeded, which tells what they
@@ -60,6 +60,6 @@ spec:
   # - a backup that is not validated yet (for example, with an invalid spec)
   # - each cluster whose run did not start yet
   # Runs that started continue. If unset, the backup waits with no limit. The operator checks one
-  # second after the due time, so set 60 or more. The run time limit is spec.activeDeadlineSeconds:
+  # second after the scheduled time, so set 60 or more. The run time limit is spec.activeDeadlineSeconds:
   # of the backup, or of the schedule with spec.scheduleRef.
   startingDeadlineSeconds: 3600

@@ -6,11 +6,11 @@
 # Runs:
 # - The operator runs the schedule on each backup-enabled cluster, through SQL on the sidecars.
 #   No ClickHouseBackup resource is necessary.
-# - Runs start at the due times of all entries, here every hour at :30.
+# - Runs start at the scheduled times of all entries, here every hour at :30.
 # - A running run is in status.active. A finished run is in status.recentRuns.
-# - A run counts for each entry that its due time matches. The run of Sunday 02:30 is the weekly,
+# - A run counts for each entry that its scheduled time matches. The run of Sunday 02:30 is the weekly,
 #   the daily and the hourly run.
-# - Each cluster names the backup of a run <prefix>-YYYYMMDDHHMMSS, from the time the run was due.
+# - Each cluster names the backup of a run <prefix>-YYYYMMDDHHMMSS, from the scheduled time of the run.
 #   The default prefix is <namespace>-<installation>-<schedule>, here default-backup-demo-nightly
 #   (see the namespace note in 01-chi-with-backup.yaml).
 #
@@ -58,8 +58,8 @@ spec:
       # incremental: true
 
   # The time, HH:MM in timeZone, for all entries. Required with a daily, weekly or monthly entry. An hour
-  # entry uses only its minute, a 6hours entry its hour modulo 6 and its minute. Entries due at
-  # the same time make one backup.
+  # entry uses only its minute, a 6hours entry its hour modulo 6 and its minute. Entries with
+  # the same scheduled time make one backup.
   time: "02:30"
 
   # The IANA time zone of the entries. Default: UTC
@@ -82,7 +82,7 @@ spec:
   # spec.startingDeadlineSeconds did not pass. It skips the other missed runs.
   suspend: false
 
-  # The maximum delay, in seconds, from the due time of a run to its start. A run waits while the
+  # The maximum delay, in seconds, from the scheduled time of a run to its start. A run waits while the
   # operator is down, while a run of the cluster is in progress (runs never overlap), or while a
   # restore holds the cluster. After the deadline, the run is skipped, and the next run starts at its
   # own time. If unset, the latest missed run starts when it can. Earlier missed runs are always
@@ -121,8 +121,8 @@ spec:
   # DeadlineExceeded. There is no retry. Increase it for a backup that needs more than a day to upload.
   # activeDeadlineSeconds: 14400
 
-  # The prefix of the backup names. A run names its backup <prefix>-YYYYMMDDHHMMSS, from the time it
-  # was due. A backup that runs the schedule once (05-backup-from-schedule.yaml) is named
+  # The prefix of the backup names. A run names its backup <prefix>-YYYYMMDDHHMMSS, from its scheduled
+  # time. A backup that runs the schedule once (05-backup-from-schedule.yaml) is named
   # <prefix>-YYYYMMDDTHHMMSS.
   # - Default: <namespace>-<installation>-<schedule>, here default-backup-demo-nightly. A prefix
   #   longer than 112 characters is shortened with a hash.

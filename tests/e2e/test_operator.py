@@ -9509,7 +9509,7 @@ def test_010087(self):
         with When(f"A schedule of the whole installation, running every minute and keeping {keep} backups, is created"):
             kubectl.apply(util.get_full_path(schedule_manifest))
 
-        with Then("The schedule is Active, with the minute entry next due, and runs in the operator: no CronJob, Job or Pod"):
+        with Then("The schedule is Active, with the minute entry scheduled next, and runs in the operator: no CronJob, Job or Pod"):
             for attempt in retries(timeout=120, delay=5):
                 with attempt:
                     status = backup_status(schedule_kind, schedule)
@@ -9887,7 +9887,7 @@ def test_010088(self):
                 f"prefix {default_prefix(schedule)} would be shortened"
             )
         # The backup of the source runs a schedule of the source once, which carries the default prefix of schedule
-        # nightly of the new installation: the backup is named with it and the time it is due, as YYYYMMDDTHHMMSS.
+        # nightly of the new installation: the backup is named with it and its scheduled time, as YYYYMMDDTHHMMSS.
         nightly_default_prefix = default_prefix(nightly)
         source_backup_name = ""
 
@@ -9977,7 +9977,7 @@ def test_010088(self):
             ("OrchestratorBackupStarted", "OrchestratorBackupCompleted"),
         )
 
-        with When("A new installation to be recovered from that backup is created, with three schedules due once a year"):
+        with When("A new installation to be recovered from that backup is created, with three schedules that run once a year"):
             def recover(data):
                 data["spec"]["backup"]["recovery"]["backupName"] = source_backup_name
 
@@ -10222,7 +10222,7 @@ def test_010089(self):
     pod_name = f"chi-{chi}-{cluster}-0-0-0"
     database = "test_089"
     rows = 100
-    # The backups of the series: <prefix>-YYYYMMDDHHMMSS, the slot in UTC; a backup run now adds a T.
+    # The backups of the series: <prefix>-YYYYMMDDHHMMSS, the scheduled time in UTC; a backup run now adds a T.
     scheduled_name = re.compile(re.escape(prefix) + r"-([0-9]{14})")
     run_now_name_pattern = re.escape(prefix) + r"-[0-9]{8}T[0-9]{6}"
     tag_format = "%Y%m%d%H%M%S"
@@ -10376,7 +10376,7 @@ def test_010089(self):
         wait_backup_phase(backup_kind, run_now, "Completed", timeout=600)
 
         run_now_name = kubectl.get_field(backup_kind, run_now, ".status.backupName")
-        with Then("It made a run-now backup of the schedule, named with the time it was due as YYYYMMDDTHHMMSS"):
+        with Then("It made a run-now backup of the schedule, named with its scheduled time as YYYYMMDDTHHMMSS"):
             assert re.fullmatch(run_now_name_pattern, run_now_name), error(f"{run_now}: status.backupName {run_now_name}")
 
         with And(f"Pinned without until in spec.retention.keepBackups: retention keeps {run_now_name} while it is listed"):
@@ -10388,7 +10388,7 @@ def test_010089(self):
             timeout=600,
         )
 
-        # The newest backup made before the change, pinned without until; and two slots the schedule as it is runs
+        # The newest backup made before the change, pinned without until; and two scheduled times the schedule as it is runs
         # after the change, pinned until an hour on: one stays, the until of the other is set to the time of an edit.
         held_pin = series(names)[-1]
         now = utcnow()

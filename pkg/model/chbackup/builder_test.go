@@ -120,7 +120,7 @@ func TestRunSpecsTargetTheHostsOfTheirOperation(t *testing.T) {
 	require.False(t, RestoreRunSpec(chr, topology).ReplicatedCopyToDetached)
 }
 
-// A scheduled run names its backup after its slot, in the zone of the schedule, and prunes on every host it backs up
+// A scheduled run names its backup after its scheduled time, in the zone of the schedule, and prunes on every host it backs up
 func TestScheduledRunSpec(t *testing.T) {
 	chbs := testSchedule("nightly")
 	chbs.Spec.TimeZone = "Europe/Berlin"
@@ -179,7 +179,7 @@ func TestBackupNamedWithTheSchedulePrefixOnlyWithScheduleRef(t *testing.T) {
 	require.Equal(t, "b1-1700000000", ResolveBackupName(chb))
 }
 
-// A plain backup due at a scheduled time is named after that time, as one due when created is after its creation.
+// A plain backup with a scheduled time is named after that time. A backup without one is named after its creation.
 func TestBackupDueLaterIsNamedAfterItsScheduledTime(t *testing.T) {
 	chb := testBackup("b1")
 	chb.Spec.ScheduledTime = "2026-10-20T02:00:00+02:00"

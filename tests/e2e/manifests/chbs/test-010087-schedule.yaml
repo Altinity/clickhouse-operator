@@ -1,6 +1,6 @@
 # test_010087
-# No spec.cluster: the operator runs it on every backup-enabled cluster at the slots of all its entries, every
-# minute, so the runs of one slot make one backup name. Every run matches the minute entry, whose retention keeps
+# No spec.cluster: the operator runs it on every backup-enabled cluster at the scheduled times of all its entries, every
+# minute, so the runs of one scheduled time make one backup name. Every run matches the minute entry, whose retention keeps
 # the two newest backups of the series.
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseBackupSchedule"

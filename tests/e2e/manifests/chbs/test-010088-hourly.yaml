@@ -2,7 +2,7 @@
 # No backupNamePrefix: the default prefix, <namespace>-test-088-dr-hourly, is not that of the
 # backup the installation is recovered from, but a schedule of the same name of the installation
 # that made the backup would default to it, on the same storage path. So the operator holds
-# this schedule as it holds nightly, until it is given its prefix explicitly. Due once a month, so
+# this schedule as it holds nightly, until it is given its prefix explicitly. Scheduled once a month, so
 # it does not run during the scenario.
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseBackupSchedule"
@@ -10,7 +10,7 @@ metadata:
   name: hourly
 spec:
   clickHouseInstallation: test-088-dr
-  # Due once a month, on the 1st at 00:00, so it does not run during the scenario.
+  # Scheduled once a month, on the 1st at 00:00, so it does not run during the scenario.
   time: "00:00"
   schedules:
     - period: monthly

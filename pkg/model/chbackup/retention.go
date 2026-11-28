@@ -31,7 +31,7 @@ type SlotEntry struct {
 	Keep            int
 	Incremental     bool
 	ConfigOverrides []string
-	// Zone is nil for UTC. A slot in a spring-forward gap moves to the Go-normalized time, as the backup name does.
+	// Zone is nil for UTC. A scheduled time in a spring-forward gap moves to the Go-normalized time, as the backup name does.
 	Zone *time.Location
 }
 
@@ -52,7 +52,7 @@ func SlotEntries(entries []api.BackupScheduleEntry, scheduleTime, zone string) [
 	return resolved
 }
 
-// The tag may be up to tolerance seconds after the slot. For a slot in a DST gap, see inGapSlot.
+// The tag may be up to tolerance seconds after the scheduled time. For a scheduled time in a DST gap, see inGapSlot.
 func SlotMatches(entry SlotEntry, tag string, tolerance int) bool {
 	if entry.Period == api.BackupPeriodMinute {
 		return true

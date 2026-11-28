@@ -314,7 +314,7 @@ func dueSlot(chbs *api.ClickHouseBackupSchedule, now time.Time) time.Time {
 	return latest
 }
 
-// missedSlotsMax caps missedSlots, so a minute entry of a long-stopped schedule is not walked slot by slot.
+// missedSlotsMax caps missedSlots, so a minute entry of a long-stopped schedule is not walked one scheduled time at a time.
 const missedSlotsMax = 10000
 
 func missedSlots(chbs *api.ClickHouseBackupSchedule, after, slot time.Time) (int, time.Time) {
@@ -365,8 +365,8 @@ func (c *ScheduleController) warnMissedSlots(
 		more = " or more"
 	}
 	out.add(c.warning(chbs, a.EventActionReconcile, reasonScheduledRunSkipped,
-		"%d%s slot(s) of cluster %s from %s were missed, as the operator did not run or a run of the cluster was in "+
-			"progress or held: only the latest due slot %s runs, the missed ones are not made up",
+		"%d%s scheduled time(s) of cluster %s from %s were missed, as the operator did not run or a run of the cluster was in "+
+			"progress or held: only the latest scheduled time %s runs, the missed ones are not made up",
 		count, more, name, first.UTC().Format(time.RFC3339), slot.UTC().Format(time.RFC3339)))
 }
 
@@ -398,7 +398,7 @@ func (c *ScheduleController) runDueSlot(
 		if deadline := chbs.Spec.StartingDeadlineSeconds; (deadline != nil) && (now.Sub(slot) > time.Duration(*deadline)*time.Second) {
 			cluster.LastScheduleTime = &meta.Time{Time: slot.UTC()}
 			out.add(c.warning(chbs, a.EventActionReconcile, reasonScheduledRunSkipped,
-				"the run of slot %s on cluster %s did not start within startingDeadlineSeconds of the slot, and is skipped",
+				"the run of scheduled time %s on cluster %s did not start within startingDeadlineSeconds of that time, and is skipped",
 				slot.UTC().Format(time.RFC3339), name))
 			continue
 		}
@@ -485,7 +485,7 @@ func (c *ScheduleController) startScheduledRun(
 	status := scheduleCluster(chbs, cluster)
 	status.LastScheduleTime = &meta.Time{Time: slot.UTC()}
 	namespace, chiName := chbs.GetNamespace(), chbs.Spec.ClickHouseInstallation
-	out.add(c.info(chbs, a.EventActionCreate, reasonScheduledBackupStarted, "scheduled backup %s of cluster %s started, slot %s",
+	out.add(c.info(chbs, a.EventActionCreate, reasonScheduledBackupStarted, "scheduled backup %s of cluster %s started, scheduled time %s",
 		backupName, cluster, slot.UTC().Format(time.RFC3339)))
 	out.add(func() { metrics.BackupStarted(context.Background(), namespace, chiName, cluster) })
 	return runningRequeueInterval, nil
@@ -827,7 +827,7 @@ func (c *ScheduleController) validated(chbs *api.ClickHouseBackupSchedule, targe
 // it is not: the installation is restored, or about to be, from a backup that carries the prefix the
 // schedules of the installation default to. The installation that made the backup typically has the
 // same namespace and name, in another Kubernetes cluster, and the same storage paths: a schedule
-// of the same name there would overwrite the backups this one makes in the same slot, and prune them,
+// of the same name there would overwrite the backups this one makes at the same scheduled time, and prune them,
 // and a schedule of another name may still share the storage path of a cluster with this one. Every
 // cluster may share it, those the recovery leaves out included, so every schedule that defaults its
 // prefix is held, whatever cluster it backs up, from the moment the recovery is asked for. An explicit

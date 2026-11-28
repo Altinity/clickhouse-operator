@@ -319,7 +319,7 @@ func TestDeletedRestoreWaitsForItsRun(t *testing.T) {
 	require.Len(t, eventMessages(t, c, reasonDeletionRunFinished), 1)
 }
 
-// A schedule deleted starts no slot from then on; one whose run is in progress keeps its finalizer until the run, its
+// A schedule deleted starts no run from then on. One whose run is in progress keeps its finalizer until the run, its
 // retention included, ends, then goes.
 func TestDeletedScheduleStartsNoSlotAndWaitsForItsRun(t *testing.T) {
 	newSchedule := func(t *testing.T, sc *fakeSidecars) (client.Client, *clocktesting.FakePassiveClock, func() (ctrl.Result, error)) {
@@ -333,7 +333,7 @@ func TestDeletedScheduleStartsNoSlotAndWaitsForItsRun(t *testing.T) {
 		return c, clock, func() (ctrl.Result, error) { return controller.Reconcile(context.Background(), request("nightly")) }
 	}
 
-	t.Run("no slot", func(t *testing.T) {
+	t.Run("no run", func(t *testing.T) {
 		sc := newFakeSidecars()
 		sc.any = true
 		withSidecars(t, sc)
@@ -346,7 +346,7 @@ func TestDeletedScheduleStartsNoSlotAndWaitsForItsRun(t *testing.T) {
 		_, err = reconcile()
 		require.NoError(t, err)
 		require.True(t, gone(t, c, &api.ClickHouseBackupSchedule{}, "nightly"))
-		require.Empty(t, sc.commands(), "the slot due after the deletion never starts")
+		require.Empty(t, sc.commands(), "the run scheduled after the deletion never starts")
 	})
 
 	t.Run("run in progress", func(t *testing.T) {
@@ -373,7 +373,7 @@ func TestDeletedScheduleStartsNoSlotAndWaitsForItsRun(t *testing.T) {
 		finishHanging(sc)
 		reconcileUntil(t, reconcile, func() bool { return gone(t, c, &api.ClickHouseBackupSchedule{}, "nightly") })
 		require.Equal(t, []string{"chi-demo-main-0-0: create_remote --rbac nightly-20261112030000"}, sc.commands(),
-			"the slot of the next day never starts, the run in progress is never killed")
+			"the scheduled time of the next day never starts, the run in progress is never killed")
 		require.Len(t, eventMessages(t, c, reasonDeletionRunFinished), 1)
 		require.Len(t, eventMessages(t, c, reasonScheduledBackupSucceeded), 1, "the outcome of the run is recorded")
 	})

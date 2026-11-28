@@ -50,7 +50,7 @@ type reconciler struct {
 	cr     interfaces.IKubeCR
 	events *a.EventEmitter
 	kind   string
-	// clock tells the time due times and starting deadlines are compared with.
+	// clock tells the time scheduled times and starting deadlines are compared with.
 	clock clock.PassiveClock
 }
 

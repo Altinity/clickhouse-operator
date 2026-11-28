@@ -156,7 +156,7 @@ func (o *orchestrator) planBackup(ctx context.Context) (*backupPlan, error) {
 		slotTag = model.SlotTag(spec.Slot, spec.TimeZone)
 	}
 	plan := &backupPlan{hosts: hosts, commands: map[string]string{}}
-	// A ClickHouseBackup always has a name. A scheduled run has none: its name is the prefix and the slot time.
+	// A ClickHouseBackup always has a name. A scheduled run has none: its name is the prefix and the scheduled time.
 	switch {
 	case spec.BackupName != "":
 		key, prefix, err := naming.Key("backup name", spec.BackupName, spec.Prefix)
@@ -215,13 +215,13 @@ func (o *orchestrator) planBackup(ctx context.Context) (*backupPlan, error) {
 	case len(spec.Entries) > 0:
 		winner, matched := model.WinnerEntry(spec.Entries, slotTag, naming.Tolerance())
 		if winner < 0 {
-			o.logf("backup %s: the slot %s is a slot of no schedule entry, the backup is full", plan.name, slotTag)
+			o.logf("backup %s: the scheduled time %s belongs to no schedule entry, the backup is full", plan.name, slotTag)
 		} else {
 			lighter := ""
 			if len(matched) > 1 {
 				lighter = " and lighter ones"
 			}
-			o.logf("backup %s: the slot %s is a slot of the %s entry%s", plan.name, slotTag, spec.Entries[winner].Period, lighter)
+			o.logf("backup %s: the scheduled time %s belongs to the %s entry%s", plan.name, slotTag, spec.Entries[winner].Period, lighter)
 			if spec.Entries[winner].Incremental && (spec.DiffFromRemote == "") {
 				incremental, keep = true, spec.Entries[winner].Keep
 			}
@@ -615,7 +615,7 @@ func (o *orchestrator) retention(ctx context.Context) {
 		o.warnf("retention skipped: no host")
 		return
 	}
-	o.logf("retention: keeping the newest %s-* backup, the newest backups of the slots of every schedule entry it keeps, "+
+	o.logf("retention: keeping the newest %s-* backup, the newest backups of the scheduled times of every schedule entry it keeps, "+
 		"and the backups made at once no older than the oldest of those", spec.Prefix)
 	o.bestEffort = true
 	defer func() { o.bestEffort = false }()

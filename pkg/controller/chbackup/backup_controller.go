@@ -155,7 +155,7 @@ func (c *BackupController) validate(ctx context.Context, chb *api.ClickHouseBack
 	}
 	if due := chb.DueTime(); now.Before(due) {
 		op.wait(api.BackupConditionValidated, api.BackupReasonWaitingForScheduledTime,
-			fmt.Sprintf("the backup is due at %s", due.UTC().Format(time.RFC3339)))
+			fmt.Sprintf("the backup is scheduled for %s", due.UTC().Format(time.RFC3339)))
 		return ctrl.Result{RequeueAfter: min(due.Sub(now)+dueRecheckDelay, dueRecheckCap)}, false, nil
 	}
 
@@ -287,7 +287,7 @@ func missedStartingDeadline(chb *api.ClickHouseBackup, now time.Time, waited str
 	if !bounded || !now.After(deadline) {
 		return nil
 	}
-	message := fmt.Sprintf("not started by %s, %ds after the backup was due", deadline.UTC().Format(time.RFC3339),
+	message := fmt.Sprintf("not started by %s, %ds after its scheduled time", deadline.UTC().Format(time.RFC3339),
 		*chb.Spec.StartingDeadlineSeconds)
 	if waited != "" {
 		message += ": " + waited

@@ -29,7 +29,7 @@ func lastDayOfMonth(t time.Time) int {
 	return time.Date(t.Year(), t.Month()+1, 0, 0, 0, 0, 0, time.UTC).Day()
 }
 
-// inGapSlot matches a slot whose time is in a spring-forward gap, which Go moves forward (02:30 to 03:30).
+// inGapSlot matches a scheduled time in a spring-forward gap, which Go moves forward (02:30 to 03:30).
 // wall is a wall-clock time in the zone, stored as UTC.
 func inGapSlot(period api.BackupPeriod, hour, minute, day int, zone *time.Location, wall time.Time, tolerance int) bool {
 	if (zone == nil) || (zone == time.UTC) {
@@ -80,7 +80,7 @@ func secondOccurrence(t time.Time) (start time.Time, delta time.Duration, ok boo
 	return start, delta, (delta > 0) && (t.Sub(start) < delta)
 }
 
-// Only the first occurrence of a repeated wall-clock time runs the slot.
+// Only the first occurrence of a repeated wall-clock time is a scheduled time.
 func firstOccurrence(t time.Time) time.Time {
 	if _, delta, ok := secondOccurrence(t); ok {
 		return t.Add(-delta)
@@ -131,7 +131,7 @@ func MatchingEntries(entries []api.BackupScheduleEntry, scheduleTime string, t t
 }
 
 // scheduleTime is spec.time. tz nil means UTC. An invalid time gives the zero time.
-// On a fall-back day only the first occurrence is a slot, because a second would get the same backup name.
+// On a fall-back day only the first occurrence is a scheduled time, because a second would get the same backup name.
 func LatestSlot(entry api.BackupScheduleEntry, scheduleTime string, tz *time.Location, now time.Time) time.Time {
 	if tz == nil {
 		tz = time.UTC

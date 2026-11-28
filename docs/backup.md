@@ -306,7 +306,7 @@ spec:
 | `cluster`                 | all             | Back up only this cluster. |
 | `backupName`              | generated       | The backup name. Empty gives `<resource name>-<Unix time>`. |
 | `scheduledTime`           | creation time   | The RFC 3339 time to start. See [Back up at a later time](#back-up-at-a-later-time). |
-| `startingDeadlineSeconds` | no limit        | How many seconds after the due time the backup can still start. |
+| `startingDeadlineSeconds` | no limit        | How many seconds after the scheduled time the backup can still start. |
 | `diffFromRemote`          |                 | Make an [incremental backup](#incremental-backups) on this existing backup. |
 | `configOverrides`         |                 | `clickhouse-backup` settings for this backup only. See [Config overrides](#config-overrides). |
 | `schemaOnly`              | `false`         | Back up table and database definitions only. |
@@ -382,14 +382,14 @@ spec:
 * The backup takes the CHI, the clusters, the prefix and the options of the schedule.
 * You can set only `cluster`, `diffFromRemote`, `scheduledTime`, `startingDeadlineSeconds` and
   `timeouts`. `backupName` and `configOverrides` are refused.
-* The name is `<backupNamePrefix>-<YYYYMMDDTHHMMSS>`, with the UTC due time, for example
+* The name is `<backupNamePrefix>-<YYYYMMDDTHHMMSS>`, with the UTC scheduled time, for example
   `default-backup-demo-nightly-20261012T101507`.
 * Retention of the schedule keeps it while it is not older than the oldest scheduled backup that an
   entry keeps. Then retention deletes it.
 * With an `incremental` entry, the backup is incremental on the newest backup of the schedule.
 * It runs also while the schedule is suspended. It waits while the schedule does not exist yet
   (`ScheduleNotFound`).
-* Two such backups due in the same second get the same name, and the second fails.
+* Two such backups with the same scheduled second get the same name, and the second fails.
 
 ## ClickHouseBackupSchedule
 
@@ -423,7 +423,7 @@ spec:
 | `time`                        | `00:00`                        | `HH:MM` in `timeZone`, for all entries. Required with a `daily`, `weekly` or `monthly` entry. |
 | `timeZone`                    | UTC                            | The IANA time zone of the entries, e.g. `Europe/Berlin`. |
 | `suspend`                     | `false`                        | Start no new runs. A run in progress continues. |
-| `startingDeadlineSeconds`     | no limit                       | How many seconds after its slot a late run can still start. |
+| `startingDeadlineSeconds`     | no limit                       | How many seconds after its scheduled time a late run can still start. |
 | `backupNamePrefix`            | `<namespace>-<chi>-<schedule>` | The start of every backup name. You can set it one time only. |
 | `retention`                   |                                | Backups to keep in addition to the entries. See [Schedule changes](#schedule-changes). |
 | `successfulRunsHistoryLimit`  | `3`                            | How many successful runs `status.recentRuns` keeps. |
@@ -444,24 +444,25 @@ Each entry of `schedules`:
 
 ### How a schedule runs
 
-* **Slots.** A schedule runs at the due times of all its entries. In the example, that is every hour at
+* **Scheduled times.** A schedule runs at the scheduled times of all its entries. In the example, that is every hour at
   :30. `hour` uses only the minute of `time`. `6hours` uses the hour modulo 6 and the minute.
   `minute` uses no time.
-* **One run per slot.** A run counts for every entry whose slot it is. In the example, the run of
+* **One run per scheduled time.** A run counts for every entry whose scheduled time it is. In the example, the run of
   Sunday 02:30 counts for the weekly, the daily and the hourly entry.
 * **The heaviest entry decides.** The entry with the longest period sets `incremental` and
   `configOverrides` for the run.
 * **Day of month.** A day after the end of the month means the last day. `day: 31` is the last day of
   every month.
-* **Names.** A backup is named `<backupNamePrefix>-YYYYMMDDHHMMSS`, after the slot time in `timeZone`,
-  for example `default-backup-demo-nightly-20261003023000`. A late run keeps the name of its slot.
-* **No overlap.** A slot that comes while a run or another operation of the cluster runs waits for it.
-* **Missed slots.** As with a `CronJob`, only the latest missed slot runs. A slot older than
+* **Names.** A backup is named `<backupNamePrefix>-YYYYMMDDHHMMSS`, after the scheduled time in `timeZone`,
+  for example `default-backup-demo-nightly-20261003023000`. A late run keeps the name of its scheduled time.
+* **No overlap.** A scheduled time that comes while a run or another operation of the cluster runs waits for it.
+* **Missed scheduled times.** As with a `CronJob`, only the latest missed scheduled time runs. A
+  scheduled time older than
   `startingDeadlineSeconds` is skipped with a `ScheduledRunSkipped` warning.
-* **Daylight saving time.** A slot at a wall time that does not exist moves to the time the zone
+* **Daylight saving time.** A scheduled time at a wall time that does not exist moves to the time the zone
   gives. A wall time that occurs twice runs once.
 
-See [Schedule slots and status](backup-internals.md#schedule-slots-and-status) for the details.
+See [Scheduled times and status](backup-internals.md#scheduled-times-and-status) for the details.
 
 **Example: weekly full backups, hourly incremental backups.**
 
@@ -588,7 +589,7 @@ expires. A change of `incremental` is not a change. See
 
 Other status fields:
 
-* `nextScheduleTime`: the next slot.
+* `nextScheduleTime`: the next scheduled time.
 * `lastBackupName`, `lastSuccessfulTime`: the newest backup that every cluster made. Use it to
   [recover the whole CHI](#recover-a-new-chi-from-a-backup).
 * `clusters[]`: the last run, success and failure of each cluster.

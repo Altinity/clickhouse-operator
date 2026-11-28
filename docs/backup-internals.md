@@ -628,7 +628,7 @@ with the CHI it was restored from, and so does every schedule of both CHIs. Thei
 name only. [Retention](#retention) deletes the backups of the series of a schedule,
 `<backupNamePrefix>-YYYYMMDDHHMMSS`, and a run refuses a name that is already in the storage. So two
 schedules with the same `backupNamePrefix` on one storage path delete each other's backups, and fail
-each other's runs when they are due at the same time. The default prefix,
+each other's runs when they have the same scheduled time. The default prefix,
 `<namespace>-<chi>-<schedule>`, keeps the schedules of one Kubernetes cluster apart, unless their
 names joined with dashes are the same (see below). An explicit prefix must be unique among all
 schedules that write to the same storage path.
@@ -695,10 +695,10 @@ Rules:
   only the same shard order.
 * An empty `naming` keeps the default names.
 
-**The time in the name.** A scheduled run uses the time of its slot, in the `timeZone` of the
+**The time in the name.** A scheduled run uses its scheduled time, in the `timeZone` of the
 schedule. A backup made at once (a `ClickHouseBackup`, also one from a
-[schedule](backup.md#run-a-schedule-now)) uses the time it is due, in UTC, with a `T` before the hour
-(`shard1-20261113T101500`). The `T` keeps the name out of the slots of the schedule, as the
+[schedule](backup.md#run-a-schedule-now)) uses its scheduled time, in UTC, with a `T` before the hour
+(`shard1-20261113T101500`). The `T` keeps the name out of the scheduled times of the schedule, as the
 `<prefix>-YYYYMMDDTHHMMSS` of the default naming does.
 
 **What a template changes:**
@@ -716,10 +716,10 @@ schedule. A backup made at once (a `ClickHouseBackup`, also one from a
   cluster share a path, for example `s3.path: backup/{namespace}/{installation}/{cluster}` without
   `{shard}`, and the same for the object disk path. It still refuses a path that two clusters share.
   Each host lists, deletes and restores only the backups of its own shard at that path.
-* **A slot tolerance of 30 minutes.** The Altinity usual backup workflow names a scheduled backup
-  after the time its run started, up to 30 minutes after the slot (its refresh rate times 1.5). With
-  a template, a backup belongs to the slot of an entry when its time is from the slot to 30 minutes
-  after it. So retention counts the backups that this workflow made for entries at the same times.
+* **A scheduled time tolerance of 30 minutes.** The Altinity usual backup workflow names a scheduled backup
+  after the time its run started, up to 30 minutes after the scheduled time (its refresh rate times 1.5). With
+  a template, a backup belongs to the scheduled time of an entry when its time is from the scheduled
+  time to 30 minutes after it. So retention counts the backups that this workflow made for entries at the same times.
 * **Retention deletes every name the template makes.** When the template has no `{prefix}`, the
   retention of a schedule takes every name that the template makes on its cluster as its own, as the
   cleanup of the Altinity usual backup workflow does. Run only one schedule per cluster then.
@@ -760,7 +760,7 @@ When the backup fails on one cluster, the other clusters continue. The backup th
 with the reason `PartiallyCompleted`. Each cluster that completed has a complete backup, and you can
 restore that cluster from it. A schedule uses one name for all clusters in the same way. To recover
 a whole CHI, use a backup that completed on every cluster. The schedule shows the last such backup in
-`status.lastBackupName`. See [Schedule slots and status](#schedule-slots-and-status) for when this
+`status.lastBackupName`. See [Scheduled times and status](#scheduled-times-and-status) for when this
 value is behind.
 
 **No consistency across shards or clusters.** A backup is not a snapshot of the CHI:
@@ -899,12 +899,12 @@ The operator validates the spec when you create the resource:
   `diffFromRemote`, `scheduledTime`, `startingDeadlineSeconds` and `timeouts`. A `timeouts` field
   that the backup does not set comes from the schedule. `configOverrides` is not allowed, and the
   backup uses no overrides of the schedule entries.
-* **Name.** The name is `<backupNamePrefix>-<YYYYMMDDTHHMMSS>`, the UTC due time, e.g.
+* **Name.** The name is `<backupNamePrefix>-<YYYYMMDDTHHMMSS>`, the UTC scheduled time, e.g.
   `default-backup-demo-nightly-20261012T101507`. A `backupName` is refused (`a backup that runs a
   schedule is named with the schedule's backupNamePrefix: backupName is not set with scheduleRef`).
   So the name always shows which schedule made the backup. The prefix also lets the
   [recovery prefix guard](#two-chis-on-one-storage-path) identify the source.
-* **Retention.** The `T` in the name keeps the backup out of the schedule slots. So it never pushes a
+* **Retention.** The `T` in the name keeps the backup out of the scheduled times of the schedule. So it never pushes a
   scheduled backup out. [Retention](#retention) keeps it while it is not older than the oldest
   scheduled backup that an entry keeps. Then retention deletes it. Retention runs after this backup
   as after a scheduled run, on the same hosts. It is skipped while a restore holds the schedule's
@@ -916,7 +916,7 @@ The operator validates the spec when you create the resource:
 * **When it runs.** It runs also while the schedule is suspended or held for a restore. It waits
   while the schedule does not exist yet (`ScheduleNotFound`), for example when you apply both
   together. It also waits while the operator finds the schedule spec invalid (`InvalidSpec`). A `cluster` that the schedule does not back up is refused (`ClusterNotFound`).
-* **Same name.** Two such backups due in the same second get the same name. On a cluster that both
+* **Same name.** Two such backups with the same scheduled second get the same name. On a cluster that both
   back up, the second one fails before it changes anything. To fix it, delete the failed backup and
   create it again without `scheduledTime`. Or give each backup its own `scheduledTime`. A backup kept
   in git gets a new name on re-creation only without `scheduledTime`. With `scheduledTime`, it gets
@@ -925,13 +925,13 @@ The operator validates the spec when you create the resource:
 ## Scheduled time in detail
 
 * **`startingDeadlineSeconds`** limits the late start:
-  * A backup that is not validated within this many seconds after the due time fails with
+  * A backup that is not validated within this many seconds after the scheduled time fails with
     `StartingDeadlineExceeded`. This includes an invalid spec. The message tells what the backup
     waited for.
   * Each cluster whose run did not start by then fails the same way.
   * Without `scheduledTime`, the deadline starts at creation. So a backup does not wait forever for a
     CHI that never becomes ready.
-  * The operator checks the time one second after the due time. A deadline of a few seconds can fail
+  * The operator checks the time one second after the scheduled time. A deadline of a few seconds can fail
     a backup that is on time. Use one minute or more.
 * Do not edit `scheduledTime` or `startingDeadlineSeconds` after validation. The clusters that still
   wait use the edited values.
@@ -1340,7 +1340,7 @@ completes without a warning. But ClickHouse loads the restored entities of a loc
 (the default) only after a restart. Restart it, for example with `spec.restart: "RollingUpdate"`,
 before clients use them.
 
-## Schedule slots and status
+## Scheduled times and status
 
 The basics are in [How a schedule runs](backup.md#how-a-schedule-runs).
 
@@ -1349,39 +1349,41 @@ The basics are in [How a schedule runs](backup.md#how-a-schedule-runs).
 * A run in progress is in `status.active`, at most one per cluster.
 * A finished run is in `status.recentRuns`, newest first. `successfulRunsHistoryLimit` and
   `failedRunsHistoryLimit` set how many stay.
-* Runs never overlap. A slot that comes while a run or another operation of the cluster is in
-  progress waits for it.
-* A slot before the schedule was created never runs.
-* A late run still names the backup after its slot. So all clusters get the same backup name for one
-  slot.
-* A cluster that joins (added to the CHI, or backup enabled) runs from its next slot, after the CHI
+* Runs never overlap. A scheduled time that comes while a run or another operation of the cluster is
+  in progress waits for it.
+* A scheduled time before the schedule was created never runs.
+* A late run still names the backup after its scheduled time. So all clusters get the same backup
+  name for one scheduled time.
+* A cluster that joins (added to the CHI, or backup enabled) runs from its next scheduled time, after the CHI
   reconcile is complete.
 * A cluster that leaves runs no more. See [Hosts that leave a schedule](#hosts-that-leave-a-schedule).
 
-**Missed slots.** Like a `CronJob`, a schedule runs only the latest slot that it missed. Causes are an
-operator that was down, or a run, a restore or a hold that the schedule waited for. The run starts
-late, unless `startingDeadlineSeconds` passed since that slot. Then the slot is skipped with a
-`ScheduledRunSkipped` warning. Earlier missed slots never run, so a long outage makes one backup, not
-one per slot. The warning tells how many slots of the cluster were missed (up to 10000), from which
-slot, and which slot runs instead. [Retention](#retention) counts backups, not slots. So a missed
-slot deletes no older backup. The older backups stay longer, until newer backups replace them.
+**Missed scheduled times.** Like a `CronJob`, a schedule runs only the latest scheduled time that it
+missed. Causes are an operator that was down, or a run, a restore or a hold that the schedule waited
+for. The run starts late, unless `startingDeadlineSeconds` passed since that scheduled time. Then the
+operator skips that scheduled time with a `ScheduledRunSkipped` warning. Earlier missed scheduled
+times never run, so a long outage makes one backup, not one per scheduled time. The warning tells how
+many scheduled times of the cluster were missed (up to 10000), from which scheduled time, and which
+scheduled time runs instead. [Retention](#retention) counts backups, not scheduled times. So a missed
+scheduled time deletes no older backup. The older backups stay longer, until newer backups replace them.
 
 **No jitter.** A run starts the backup on all shards at the same time, without a random delay. By
 default it uses one replica per shard (`replicaSelection: FirstPerShard`). This keeps the shard
 backups as close in time as possible. See
 [No consistency across shards or clusters](#clusters-of-a-chi).
 
-**Daylight saving time.** A backup name uses the wall-clock time of its slot in `timeZone`:
+**Daylight saving time.** A backup name uses the wall-clock time of its scheduled time in `timeZone`:
 
 * **Clocks go forward** (02:00 to 03:00 in `Europe/Berlin`, last Sunday of March). A `daily`,
-  `weekly` or `monthly` slot at a time that does not exist that day, such as `02:30`, moves to the
-  time the zone gives, `03:30`. The backup name uses that time: `...-20260329033000`. The slot keeps
+  `weekly` or `monthly` scheduled time that does not exist that day, such as `02:30`, moves to the
+  time the zone gives, `03:30`. The backup name uses that time: `...-20260329033000`. The scheduled time keeps
   its entries: on a Sunday the run is the weekly one, with its `configOverrides` and `incremental`.
   [Retention](#retention) counts the backup for its entries.
 * **Clocks go back** (03:00 to 02:00, last Sunday of October). A wall-clock time that occurs two
-  times is one slot, at its first occurrence. Two runs would make two backups with the same name. So
-  an `hour` or `minute` entry has no slots in the second 02:00 to 03:00. A `daily` slot at `02:30`
-  runs at the first 02:30. The operator does not report these slots as skipped.
+  times is one scheduled time, at its first occurrence. Two runs would make two backups with the same
+  name. So an `hour` or `minute` entry has no scheduled times in the second 02:00 to 03:00. A `daily`
+  scheduled time of `02:30` runs at the first 02:30. The operator does not report these scheduled
+  times as skipped.
 
 **Prefix.** The default prefix joins the namespace, CHI and schedule names. Past 112 characters, the
 operator shortens it with a hash. So schedules of different CHIs, or of CHIs with the same name in
@@ -1409,7 +1411,7 @@ that ran, create a new schedule. For a backup at once, see [Run a schedule now](
   * `LastBackupFailed`: the last scheduled run failed. Only in this case the schedule continues to
     run, and a later successful run makes it `Active` again.
 
-**Status per entry.** `status.nextScheduleTime` is the next slot of any entry. It is empty while the
+**Status per entry.** `status.nextScheduleTime` is the next scheduled time of any entry. It is empty while the
 schedule is suspended, or aborted for a reason other than a failed run. `status.entries[]` gives, per
 `period`, the `lastScheduleTime` of the newest run for that entry and the `lastBackupName` of the
 newest completed one.
@@ -1419,7 +1421,7 @@ newest completed one.
 * `configSecret`: the Secret of the `storageConfig` of the last run. For a cluster that the schedule
   no longer backs up, this is the storage of its unpruned backups. See
   [Hosts that leave a schedule](#hosts-that-leave-a-schedule).
-* `lastScheduleTime`: the slot of the last run that started.
+* `lastScheduleTime`: the scheduled time of the last run that started.
 * `lastSuccessfulTime` and `lastBackupName`: the last successful run and its backup.
 * `lastFailureTime` and `lastFailureMessage`: the last failed run, with the error that the sidecars
   reported.
@@ -1432,7 +1434,8 @@ clusters. At that time every cluster had a backup. `status.lastBackupName` is th
 every cluster made. Use it to [recover the whole CHI](backup.md#recover-a-new-chi-from-a-backup). Both are
 empty until every cluster completed a run.
 
-* While the clusters complete the runs of a slot, `lastBackupName` stays at the previous slot until
+* While the clusters complete the runs of a scheduled time, `lastBackupName` stays at the previous
+  scheduled time until
   all clusters have the new backup.
 * If the last run of a cluster failed, `lastBackupName` is cleared when another cluster completes a
   newer run.
@@ -1449,8 +1452,8 @@ with the reason `CompletedWithoutData`. Then `Ready` stays `True` with the reaso
 **Events** on the schedule:
 
 * `ScheduledBackupStarted`: a run starts on a cluster.
-* `ScheduledRunSkipped` (warning): a slot missed by more than `startingDeadlineSeconds`, or missed
-  slots before the latest one.
+* `ScheduledRunSkipped` (warning): a scheduled time missed by more than `startingDeadlineSeconds`, or
+  missed scheduled times before the latest one.
 * `ScheduleActive`, `ScheduleSuspended`, `ScheduleAborted` (warning, with the reason): the phase
   changes.
 * `ScheduledBackupSucceeded`: a run completed. It names the backup.
@@ -1467,7 +1470,7 @@ After each successful scheduled run, the run deletes old backups of the schedule
 the cleanup of the Altinity usual backup workflow does.
 
 * **Only the schedule's own backups count.** Retention uses only backups with these names:
-  * `<backupNamePrefix>-YYYYMMDDHHMMSS`: scheduled backups, named after their slot in `timeZone`,
+  * `<backupNamePrefix>-YYYYMMDDHHMMSS`: scheduled backups, named after their scheduled time in `timeZone`,
   * `<backupNamePrefix>-YYYYMMDDTHHMMSS`: backups that [run the schedule now](backup.md#run-a-schedule-now),
   * with a [naming template](#backup-naming): every name that the template makes for the shard of
     each host, with the schedule's prefix if it contains `{prefix}`, sorted by their time.
@@ -1479,8 +1482,8 @@ the cleanup of the Altinity usual backup workflow does.
   must be unique among all schedules that write to that path. Otherwise each schedule deletes the
   backups of the other. See [Two CHIs on one storage path](#two-chis-on-one-storage-path). The prefix names the series, so you can
   set it one time only.
-* **Each entry keeps its newest `keep` backups.** A scheduled backup counts for every entry whose slot
-  its time is. With the entries of the [user guide example](backup.md#clickhousebackupschedule), the
+* **Each entry keeps its newest `keep` backups.** A scheduled backup counts for every entry whose
+  scheduled time its time is. With the entries of the [user guide example](backup.md#clickhousebackupschedule), the
   Sunday 02:30 backup counts for the hourly, daily and weekly entry.
   It stays while any entry keeps it. The newest backup and the backup that the run just made always
   stay.
@@ -1523,7 +1526,7 @@ the cleanup of the Altinity usual backup workflow does.
 Retention keeps what the entries keep. So a change of the entries or of `timeZone` can make the next
 run delete the backups that the schedule kept until then:
 
-* a new `time` matches no slot of the older backups,
+* a new `time` matches no scheduled time of the older backups,
 * a removed weekly entry leaves its backups to the daily entry,
 * a lower `keep` drops the excess backups.
 
@@ -1692,7 +1695,7 @@ The basics are in [Config overrides](backup.md#config-overrides).
   leading `--env=` is removed. The key contains upper-case letters, digits and `_`. The value
   contains letters, digits and `_ . , : / @ + = -`. So each override is one token of a command. At
   most 16 overrides, each key one time.
-* **Which overrides apply.** A scheduled run uses the overrides of the heaviest entry of its slot, as
+* **Which overrides apply.** A scheduled run uses the overrides of the heaviest entry of its scheduled time, as
   for `incremental`. With the [user guide example](backup.md#config-overrides), the Sunday run uses the weekly `STANDARD_IA`, and the run on the
   1st of the month uses the monthly `GLACIER_IR`. A backup [run now](backup.md#run-a-schedule-now) from a
   schedule uses none, and does not accept `configOverrides`. A restore uses its own `configOverrides`.
@@ -1732,7 +1735,7 @@ The basics are in [Config overrides](backup.md#config-overrides).
 
 ## Incremental backups
 
-* **Which run is incremental.** The heaviest entry of the run's slot decides, as for
+* **Which run is incremental.** The heaviest entry of the run's scheduled time decides, as for
   `configOverrides`. The run is incremental only if that entry has `incremental: true`. For example,
   with `incremental` on a daily entry, the Sunday run is the weekly one, which is heavier, so it makes
   a full backup. See the [example](backup.md#clickhousebackupschedule) in the schedule section.
@@ -1746,7 +1749,7 @@ The basics are in [Config overrides](backup.md#config-overrides).
 
 ```mermaid
 flowchart TD
-    run([Scheduled run]) --> heavy{Heaviest entry of the slot<br/>has incremental: true?}
+    run([Scheduled run]) --> heavy{Heaviest entry of the scheduled time<br/>has incremental: true?}
     heavy -- no --> full[Full backup]
     heavy -- yes --> base{Newest backup of the schedule<br/>exists on every host?}
     base -- no --> full
@@ -2069,7 +2072,7 @@ The `reason` of a condition tells why. The `message` gives the details.
 | `SharesSourcePrefix`                                 | Schedules: held, because the CHI is recovered from a backup whose name starts with `<namespace>-<chi>-`. Set `backupNamePrefix` to release it. See [Two CHIs on one storage path](#two-chis-on-one-storage-path). |
 | `InvalidSpec`                                        | The spec failed validation, or the spec of the schedule that a backup [runs](backup.md#run-a-schedule-now) failed.                                                                        |
 | `WaitingForScheduledTime`                            | Backups: the backup waits for its `scheduledTime`. See [Back up at a later time](backup.md#back-up-at-a-later-time).                                                                     |
-| `StartingDeadlineExceeded`                           | Backups: the backup, or the run of a cluster, did not start within `startingDeadlineSeconds` after it was due. The message tells what it waited for.                            |
+| `StartingDeadlineExceeded`                           | Backups: the backup, or the run of a cluster, did not start within `startingDeadlineSeconds` after its scheduled time. The message tells what it waited for.                            |
 | `ScheduleNotFound`                                   | Backups that [run a schedule now](backup.md#run-a-schedule-now): the schedule does not exist (yet). The backup waits.                                                                    |
 | `CHINotFound`, `CHINotReady`, `CHIStopped`           | The CHI does not exist, did not complete its reconcile, or is stopped. The resource waits.                                                                                      |
 | `NoClickHouseAccess`                                 | The operator configuration has no ClickHouse username and password of its own (`clickhouse.access`, or its Secret). The defaults do not count. The resource waits. See [ClickHouse credentials](#clickhouse-credentials). |

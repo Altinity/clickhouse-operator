@@ -704,7 +704,7 @@ func TestOrchestratorAdoptsNoCommandOfAnEarlierOperation(t *testing.T) {
 	require.Equal(t, []string{"h0: create_remote --rbac b1"}, resumed.commands(), "the row finished before the run started")
 }
 
-// A scheduled run names its backup after its slot, and prunes the series of the schedule after it: every entry keeps
+// A scheduled run names its backup after its scheduled time, and prunes the series of the schedule after it: every entry keeps
 // its newest keep backups.
 func TestOrchestratorPrunesAfterAScheduledRun(t *testing.T) {
 	sc := newFakeSidecars("h0", "h1")
@@ -740,9 +740,9 @@ func TestOrchestratorPrunesAfterAScheduledRun(t *testing.T) {
 	require.Len(t, sc.commands(), before+2)
 }
 
-// The run of a slot whose time does not exist the day the clocks go forward, 02:30 in Berlin on 2026-03-29, which the zone
-// moves to 03:30, which the backup is named after, is the run of the entry whose slot it is: it makes the backup as that
-// entry says, with its config overrides and as incremental, and retention keeps it, as it keeps the backup of any slot.
+// The run of a scheduled time that does not exist the day the clocks go forward, 02:30 in Berlin on 2026-03-29, which the zone
+// moves to 03:30, which the backup is named after, is the run of the entry whose scheduled time it is: it makes the backup as that
+// entry says, with its config overrides and as incremental, and retention keeps it, as it keeps the backup of any scheduled time.
 func TestOrchestratorRunsTheSlotOfASpringForwardGap(t *testing.T) {
 	sc := newFakeSidecars("h0")
 	for _, name := range []string{"nightly-20260327023000", "nightly-20260328023000"} {
@@ -763,7 +763,7 @@ func TestOrchestratorRunsTheSlotOfASpringForwardGap(t *testing.T) {
 	require.False(t, outcome.failed, outcome.message)
 	require.Equal(t, "nightly-20260329033000", outcome.backupName)
 	require.Equal(t, []string{"h0: create_remote --rbac --env=S3_STORAGE_CLASS=GLACIER nightly-20260329033000"}, sc.commands()[:1],
-		"the slot is the weekly entry's, whose overrides the backup is made with")
+		"the scheduled time is the weekly entry's, whose overrides the backup is made with")
 
 	// The next day's run keeps the backup of the gap, which is the Sunday's, and prunes the one before it
 	spec.Slot = time.Date(2026, time.March, 30, 0, 30, 0, 0, time.UTC)
@@ -796,7 +796,7 @@ func TestOrchestratorMakesIncrementalBackups(t *testing.T) {
 }
 
 // With a naming template every shard backs up under a name of its own, which a template of the Altinity usual backup
-// workflow makes of its shard and the slot.
+// workflow makes of its shard and the scheduled time.
 func TestOrchestratorNamesTheBackupOfEveryShard(t *testing.T) {
 	sc := newFakeSidecars("h0", "h1")
 	spec := &model.RunSpec{

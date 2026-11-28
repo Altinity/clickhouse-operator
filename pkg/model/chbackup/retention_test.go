@@ -112,22 +112,22 @@ func TestSlotMatches(t *testing.T) {
 	}
 }
 
-// With a naming template a backup belongs to the slot of a schedule entry up to 30 minutes after the slot, as the
+// With a naming template a backup belongs to the scheduled time of a schedule entry up to 30 minutes after it, as the
 // Altinity usual backup workflow names a scheduled backup after the time its run started, its seconds included.
 func TestSlotTolerance(t *testing.T) {
 	daily := slotEntriesOf(t, "period=daily time=02:00 keep=1", "")[0]
 	for tag, match := range map[string]bool{
 		"20261112020000": true, "20261112022959": true, "20261112023000": false, "20261112015959": false,
-		// Past midnight, of a slot at 23:50
+		// Past midnight, of a scheduled time at 23:50
 	} {
 		require.Equal(t, match, SlotMatches(daily, tag, SlotTolerance), tag)
 	}
 	late := slotEntriesOf(t, "period=daily time=23:50 keep=1", "")[0]
-	require.True(t, SlotMatches(late, "20261113001959", SlotTolerance), "a run past midnight counts for the slot of the day before")
+	require.True(t, SlotMatches(late, "20261113001959", SlotTolerance), "a run past midnight counts for the scheduled time of the day before")
 	require.False(t, SlotMatches(late, "20261113002000", SlotTolerance))
 }
 
-// The heaviest entry of a slot wins: minute < hour < 6hours < daily < weekly < monthly; the operator agrees.
+// The heaviest entry of a scheduled time wins: minute < hour < 6hours < daily < weekly < monthly; the operator agrees.
 func TestWinnerEntry(t *testing.T) {
 	entries, at := entriesOf(t, "period=minute keep=60;period=hour keep=24;period=6hours keep=4;"+
 		"period=daily time=06:30 keep=7;period=weekly day=0 time=06:30 keep=4;period=monthly day=15 time=06:30 keep=12")
@@ -217,7 +217,7 @@ func TestRetentionPlan(t *testing.T) {
 			names:     all("d-20200101T120000", "d-20200102T120000"),
 			keep:      all("d-20200101T120000", "d-20200102T120000"),
 		},
-		"backups of no slot": {
+		"backups of no scheduled time": {
 			schedules: "period=daily time=00:00 keep=5",
 			names:     all("d-20200101000000", "d-20200101060000", "d-20200102000000"),
 			keep:      all("d-20200101000000", "d-20200102000000"),
@@ -428,7 +428,7 @@ func TestRetentionHoldsEveryChange(t *testing.T) {
 }
 
 // Backups named by the template of the Altinity usual backup workflow, after the time their run started, count for the
-// slots of the entries with its tolerance; one pinned by the name of the backup of any shard stays.
+// scheduled times of the entries with its tolerance; one pinned by the name of the backup of any shard stays.
 func TestRetentionOfTemplateNamedBackups(t *testing.T) {
 	naming := Naming{Template: api.BackupNamingShardTime, Cluster: "main", Shards: []string{"0", "1"}, ShardOf: map[string]int{"h0": 0, "h1": 1}}
 	keys := []string{"20261108020412", "20261109021733", "20261110020059", "20261111020502", "20261111143000", "20261112020911"}
@@ -722,8 +722,8 @@ func TestRetentionOfIncompleteBackups(t *testing.T) {
 	require.Equal(t, []string{"d-20261102020000"}, plan.Expired)
 }
 
-// A backup named after a slot whose time does not exist the day the clocks go forward, 02:30 in Berlin on 2026-03-29,
-// whose name tells 03:30, is a backup of the slot to the entries and to retention, which keeps it as it keeps any.
+// A backup named after a scheduled time that does not exist the day the clocks go forward, 02:30 in Berlin on 2026-03-29,
+// whose name tells 03:30, is a backup of the scheduled time to the entries and to retention, which keeps it as it keeps any.
 func TestSlotMatchesInTheSpringForwardGap(t *testing.T) {
 	entries, at := entriesOf(t, "period=daily time=02:30 keep=2;period=weekly day=0 time=02:30 keep=1")
 	berlin := SlotEntries(entries, at, "Europe/Berlin")
@@ -740,11 +740,11 @@ func TestSlotMatchesInTheSpringForwardGap(t *testing.T) {
 	}
 	winner, matched := WinnerEntry(berlin, "20260329033000", 0)
 	require.Equal(t, api.BackupPeriodWeekly, berlin[winner].Period)
-	require.Equal(t, []int{0, 1}, matched, "the slot is a slot of both entries")
-	// In UTC the zone has no gap: the slot is no slot of the entries
+	require.Equal(t, []int{0, 1}, matched, "the time is a scheduled time of both entries")
+	// In UTC the zone has no gap: the time is no scheduled time of the entries
 	winner, _ = WinnerEntry(SlotEntries(entries, at, ""), "20260329033000", 0)
 	require.Equal(t, -1, winner)
-	// With the tolerance of a naming template, seconds after the slot as it is
+	// With the tolerance of a naming template, seconds after the scheduled time as it is
 	require.True(t, SlotMatches(berlin[0], "20260329034959", SlotTolerance))
 	require.False(t, SlotMatches(berlin[0], "20260329040000", SlotTolerance))
 
@@ -757,5 +757,5 @@ func TestSlotMatchesInTheSpringForwardGap(t *testing.T) {
 	plan := retention.Plan(names, sets)
 	// The daily entry keeps two, the weekly one the Sunday: the backup of the gap is the Sunday's
 	require.Equal(t, []string{"d-20260328023000"}, plan.Obsolete)
-	require.True(t, plan.Keep["d-20260329033000"], "the backup of the weekly slot of the gap is kept")
+	require.True(t, plan.Keep["d-20260329033000"], "the backup of the weekly scheduled time of the gap is kept")
 }

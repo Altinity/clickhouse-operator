@@ -108,7 +108,7 @@ func TestBackupOfEveryReplicaAtPathsOfTheirOwnRuns(t *testing.T) {
 }
 
 // A schedule of a backup of every replica whose replicas would write the backup of one name at one storage path is
-// aborted, and runs no slot, until the paths change.
+// aborted, and runs nothing, until the paths change.
 func TestScheduleOfEveryReplicaAtOneStoragePathIsAborted(t *testing.T) {
 	sc := newFakeSidecars()
 	sc.any = true
@@ -132,7 +132,7 @@ func TestScheduleOfEveryReplicaAtOneStoragePathIsAborted(t *testing.T) {
 	validated := condition(t, got.Status.Conditions, api.BackupConditionValidated)
 	require.Equal(t, meta.ConditionFalse, validated.Status)
 	require.Equal(t, api.BackupReasonStoragePathConflict, validated.Reason)
-	require.Empty(t, got.Status.Active, "the due slot does not run")
+	require.Empty(t, got.Status.Active, "the backup at the scheduled time does not run")
 	require.Len(t, eventMessagesOfType(t, c, reasonScheduleAborted, core.EventTypeWarning), 1)
 	require.Empty(t, sc.commands())
 

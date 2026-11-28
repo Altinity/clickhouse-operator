@@ -52,7 +52,7 @@ var BackupPeriods = []BackupPeriod{
 	BackupPeriodMinute, BackupPeriodHour, BackupPeriod6Hours, BackupPeriodDaily, BackupPeriodWeekly, BackupPeriodMonthly,
 }
 
-// When several entries are due at one time, the run belongs to the heaviest entry. The others count it too.
+// When several entries are scheduled at one time, the run belongs to the heaviest entry. The others count it too.
 func (p BackupPeriod) Weight() float64 {
 	switch p {
 	case BackupPeriodMinute:
@@ -109,7 +109,7 @@ type BackupScheduleEntry struct {
 	Keep int32 `json:"keep" yaml:"keep"`
 	// Incremental runs are incremental while the chain is shorter than Keep, then the next run is full.
 	Incremental *types.StringBool `json:"incremental,omitempty" yaml:"incremental,omitempty"`
-	// When entries share a slot, only the heaviest entry applies its overrides and incremental setting.
+	// When entries share a scheduled time, only the heaviest entry applies its overrides and incremental setting.
 	ConfigOverrides []string `json:"configOverrides,omitempty" yaml:"configOverrides,omitempty"`
 }
 
@@ -170,7 +170,7 @@ type ClickHouseBackupScheduleSpec struct {
 	ClickHouseInstallation string `json:"clickHouseInstallation" yaml:"clickHouseInstallation"`
 	// Cluster is immutable. Empty backs up every backup-enabled cluster.
 	Cluster string `json:"cluster,omitempty" yaml:"cluster,omitempty"`
-	// Schedules run at the slots of every entry. A run counts for every entry due at that time.
+	// Schedules run at the scheduled times of every entry. A run counts for every entry scheduled at that time.
 	Schedules []BackupScheduleEntry `json:"schedules" yaml:"schedules"`
 	// Time is "HH:MM" in TimeZone, required for daily, weekly and monthly. An hour entry uses its minute,
 	// a 6hours entry its hour modulo 6 and its minute.
@@ -179,7 +179,7 @@ type ClickHouseBackupScheduleSpec struct {
 	TimeZone string `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
 	// Suspend pauses new runs. A run in progress goes on.
 	Suspend *types.StringBool `json:"suspend,omitempty" yaml:"suspend,omitempty"`
-	// StartingDeadlineSeconds skips a slot missed by more. Unset runs the latest missed slot, however late.
+	// StartingDeadlineSeconds skips a scheduled time missed by more. Unset runs the latest missed scheduled time, however late.
 	StartingDeadlineSeconds    *int64 `json:"startingDeadlineSeconds,omitempty" yaml:"startingDeadlineSeconds,omitempty"`
 	SuccessfulRunsHistoryLimit *int32 `json:"successfulRunsHistoryLimit,omitempty" yaml:"successfulRunsHistoryLimit,omitempty"`
 	FailedRunsHistoryLimit     *int32 `json:"failedRunsHistoryLimit,omitempty" yaml:"failedRunsHistoryLimit,omitempty"`
@@ -492,7 +492,7 @@ type ScheduleClusterStatus struct {
 	Name string `json:"name" yaml:"name"`
 	// ConfigSecret identifies the storage of the unpruned backups of a removed cluster.
 	ConfigSecret string `json:"configSecret,omitempty" yaml:"configSecret,omitempty"`
-	// LastScheduleTime is a slot time, not a start time.
+	// LastScheduleTime is a scheduled time, not a start time.
 	LastScheduleTime   *meta.Time `json:"lastScheduleTime,omitempty" yaml:"lastScheduleTime,omitempty"`
 	LastSuccessfulTime *meta.Time `json:"lastSuccessfulTime,omitempty" yaml:"lastSuccessfulTime,omitempty"`
 	LastBackupName     string     `json:"lastBackupName,omitempty" yaml:"lastBackupName,omitempty"`

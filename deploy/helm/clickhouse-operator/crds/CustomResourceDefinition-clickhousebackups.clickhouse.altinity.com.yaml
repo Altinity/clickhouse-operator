@@ -135,7 +135,7 @@ spec:
                 backupName: &TypeBackupName
                   type: string
                   description: |
-                    Backup name. Empty generates a name from the resource name and the due time.
+                    Backup name. Empty generates a name from the resource name and the scheduled time.
                     The name must not end like a schedule backup name (-YYYYMMDDHHMMSS). Not allowed with scheduleRef.
                   maxLength: 128
                   pattern: '^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$'
@@ -151,7 +151,7 @@ spec:
                   minimum: 0
                   maximum: 2147483647
                   description: |
-                    Maximum delay in seconds after the due time to start the backup.
+                    Maximum delay in seconds after the scheduled time to start the backup.
                     A cluster that does not start by then fails. The backup fails if it is not validated by then. Unset means no limit.
                 diffFromRemote:
                   <<: *TypeBackupName
