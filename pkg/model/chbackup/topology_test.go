@@ -17,12 +17,12 @@ package chbackup
 import (
 	"encoding/json"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	core "k8s.io/api/core/v1"
-	"k8s.io/utils/ptr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -52,8 +52,8 @@ func TestMain(m *testing.M) {
 
 func enabledBackup() *api.ClusterBackup {
 	return &api.ClusterBackup{
-		Enabled:         types.NewStringBool(true),
-		ConfigSecretRef: &core.LocalObjectReference{Name: testStorageSecret},
+		Enabled:       types.NewStringBool(true),
+		StorageConfig: api.NewStorageConfig(testStorageSecret, "config.yml"),
 	}
 }
 
@@ -139,6 +139,28 @@ func TestTopologyFromLayoutCounts(t *testing.T) {
 		topology.allReplicas())
 	require.Equal(t, topology.firstPerShard(), topology.hosts(api.ReplicaSelectionFirstPerShard))
 	require.Equal(t, topology.allReplicas(), topology.hosts(api.ReplicaSelectionAllReplicas))
+}
+
+// A backup of one replica per shard runs on backup.preferredReplica of every shard, the first replica of a shard that
+// has fewer; a backup of every replica, and a restore, are not concerned.
+func TestTopologyBacksUpThePreferredReplica(t *testing.T) {
+	backup := enabledBackup()
+	backup.PreferredReplica = types.NewInt32(1)
+	chi := newCHI("demo", layoutCluster("main", 2, 2, backup))
+	chi.Spec.Configuration.Clusters[0].Layout = &api.ChiClusterLayout{Shards: []*api.ChiShard{
+		{Name: "0", ReplicasCount: 2}, {Name: "1", ReplicasCount: 1},
+	}}
+	_, stored := normalize(t, chi)
+	topology, err := NewTopology(stored, "")
+	require.NoError(t, err)
+	require.Equal(t, []string{"chi-demo-main-0-1", "chi-demo-main-1-0"}, topology.backupHosts(api.ReplicaSelectionFirstPerShard))
+	require.Equal(t, []string{"chi-demo-main-0-0", "chi-demo-main-1-0"}, topology.hosts(api.ReplicaSelectionFirstPerShard))
+	require.Equal(t, topology.allReplicas(), topology.backupHosts(api.ReplicaSelectionAllReplicas))
+
+	_, stored = normalize(t, newCHI("demo", layoutCluster("main", 2, 2, enabledBackup())))
+	topology, err = NewTopology(stored, "")
+	require.NoError(t, err)
+	require.Equal(t, topology.firstPerShard(), topology.backupHosts(api.ReplicaSelectionFirstPerShard))
 }
 
 // Explicit shard and replica lists name their hosts after the listed entries and may give each
@@ -269,7 +291,6 @@ func TestTopologyForCluster(t *testing.T) {
 	require.Equal(t, []string{"cold"}, cold.ClusterNames())
 	require.Equal(t, "cold", cold.cluster())
 	require.Equal(t, []string{"chi-demo-cold-0-0", "chi-demo-cold-0-1"}, cold.allReplicas())
-	require.Equal(t, "registry/backup:cold", cold.pod().image, "the Job of a cluster runs that cluster's image")
 	require.Equal(t, topology.enabled, cold.enabled, "every backup-enabled cluster stays known, for the path check")
 
 	_, err = topology.ForCluster("plain")
@@ -320,6 +341,20 @@ func TestTopologyKnowsWhatThePathCheckNeeds(t *testing.T) {
 	require.Equal(t, "east", topology.enabled[0].shards[0].name)
 	require.Equal(t, "west", topology.enabled[0].shards[1].name)
 	require.Equal(t, "demo", topology.installation)
+
+	// Every host is checked with the macros the operator gives it, which differ between the replicas of a shard
+	check, err := topology.PathCheck(api.BackupRunOperationBackup, api.ReplicaSelectionAllReplicas,
+		func(core.EnvVar) (string, bool, error) { return "", false, nil })
+	require.NoError(t, err)
+	main := check.Clusters[0]
+	require.Len(t, main.Hosts, 2)
+	for i, host := range main.Hosts {
+		require.Equal(t, i, host.Shard)
+		require.Equal(t, topology.enabled[0].shards[i].hosts[0], host.Name)
+		require.Equal(t, strconv.Itoa(i), host.Macros[MacroAllShardedShard], "the index of the host in the installation")
+	}
+	require.Equal(t, "chi-demo-main-east-0", main.Hosts[0].Macros[MacroReplica], "the host name of the pod")
+	require.Equal(t, "chi-demo-main-west-0", main.Hosts[1].Macros[MacroReplica])
 }
 
 func TestTopologyRefusesWhatItCannotTarget(t *testing.T) {
@@ -350,7 +385,6 @@ func TestTopologyRefusesAClusterWithoutStorage(t *testing.T) {
 	topology, err := NewTopology(stored, "")
 	require.NoError(t, err)
 	require.Equal(t, []string{"backed"}, topology.ClusterNames())
-	require.Equal(t, []string{"backed"}, topology.EnabledClusterNames())
 	require.Equal(t, []string{"lacking"}, topology.ClustersWithoutStorage())
 	require.Equal(t, []string{"backed", "lacking"}, BackupRequestedClusters(stored))
 
@@ -367,78 +401,6 @@ func TestTopologyRefusesAClusterWithoutStorage(t *testing.T) {
 	_, err = NewTopology(stored, "")
 	require.EqualError(t, err, ErrNoBackupStorage.Error()+": a, b",
 		"an operation of every cluster, none of them on, tells the ones that lack a storage")
-}
-
-func TestTopologyImage(t *testing.T) {
-	first := layoutCluster("first", 1, 1, enabledBackup())
-	second := layoutCluster("second", 1, 1, enabledBackup())
-	chi := newCHI("demo", first, second, layoutCluster("default", 1, 1, enabledBackup()))
-	withSidecarImage(chi, first, "registry/backup:first")
-	withSidecarImage(chi, second, "registry/backup:second")
-	_, stored := normalize(t, chi)
-
-	topology, err := NewTopology(stored, "")
-	require.NoError(t, err)
-	require.Equal(t, "registry/backup:first", topology.pod().image, "the first target cluster in spec order names the image")
-
-	topology, err = NewTopology(stored, "second")
-	require.NoError(t, err)
-	require.Equal(t, "registry/backup:second", topology.pod().image)
-
-	topology, err = NewTopology(stored, "default")
-	require.NoError(t, err)
-	require.Equal(t, config.DefaultClickHouseBackupDockerImage, topology.pod().image)
-}
-
-// Jobs inherit the pod settings of the first target host's pod template. The template index is
-// not serialized, so the stored installation has to have it rebuilt for the host to find it.
-func TestTopologyPodSettings(t *testing.T) {
-	chi := newCHI("demo",
-		layoutCluster("plain", 1, 1, enabledBackup()),
-		layoutCluster("custom", 1, 2, enabledBackup()),
-	)
-	chi.Spec.Templates = &api.Templates{PodTemplates: []api.PodTemplate{{
-		Name: "pod",
-		Spec: core.PodSpec{
-			SecurityContext:    &core.PodSecurityContext{FSGroup: ptr.To(int64(101))},
-			ImagePullSecrets:   []core.LocalObjectReference{{Name: "registry"}},
-			ServiceAccountName: "clickhouse",
-			Containers: []core.Container{
-				{Name: "sidecar", Image: "sidecar", SecurityContext: &core.SecurityContext{RunAsUser: ptr.To(int64(1337))}},
-				{Name: config.ClickHouseContainerName, Image: "clickhouse/clickhouse-server", SecurityContext: &core.SecurityContext{RunAsUser: ptr.To(int64(101))}},
-			},
-		},
-	}}}
-	chi.Spec.Configuration.Clusters[1].Templates = &api.TemplatesList{PodTemplate: "pod"}
-	_, stored := normalize(t, chi)
-
-	topology, err := NewTopology(stored, "custom")
-	require.NoError(t, err)
-	require.Equal(t, podSettings{
-		image:                    config.DefaultClickHouseBackupDockerImage,
-		securityContext:          &core.PodSecurityContext{FSGroup: ptr.To(int64(101))},
-		containerSecurityContext: &core.SecurityContext{RunAsUser: ptr.To(int64(101))},
-		imagePullSecrets:         []core.LocalObjectReference{{Name: "registry"}},
-		serviceAccountName:       "clickhouse",
-	}, topology.pod(), "the ClickHouse container is found by its name")
-
-	topology, err = NewTopology(stored, "")
-	require.NoError(t, err)
-	require.Equal(t, podSettings{image: config.DefaultClickHouseBackupDockerImage}, topology.pod(), "the first target cluster uses no pod template")
-	require.Equal(t, podSettings{}, (*Topology)(nil).pod())
-
-	// The sidecar's own security context, which the Jobs share an image with, names their identity.
-	backupSecurityContext := &core.SecurityContext{RunAsUser: ptr.To(int64(2000)), RunAsNonRoot: ptr.To(true)}
-	chi.Spec.Templates.PodTemplates[0].Spec.Containers = append(chi.Spec.Templates.PodTemplates[0].Spec.Containers, core.Container{
-		Name: config.ClickHouseBackupContainerName, Image: "registry/backup:own", ImagePullPolicy: core.PullAlways, SecurityContext: backupSecurityContext,
-	})
-	useTemplate(chi, chi.Spec.Configuration.Clusters[1], "pod")
-	_, stored = normalize(t, chi)
-	topology, err = NewTopology(stored, "custom")
-	require.NoError(t, err)
-	require.Equal(t, backupSecurityContext, topology.pod().containerSecurityContext)
-	require.Equal(t, "registry/backup:own", topology.pod().image)
-	require.Equal(t, core.PullAlways, topology.pod().imagePullPolicy)
 }
 
 // An installation normalized in memory links its hosts back to itself; topology must resolve it
@@ -465,4 +427,76 @@ func TestTopologyLeavesItsInputUntouched(t *testing.T) {
 	require.NoError(t, err)
 	require.JSONEq(t, string(before), string(after))
 	require.Empty(t, stored.Spec.Configuration.Clusters[0].Layout.Shards[0].Hosts[0].Runtime.Address.CHIName)
+}
+
+// The operator reaches a host by the FQDN the shared namer gives it, in the domain of the namespace of the
+// installation: the one its namespaceDomainPattern gives, if any.
+func TestTopologyAddressesTheHostsInTheDomainOfTheirNamespace(t *testing.T) {
+	_, stored := normalize(t, newCHI("demo", layoutCluster("main", 1, 1, enabledBackup())))
+	topology, err := NewTopology(stored, "")
+	require.NoError(t, err)
+	want := "chi-demo-main-0-0." + stored.GetNamespace() + ".svc.cluster.local."
+	require.Equal(t, want, topology.Endpoint("chi-demo-main-0-0").Address)
+	main, err := topology.ForCluster("main")
+	require.NoError(t, err)
+	endpoint := BackupRunSpec(testBackup("b1"), main).Endpoint("chi-demo-main-0-0")
+	require.Equal(t, want, endpoint.Address)
+	require.Equal(t, 8123, endpoint.HTTPPort, "the port ClickHouse serves HTTP on, which the scheme Auto takes")
+
+	chi := newCHI("demo", layoutCluster("main", 1, 1, enabledBackup()))
+	chi.Spec.NamespaceDomainPattern = types.NewString("%s.svc.example.org")
+	_, stored = normalize(t, chi)
+	topology, err = NewTopology(stored, "")
+	require.NoError(t, err)
+	require.Equal(t, "chi-demo-main-0-0."+stored.GetNamespace()+".svc.example.org", topology.Endpoint("chi-demo-main-0-0").Address)
+}
+
+// A backup is made on a shard once any replica of it made it, so a run knows the shard of every host.
+func TestTopologyTellsTheShardOfAHost(t *testing.T) {
+	_, stored := normalize(t, newCHI("demo", layoutCluster("main", 2, 2, enabledBackup())))
+	topology, err := NewTopology(stored, "")
+	require.NoError(t, err)
+	require.Equal(t, "main/0", topology.ShardOf("chi-demo-main-0-1"))
+	require.Equal(t, "main/1", topology.ShardOf("chi-demo-main-1-0"))
+	require.Empty(t, topology.ShardOf("elsewhere"))
+	require.Equal(t, "main/1", BackupRunSpec(testBackup("b1"), topology).Shard("chi-demo-main-1-1"))
+}
+
+// The naming of a run knows every shard by the value of its {shard} macro - its index from 0, or the name the layout
+// gives it - and by its number from 1, the shard_num of system.clusters, in the order of the layout.
+func TestTopologyNamesTheBackupOfAShardByItsNameAndNumber(t *testing.T) {
+	backup := enabledBackup()
+	backup.Naming = types.NewString("{shard}-shard{shardNum}-{YYYYMMDDHHIISS}")
+	cluster := &api.Cluster{Name: "main", Backup: backup, Layout: &api.ChiClusterLayout{Shards: []*api.ChiShard{
+		{Name: "west", ReplicasCount: 1}, {Name: "east", ReplicasCount: 2},
+	}}}
+	inMemory, stored := normalize(t, newCHI("demo", cluster))
+	topology, err := NewTopology(stored, "")
+	require.NoError(t, err)
+	naming := topology.RunNaming()
+	require.Equal(t, []string{"west", "east"}, naming.Shards)
+	hosts := createdServices(inMemory, "main")
+	for host, want := range map[string]string{
+		hosts[0][0]: "west-shard1-20261112020000",
+		hosts[1][0]: "east-shard2-20261112020000",
+		hosts[1][1]: "east-shard2-20261112020000",
+	} {
+		name, err := naming.HostName(host, "20261112020000", "")
+		require.NoError(t, err)
+		require.Equal(t, want, name, host)
+	}
+	chb := testBackup("b1")
+	chb.Spec.BackupName = "20261112020000"
+	name, err := ResolveTemplateBackupName(chb, topology.BackupNaming())
+	require.NoError(t, err)
+	require.Equal(t, "west-shard1-20261112020000", name)
+
+	_, stored = normalize(t, newCHI("demo", layoutCluster("main", 2, 1, backup)))
+	topology, err = NewTopology(stored, "")
+	require.NoError(t, err)
+	naming = topology.RunNaming()
+	require.Equal(t, []string{"0", "1"}, naming.Shards, "the shards of a layout by count are named by their index from 0")
+	name, err = naming.HostName("chi-demo-main-1-0", "20261112020000", "")
+	require.NoError(t, err)
+	require.Equal(t, "1-shard2-20261112020000", name)
 }

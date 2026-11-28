@@ -203,7 +203,7 @@ func (m *ServiceManager) createServiceHost(host *chi.Host) *core.Service {
 	}
 	if template, ok := host.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
-		if host.GetCluster().GetBackup().IsEnabled() {
+		if HostServesBackupAPI(host) {
 			template = template.DeepCopy()
 			serviceSpecEnsureBackupPort(&template.Spec)
 		}
@@ -238,7 +238,7 @@ func (m *ServiceManager) createServiceHost(host *chi.Host) *core.Service {
 		},
 	}
 	creator.SvcAppendSpecifiedPorts(svc, host)
-	if host.GetCluster().GetBackup().IsEnabled() {
+	if HostServesBackupAPI(host) {
 		serviceSpecEnsureBackupPort(&svc.Spec)
 	}
 	m.labeler.MakeObjectVersion(svc.GetObjectMeta(), svc)

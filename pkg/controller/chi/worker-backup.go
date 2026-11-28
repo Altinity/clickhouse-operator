@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"maps"
 	"slices"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/backupconfig"
@@ -32,26 +34,6 @@ import (
 	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
-
-// warnBackupWithoutStorage warns about the clusters that turn backup on without the settings of a storage,
-// which leaves their backup off: they run without the sidecar, and backups and restores of them are refused -
-// with nothing on the installation itself telling why.
-func (w *worker) warnBackupWithoutStorage(cr *api.ClickHouseInstallation) {
-	var clusters []string
-	cr.WalkClusters(func(cluster api.ICluster) error {
-		if cluster.GetBackup().LacksStorage() {
-			clusters = append(clusters, cluster.GetName())
-		}
-		return nil
-	})
-	if len(clusters) == 0 {
-		return
-	}
-	w.a.V(1).M(cr).F().
-		WithEvent(cr, a.EventActionReconcile, a.EventReasonBackupNoStorage).
-		Warning("Backup stays off on the clusters with backup enabled without a storage: %s - %s",
-			strings.Join(clusters, ", "), api.BackupStorageHint)
-}
 
 // warnIncompleteBackupCredentials warns when the backup Secret sets only one of the ClickHouse username and password.
 // The operator creates the backup user only when both are set, so there is none then, and the sidecars connect to
@@ -81,11 +63,11 @@ func (w *worker) warnIncompleteBackupCredentials(ctx context.Context, cr *api.Cl
 			"defaults of clickhouse-backup", util.NamespaceNameString(secret), set, unset, set)
 }
 
-// reconcileBackupConfigSecrets reconciles the configuration file Secret of the sidecars of every backup-enabled
-// cluster, registering each so that it is not purged as an unknown object, and warns about the storage Secrets the
-// files name no storage by, or cannot be built from. A missing storage Secret leaves the hosts without a storage to
-// upload to - or, once they had one, with the storage settings they had - with nothing else telling why.
+// An invalid backup config aborts the reconcile, else every backup and restore would fail with no visible cause.
 func (w *worker) reconcileBackupConfigSecrets(ctx context.Context, cr *api.ClickHouseInstallation) error {
+	if problems := backupSpecProblems(cr); len(problems) > 0 {
+		return w.abortOnInvalidBackupConfig(cr, problems)
+	}
 	outcomes, err := w.c.reconcileBackupConfigSecrets(ctx, cr, cr, false)
 	if err != nil {
 		w.a.V(1).M(cr).F().
@@ -94,12 +76,17 @@ func (w *worker) reconcileBackupConfigSecrets(ctx context.Context, cr *api.Click
 		return err
 	}
 	var errs []error
+	var invalid []string
 	for _, cluster := range slices.Sorted(maps.Keys(outcomes)) {
 		outcome := outcomes[cluster]
 		w.c.backupConfigProblems.reported(cr, cluster, outcome)
-		warnBackupConfigOutcome(w.a, cr, cluster, outcome)
-		if (outcome.err != nil) && !errors.Is(outcome.err, backupconfig.ErrInvalidStorageConfig) {
-			errs = append(errs, outcome.err)
+		if problem := backupConfigAbortProblem(cr, cluster, outcome); problem != "" {
+			invalid = append(invalid, problem)
+		} else {
+			warnBackupConfigOutcome(w.a, cr, cluster, outcome)
+			if outcome.err != nil {
+				errs = append(errs, outcome.err)
+			}
 		}
 		if outcome.secret == nil {
 			continue
@@ -111,7 +98,57 @@ func (w *worker) reconcileBackupConfigSecrets(ctx context.Context, cr *api.Click
 			w.task.RegistryReconciled().RegisterSecret(outcome.secret.GetObjectMeta())
 		}
 	}
+	if len(invalid) > 0 {
+		return w.abortOnInvalidBackupConfig(cr, invalid)
+	}
 	return errors.Join(errs...)
+}
+
+func backupSpecProblems(cr *api.ClickHouseInstallation) []string {
+	var problems []string
+	if err := cr.GetSpecT().GetBackup().Validate(); err != nil {
+		problems = append(problems, "spec.backup: "+err.Error())
+	}
+	var lacking []string
+	for _, cluster := range cr.GetSpecT().GetConfiguration().GetClusters() {
+		if err := cluster.GetBackup().Validate(); err != nil {
+			problems = append(problems, "cluster "+cluster.GetName()+": "+err.Error())
+		}
+		if cr.ClusterBackup(cluster).LacksStorage() {
+			lacking = append(lacking, cluster.GetName())
+		}
+	}
+	if len(lacking) > 0 {
+		problems = append(problems, fmt.Sprintf("backup is enabled without a storage on the clusters: %s - %s",
+			strings.Join(lacking, ", "), api.BackupStorageHint))
+	}
+	return problems
+}
+
+func backupConfigAbortProblem(cr *api.ClickHouseInstallation, cluster string, outcome backupConfigOutcome) string {
+	storageSecret := util.NamespaceNameString(&meta.ObjectMeta{Namespace: cr.GetNamespace(), Name: outcome.storageSecret})
+	switch {
+	case errors.Is(outcome.err, backupconfig.ErrInvalidStorageConfig):
+		return fmt.Sprintf("cluster %s: Secret %s holds a %s that cannot be read: %v", cluster, storageSecret, outcome.storageKey, outcome.err)
+	case errors.Is(outcome.err, errBackupStorageSecretUnreadable):
+		return fmt.Sprintf("cluster %s: Secret %s %v", cluster, storageSecret, outcome.err)
+	case errors.Is(outcome.err, errBackupConfigSecretForeign):
+		return fmt.Sprintf("cluster %s: %v", cluster, outcome.err)
+	case outcome.noStorage != nil:
+		return fmt.Sprintf("cluster %s: Secret %s %v - it has to hold the clickhouse-backup configuration in key %s",
+			cluster, storageSecret, outcome.noStorage, outcome.storageKey)
+	}
+	return ""
+}
+
+// Installation objects stay unchanged. syncBackupConfigs reconciles again once the storage Secrets are usable.
+func (w *worker) abortOnInvalidBackupConfig(cr *api.ClickHouseInstallation, problems []string) error {
+	message := strings.Join(problems, "; ")
+	cr.EnsureStatus().ReconcileAbortWithReason(api.StatusReasonBackupConfigInvalid, message)
+	w.a.V(1).M(cr).F().
+		WithEvent(cr, a.EventActionReconcile, a.EventReasonBackupStorageConfigInvalid).
+		Warning("Reconcile aborted, the backup cannot be configured: %s", message)
+	return fmt.Errorf("%w: %s: %s", common.ErrCRUDAbort, api.StatusReasonBackupConfigInvalid, message)
 }
 
 // warnBackupConfigOutcome warns about the configuration file Secret of the cluster when it names no storage although
@@ -123,7 +160,7 @@ func warnBackupConfigOutcome(announcer a.Announcer, cr *api.ClickHouseInstallati
 		announcer.V(1).M(cr).F().
 			WithEvent(cr, a.EventActionReconcile, a.EventReasonBackupStorageConfigInvalid).
 			Warning("Secret %s of the backup storage of cluster %s holds a %s that cannot be read - the sidecars "+
-				"keep their configuration until it is fixed: %v", storageSecret, cluster, backupconfig.FileName, outcome.err)
+				"keep their configuration until it is fixed: %v", storageSecret, cluster, outcome.storageKey, outcome.err)
 	case outcome.err != nil:
 		announcer.V(1).M(cr).F().
 			WithEvent(cr, a.EventActionReconcile, a.EventReasonReconcileFailed).
@@ -133,23 +170,22 @@ func warnBackupConfigOutcome(announcer a.Announcer, cr *api.ClickHouseInstallati
 			WithEvent(cr, a.EventActionReconcile, a.EventReasonBackupStorageSecretMissing).
 			Warning("Secret %s of the backup storage of cluster %s %v - the sidecars keep the storage settings they "+
 				"have until the Secret holds the clickhouse-backup configuration of the storage in key %s again",
-				storageSecret, cluster, outcome.noStorage, backupconfig.FileName)
+				storageSecret, cluster, outcome.noStorage, outcome.storageKey)
 	case outcome.noStorage != nil:
 		announcer.V(1).M(cr).F().
 			WithEvent(cr, a.EventActionReconcile, a.EventReasonBackupStorageSecretMissing).
 			Warning("Secret %s of the backup storage of cluster %s %v - its backups fail until the Secret holds the "+
 				"clickhouse-backup configuration of the storage in key %s, which the sidecars pick up within a few minutes",
-				storageSecret, cluster, outcome.noStorage, backupconfig.FileName)
+				storageSecret, cluster, outcome.noStorage, outcome.storageKey)
 	}
 }
 
 // warnUnpublishedBackupAPI warns about the hosts of backup-enabled clusters whose Service does not publish the
-// clickhouse-backup REST API. A Service reachable from outside the cluster does not get the port, so the backup
-// Jobs cannot reach these hosts, and every backup and restore of them fails - with nothing else telling why.
+// clickhouse-backup REST API. A Service reachable from outside the cluster does not get the port.
 func (w *worker) warnUnpublishedBackupAPI(cr *api.ClickHouseInstallation) {
 	var hosts []string
 	cr.WalkHosts(func(host *api.Host) error {
-		if !host.GetCluster().GetBackup().IsEnabled() {
+		if !chiCreator.HostServesBackupAPI(host) {
 			return nil
 		}
 		if service := w.task.Creator().CreateService(interfaces.ServiceHost, host).First(); !chiCreator.ServiceHasBackupPort(service) {

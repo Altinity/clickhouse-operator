@@ -78,7 +78,7 @@ jobs:
           test "$(docker info -f '{{.DockerRootDir}}')" = "/mnt/docker"
           df -h /mnt /
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         id: setup-python
         with:
           python-version: '3.12'
@@ -129,8 +129,8 @@ jobs:
           echo "current release=$CHO_RELEASE"
           echo "current go version=$GO_VERSION"
 
-          docker build -f dockerfile/operator/Dockerfile         --build-arg GO_VERSION=${GO_VERSION} --build-arg GOFIPS140=${GOFIPS140} -t altinity/clickhouse-operator:${CHO_RELEASE} --pull .
-          docker build -f dockerfile/metrics-exporter/Dockerfile --build-arg GO_VERSION=${GO_VERSION} --build-arg GOFIPS140=${GOFIPS140} -t altinity/metrics-exporter:${CHO_RELEASE}    --pull .
+          docker build -f dockerfile/operator/Dockerfile         --build-arg GO_VERSION=${GO_VERSION} --build-arg GIT_SHA=$(git rev-parse --short HEAD) --build-arg GOFIPS140=${GOFIPS140} -t altinity/clickhouse-operator:${CHO_RELEASE} --pull .
+          docker build -f dockerfile/metrics-exporter/Dockerfile --build-arg GO_VERSION=${GO_VERSION} --build-arg GIT_SHA=$(git rev-parse --short HEAD) --build-arg GOFIPS140=${GOFIPS140} -t altinity/metrics-exporter:${CHO_RELEASE}    --pull .
 
           docker image save altinity/clickhouse-operator:${CHO_RELEASE} -o operator.tar
           docker image save altinity/metrics-exporter:${CHO_RELEASE}    -o metrics-exporter.tar

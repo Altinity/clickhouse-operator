@@ -114,3 +114,35 @@ func TestClusterOnlyRecovery(t *testing.T) {
 	require.False(t, RecoveryPredicate().Create(event.CreateEvent{Object: optedOut}))
 	require.Nil(t, trim(t, optedOut).Spec.Configuration)
 }
+
+// A restore that only records the progress of its run does not wake the schedules. A change of what holds them does.
+func TestRestoreHoldPredicate(t *testing.T) {
+	running := &api.ClickHouseRestore{
+		Spec: api.ClickHouseRestoreSpec{ClickHouseInstallation: "demo"},
+		Status: api.ClickHouseRestoreStatus{Phase: api.OperationPhaseRunning, Clusters: []api.OperationClusterStatus{
+			{Name: "c1", Phase: api.OperationPhaseRunning, Run: &api.BackupRunStatus{}},
+		}},
+	}
+	update := func(change func(*api.ClickHouseRestore)) bool {
+		cur := running.DeepCopy()
+		change(cur)
+		return RestoreHoldPredicate().Update(event.UpdateEvent{ObjectOld: running, ObjectNew: cur})
+	}
+	require.False(t, update(func(*api.ClickHouseRestore) {}))
+	require.False(t, update(func(cur *api.ClickHouseRestore) {
+		cur.Status.Clusters[0].Run.Actions = []api.BackupRunAction{{Host: "h0", Command: "download b"}}
+	}), "the progress of a run")
+	require.True(t, update(func(cur *api.ClickHouseRestore) { cur.Status.Phase = api.OperationPhaseFailed }))
+	require.True(t, update(func(cur *api.ClickHouseRestore) { cur.Status.Clusters[0].Phase = api.OperationPhaseCompleted }))
+	require.True(t, update(func(cur *api.ClickHouseRestore) { cur.Status.Clusters[0].Reason = api.BackupReasonFailedUnchanged }))
+	require.True(t, update(func(cur *api.ClickHouseRestore) { cur.Status.Clusters[0].Run = nil }))
+	require.True(t, update(func(cur *api.ClickHouseRestore) {
+		cur.Status.Clusters = append(cur.Status.Clusters, api.OperationClusterStatus{Name: "c2"})
+	}))
+	require.True(t, update(func(cur *api.ClickHouseRestore) { cur.Spec.BackupName = "other" }))
+	require.True(t, update(func(cur *api.ClickHouseRestore) {
+		cur.OwnerReferences = []meta.OwnerReference{{Name: "demo"}}
+	}))
+	require.True(t, RestoreHoldPredicate().Create(event.CreateEvent{Object: running}))
+	require.True(t, RestoreHoldPredicate().Delete(event.DeleteEvent{Object: running}))
+}

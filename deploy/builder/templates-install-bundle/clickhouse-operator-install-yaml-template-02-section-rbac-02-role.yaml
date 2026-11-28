@@ -79,6 +79,18 @@ rules:
       - update
       - watch
       - delete
+  # begin namespaced-only: dropped from the ClusterRole, see rbac-03-leader-election.yaml
+  # The backup controllers are leader-elected by a Lease in the namespace of the operator, which a Role of that
+  # namespace grants: a ClusterRole would grant it in every namespace
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - create
+      - get
+      - update
+  # end namespaced-only
   - apiGroups:
       - ""
     resources:
@@ -154,35 +166,6 @@ rules:
       - get
       - list
       - watch
-
-  #
-  # batch.* resources - backup/restore Jobs and CronJobs
-  # They are owned by their backup resource and garbage-collected with it. The operator never deletes
-  # a Job; a schedule deletes the CronJob of a cluster it no longer backs up.
-  #
-
-  - apiGroups:
-      - batch
-    resources:
-      - jobs
-    verbs:
-      - get
-      - list
-      - patch
-      - watch
-      - create
-  - apiGroups:
-      - batch
-    resources:
-      - cronjobs
-    verbs:
-      - get
-      - list
-      - patch
-      - update
-      - watch
-      - create
-      - delete
 
   #
   # apiextensions
@@ -272,6 +255,7 @@ rules:
       - delete
 
   # clickhouse backup - related resources
+  # The operator sets and removes its finalizers on the backups, schedules and restores
   - apiGroups:
       - clickhouse.altinity.com
     resources:
@@ -281,6 +265,8 @@ rules:
       - get
       - list
       - watch
+      - update
+      - patch
   # The operator creates a restore itself to recover an installation from a backup
   - apiGroups:
       - clickhouse.altinity.com
@@ -291,16 +277,8 @@ rules:
       - list
       - watch
       - create
-  # Jobs and CronJobs carry a blocking owner reference to their backup resource, which requires
-  # update on the owner's finalizers where OwnerReferencesPermissionEnforcement is enabled (OpenShift)
-  - apiGroups:
-      - clickhouse.altinity.com
-    resources:
-      - clickhousebackups/finalizers
-      - clickhousebackupschedules/finalizers
-      - clickhouserestores/finalizers
-    verbs:
       - update
+      - patch
   - apiGroups:
       - clickhouse.altinity.com
     resources:

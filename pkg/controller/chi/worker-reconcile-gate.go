@@ -32,8 +32,7 @@ const (
 	// be regenerated. The Pod template does not include the Secret's contents.
 	gatePasswordSecretChanged reconcileGateDecision = "PasswordSecretChanged"
 	// gateBackupSecretChanged: this pass created the backup Secret or filled in its missing REST API keys, with new
-	// random values. The configuration files of the sidecars must take them, or the backup Jobs, which read them from
-	// the Secret, are refused by the sidecars.
+	// random values. The sidecar configuration files must get them, or the sidecars refuse the integration tables.
 	gateBackupSecretChanged reconcileGateDecision = "BackupSecretChanged"
 	// gateStuckHostRecovery: a host has been sustained-NotReady past its threshold.
 	gateStuckHostRecovery reconcileGateDecision = "StuckHostRecovery"

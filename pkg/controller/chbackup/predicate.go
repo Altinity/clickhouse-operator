@@ -15,7 +15,10 @@
 package chbackup
 
 import (
+	"slices"
+
 	core "k8s.io/api/core/v1"
+	apiEquality "k8s.io/apimachinery/pkg/api/equality"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -105,6 +108,32 @@ func CHITopologyPredicate() predicate.Predicate {
 			return false
 		},
 	}
+}
+
+// RestoreHoldPredicate passes the restore events that may change how a restore holds schedules. A running
+// restore writes its status after every command: an update passes only when it changes what restoreHolds
+// reads, the spec, the owners, the phase, and the name, phase, reason and presence of a run of each cluster.
+func RestoreHoldPredicate() predicate.Predicate {
+	return predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			old, ok := e.ObjectOld.(*api.ClickHouseRestore)
+			if !ok {
+				return true
+			}
+			cur, ok := e.ObjectNew.(*api.ClickHouseRestore)
+			if !ok {
+				return true
+			}
+			return !apiEquality.Semantic.DeepEqual(old.Spec, cur.Spec) ||
+				!apiEquality.Semantic.DeepEqual(old.GetOwnerReferences(), cur.GetOwnerReferences()) ||
+				(old.Status.Phase != cur.Status.Phase) ||
+				!slices.EqualFunc(old.Status.Clusters, cur.Status.Clusters, sameHold)
+		},
+	}
+}
+
+func sameHold(a, b api.OperationClusterStatus) bool {
+	return (a.Name == b.Name) && (a.Phase == b.Phase) && (a.Reason == b.Reason) && ((a.Run == nil) == (b.Run == nil))
 }
 
 // TrimInstallation reduces an installation to what the backup controllers read from their cache:

@@ -1029,11 +1029,12 @@ def get_obj_names(chi_name, obj_type="pods", kind = "chi", ns=None, shell=None):
         label = f"-l clickhouse.altinity.com/chi={chi_name}"
     elif kind == "chk":
         label = f"-l clickhouse-keeper.altinity.com/chk={chi_name}"
-    obj_names = launch(
-        f"get {obj_type} -o=custom-columns=name:.metadata.name {label}",
+    output = launch(
+        f"get {obj_type} -o=custom-columns=name:.metadata.name --no-headers {label}",
         ns=ns,
-    ).splitlines()
-    return obj_names[1:]
+    )
+    # A name has no spaces or colons, so this drops stray shell lines, such as a warning.
+    return [line.strip() for line in output.splitlines() if line.strip() and not any(c in line.strip() for c in " :")]
 
 
 def get_ready_pods_count(kind, name, ns=None, shell=None):

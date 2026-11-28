@@ -36,16 +36,15 @@ const (
 )
 
 type instruments struct {
-	backupsStarted      metric.Int64Counter
-	backupsCompleted    metric.Int64Counter
-	backupsFailed       metric.Int64Counter
-	restoresStarted     metric.Int64Counter
-	restoresCompleted   metric.Int64Counter
-	restoresFailed      metric.Int64Counter
-	verificationsFailed metric.Int64Counter
-	backupDuration      metric.Float64Histogram
-	lastSuccess         metric.Int64ObservableGauge
-	lastFailure         metric.Int64ObservableGauge
+	backupsStarted    metric.Int64Counter
+	backupsCompleted  metric.Int64Counter
+	backupsFailed     metric.Int64Counter
+	restoresStarted   metric.Int64Counter
+	restoresCompleted metric.Int64Counter
+	restoresFailed    metric.Int64Counter
+	backupDuration    metric.Float64Histogram
+	lastSuccess       metric.Int64ObservableGauge
+	lastFailure       metric.Int64ObservableGauge
 }
 
 // latestKey identifies a series of a last-outcome gauge.
@@ -119,11 +118,6 @@ func create(meter metric.Meter) *instruments {
 	i.restoresFailed, _ = meter.Int64Counter(
 		"clickhouse_operator_restores_failed",
 		metric.WithDescription("number of restores failed"),
-		metric.WithUnit("items"),
-	)
-	i.verificationsFailed, _ = meter.Int64Counter(
-		"clickhouse_operator_backup_verifications_failed",
-		metric.WithDescription("number of backup verifications failed"),
 		metric.WithUnit("items"),
 	)
 	i.backupDuration, _ = meter.Float64Histogram(
@@ -205,8 +199,6 @@ func RetainClusters(namespace, chi string, clusters []string) {
 	}
 }
 
-// attributes identify the cluster of an installation a measurement is about. Every Job drives one
-// cluster, which an alert on the last backup of an installation has to tell apart.
 func attributes(namespace, chi, cluster string) metric.MeasurementOption {
 	return metric.WithAttributes(
 		attribute.String(operator.LabelNamespace, namespace),
@@ -237,13 +229,6 @@ func BackupFailed(ctx context.Context, namespace, chi, cluster string, failed ti
 		i.backupsFailed.Add(ctx, 1, attributes(namespace, chi, cluster))
 	}
 	recordLatest(lastFailureName, namespace, chi, cluster, failed)
-}
-
-// VerificationFailed counts a backup verification failed on a cluster.
-func VerificationFailed(ctx context.Context, namespace, chi, cluster string) {
-	if i := ensure(); i != nil {
-		i.verificationsFailed.Add(ctx, 1, attributes(namespace, chi, cluster))
-	}
 }
 
 // RestoreStarted counts a restore started on a cluster.

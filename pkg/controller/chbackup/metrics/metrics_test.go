@@ -124,7 +124,6 @@ func TestMeasurementsCarryTheInstallationLabels(t *testing.T) {
 
 	BackupCompleted(context.Background(), "ns", "demo", "main", 90*time.Second, completed)
 	BackupFailed(context.Background(), "ns", "demo", "main", completed.Add(time.Hour))
-	VerificationFailed(context.Background(), "ns", "demo", "main")
 	RestoreStarted(context.Background(), "ns", "demo", "main")
 	RestoreCompleted(context.Background(), "ns", "demo", "main")
 	RestoreFailed(context.Background(), "ns", "demo", "main")
@@ -133,7 +132,6 @@ func TestMeasurementsCarryTheInstallationLabels(t *testing.T) {
 	for _, name := range []string{
 		"clickhouse_operator_backups_completed",
 		"clickhouse_operator_backups_failed",
-		"clickhouse_operator_backup_verifications_failed",
 		"clickhouse_operator_restores_started",
 		"clickhouse_operator_restores_completed",
 		"clickhouse_operator_restores_failed",

@@ -355,21 +355,24 @@ spec:
   # override them (spec.configuration.clusters[].backup). When enabled, the operator injects a
   # clickhouse-backup sidecar into every Pod of the cluster. See docs/backup.md.
   backup:
-    # "yes" | "no" (default). Takes effect only where the storage in use has a secretRef, or with
-    # podTemplate set: without either the sidecar would have no backup storage, so backup stays off.
+    # "yes" | "no" (default). Needs a storageConfig: without one, the operator aborts the
+    # reconcile of the CHI (reason BackupConfigInvalid).
     enabled: "no"
     # Pod template whose container named clickhouse-backup the sidecar is built on - image, env,
-    # resources, securityContext; only that container is taken, and the backup/restore Jobs run its
-    # image under its identity. Empty, the operator builds the sidecar on its own.
-    # See docs/backup.md#customizing-the-sidecar.
+    # resources, securityContext; only that container is taken. Empty, the operator builds the
+    # sidecar on its own.
+    # See docs/backup-internals.md#customizing-the-sidecar.
     podTemplate: ""
-    # Secret in this CHI's namespace whose key config.yml holds the clickhouse-backup configuration of
+    # Key of a Secret in this CHI's namespace that holds the clickhouse-backup configuration of
     # the sidecar, a YAML mapping of its sections: general.remote_storage, s3.bucket, s3.path,
     # s3.access_key, ...; the operator generates the sidecar's configuration file from it. A cluster
-    # takes this one unless it names its own; name: "" on a cluster leaves it without one. Without it,
-    # the clickhouse-backup container of the pod template podTemplate names configures the storage.
-    configSecretRef:
-      name: clickhouse-backup-config
+    # takes this one unless it names its own; secretKeyRef.name: "" on a cluster leaves it without one.
+    # The key is required.
+    storageConfig:
+      valueFrom:
+        secretKeyRef:
+          name: clickhouse-backup-config
+          key: config.yml
 
   defaults:
     replicasUseFQDN: "no"

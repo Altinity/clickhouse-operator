@@ -193,7 +193,21 @@ if [[ "${MANIFEST_PRINT_RBAC_CLUSTERED}" == "yes" ]]; then
         ROLE_BINDING_KIND="ClusterRoleBinding"                        \
         ROLE_BINDING_NAME="clickhouse-operator-${OPERATOR_NAMESPACE}" \
         OPERATOR_VERSION="${OPERATOR_VERSION}"                        \
-        envsubst
+        envsubst | \
+        sed '/# begin namespaced-only/,/# end namespaced-only/d'
+
+    # The Role the operator has is namespaced, and holds the rules that are not for every namespace. Without one,
+    # a Role of the operator namespace grants them.
+    if [[ "${MANIFEST_PRINT_RBAC_NAMESPACED}" != "yes" ]]; then
+        SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-02-section-rbac-03-leader-election.yaml"
+        ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
+        render_separator
+        cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
+            NAMESPACE="${OPERATOR_NAMESPACE}"         \
+            COMMENT="$(cut_namespace_for_kubectl "${OPERATOR_NAMESPACE}")" \
+            OPERATOR_VERSION="${OPERATOR_VERSION}"    \
+            envsubst
+    fi
 fi
 
 # Render RBAC section for Role
@@ -210,7 +224,8 @@ if [[ "${MANIFEST_PRINT_RBAC_NAMESPACED}" == "yes" ]]; then
         ROLE_BINDING_KIND="RoleBinding"           \
         ROLE_BINDING_NAME="clickhouse-operator"   \
         OPERATOR_VERSION="${OPERATOR_VERSION}"    \
-        envsubst
+        envsubst | \
+        sed '/# begin namespaced-only/d;/# end namespaced-only/d'
 fi
 
 # Render header/beginning of ConfigMap yaml specification:

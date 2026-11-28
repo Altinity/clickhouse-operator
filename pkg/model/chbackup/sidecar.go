@@ -47,24 +47,15 @@ const (
 // commandWordQuotes are the quotes a shell takes off a word of a command line it runs.
 const commandWordQuotes = `"'`
 
-// sidecarSettings is how the clickhouse-backup sidecar of a host takes the settings the storage path
-// check reads. The Job reads no configuration file: the generated configuration file Secret of the cluster holds
-// the settings of the file under their env var names too, and kubelet resolves them for the Job from there.
+// The operator reads these settings by env var name from the generated configuration Secret, not from a file.
 type sidecarSettings struct {
-	// sources holds, by key of PathCheckKeys, the env vars that set the key in the sidecar, in the order
-	// kubelet applies them, each made optional so that it never keeps the Job from starting. A key nothing
-	// sets has none.
-	sources map[string][]core.EnvVar
-	// unverifiable tells why the Job cannot know a setting of the sidecar, "" when it can
+	// sources lists the env vars that set each key, in kubelet order.
+	sources      map[string][]core.EnvVar
 	unverifiable string
 }
 
-// newSidecarSettings tells how the sidecar of a host takes the settings the storage path check reads, from
-// the sidecar as the creator builds it: from the configuration file the operator generates, overridden by the env
-// vars of the sidecar. What the Job cannot follow makes the settings unverifiable: env vars from an envFrom source,
-// a command that may name another configuration file, and a value that resolves otherwise in a pod of the Job.
 func newSidecarSettings(host *api.Host, containers interfaces.IContainerManager) sidecarSettings {
-	sidecar, _ := containers.NewBackupContainer(host)
+	sidecar, _ := containers.NewBackupServerContainer(host)
 	settings := sidecarSettings{sources: map[string][]core.EnvVar{}}
 	// What the operator does not set itself comes from the clickhouse-backup container of the pod template the
 	// cluster's backup names
@@ -105,11 +96,7 @@ func (s sidecarSettings) equal(other sidecarSettings) bool {
 		apiEquality.Semantic.DeepEqual(s.sources, other.sources)
 }
 
-// sidecarSettingSources returns the env vars that set the key in the sidecar, in the order kubelet applies
-// them, or why the Job cannot follow them: the key of the configuration file Secret, which stands for the setting
-// of the configuration file, before every env var of the sidecar, which takes precedence over the file. What an entry that always sets the variable comes
-// after is overridden, and is left out. An optional source that lacks the key leaves the variable as it
-// was, in the sidecar and in the Job alike.
+// The first entry is the configuration Secret key, standing for the file. Later sidecar env vars take precedence.
 func sidecarSettingSources(configSecret string, env []core.EnvVar, key string) ([]core.EnvVar, string) {
 	entries := []core.EnvVar{k8s.NewEnvVarFromSecret(key, configSecret, key)}
 	for i := range env {
@@ -131,7 +118,7 @@ func sidecarSettingSources(configSecret string, env []core.EnvVar, key string) (
 		switch {
 		case entry.ValueFrom == nil:
 			if strings.Contains(entry.Value, envVarReferencePrefix) {
-				return nil, fmt.Sprintf("%s of the %s sidecar refers to other environment variables, which resolve otherwise in a Job",
+				return nil, fmt.Sprintf("%s of the %s sidecar refers to other environment variables, which only the pod resolves",
 					key, config.ClickHouseBackupContainerName)
 			}
 			sources = append(sources, core.EnvVar{Name: key, Value: entry.Value})
@@ -145,7 +132,7 @@ func sidecarSettingSources(configSecret string, env []core.EnvVar, key string) (
 			}
 			sources = append(sources, core.EnvVar{Name: key, ValueFrom: source})
 		default:
-			return nil, fmt.Sprintf("%s of the %s sidecar takes its value from the pod, which differs in a Job",
+			return nil, fmt.Sprintf("%s of the %s sidecar takes its value from the pod, which the operator cannot read",
 				key, config.ClickHouseBackupContainerName)
 		}
 	}

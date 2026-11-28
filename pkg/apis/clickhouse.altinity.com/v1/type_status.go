@@ -57,6 +57,8 @@ const (
 	// operator restart or auto-recovery - on a pod turning Ready, say - which this reason does not opt
 	// out of, as the Secret may well be readable by then.
 	StatusReasonBackupSecretUnresolved = "BackupSecretUnresolved"
+	// StatusReasonBackupConfigInvalid: the backup block or its storageConfig Secret is unusable; fixing the Secret is enough.
+	StatusReasonBackupConfigInvalid = "BackupConfigInvalid"
 	// StatusReasonFIPSImagePolicyViolation: security.images.policy=Required
 	// rejected this CR because a ClickHouse/Keeper container image lacks the
 	// "fips" tag substring (admission gate) or the running binary's

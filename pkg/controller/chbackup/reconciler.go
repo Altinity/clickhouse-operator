@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package chbackup contains the controllers that reconcile the ClickHouseBackup,
-// ClickHouseBackupSchedule and ClickHouseRestore custom resources into the Jobs and CronJobs that
-// drive the operator-managed clickhouse-backup sidecars, and the controller that restores a new
-// installation from the backups its spec.backup.recovery names.
+// Package chbackup contains the backup, schedule, restore and recovery controllers.
 package chbackup
 
 import (
 	"context"
 	"fmt"
 
+	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	apiMeta "k8s.io/apimachinery/pkg/api/meta"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,10 +29,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chk/kube"
 	a "github.com/altinity/clickhouse-operator/pkg/controller/common/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chbackup"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -50,7 +50,7 @@ type reconciler struct {
 	cr     interfaces.IKubeCR
 	events *a.EventEmitter
 	kind   string
-	// clock tells the time due times and starting deadlines are compared with.
+	// clock tells the time scheduled times and starting deadlines are compared with.
 	clock clock.PassiveClock
 }
 
@@ -86,10 +86,7 @@ func (r *reconciler) skip(ctx context.Context, namespace string) bool {
 	return false
 }
 
-// getConfirmed reads obj through the cache, confirming an absence against the API server: the
-// cache may not have caught up with an object created moments ago, or hold only the Jobs and
-// CronJobs its selector selects, and an absence decides whether an object is created, or an
-// operation is reported lost.
+// The cache can lag behind a new object, and a false "not found" would create a duplicate.
 func (r *reconciler) getConfirmed(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 	err := r.Get(ctx, key, obj)
 	if apiErrors.IsNotFound(err) {
@@ -160,6 +157,40 @@ func (r *reconciler) commitStatus(
 	return result, nil
 }
 
+func (r *reconciler) announcePhase(obj meta.Object, previous, phase api.OperationPhase, conditions []meta.Condition, out *announcements) {
+	if (previous == phase) || (phase == "") {
+		return
+	}
+	cause, message := "", ""
+	types := []string{api.BackupConditionStarted, api.BackupConditionValidated}
+	if phase.IsTerminal() {
+		types = []string{api.BackupConditionReady}
+	}
+	for _, conditionType := range types {
+		if condition := apiMeta.FindStatusCondition(conditions, conditionType); condition != nil {
+			cause, message = condition.Reason, condition.Message
+			break
+		}
+	}
+	from := string(previous)
+	if from == "" {
+		from = "New"
+	}
+	reason := phaseEventPrefix(r.kind) + string(phase)
+	if failedPhase(phase) {
+		out.add(r.warning(obj, a.EventActionReconcile, reason, "%s %s: %s -> %s (%s): %s", r.kind, obj.GetName(), from, phase, cause, message))
+		return
+	}
+	out.add(r.info(obj, a.EventActionReconcile, reason, "%s %s: %s -> %s (%s): %s", r.kind, obj.GetName(), from, phase, cause, message))
+}
+
+func phaseEventPrefix(kind string) string {
+	if kind == api.ClickHouseRestoreCRDResourceKind {
+		return "Restore"
+	}
+	return "Backup"
+}
+
 func setCondition(
 	conditions *[]meta.Condition,
 	generation int64,
@@ -175,4 +206,66 @@ func setCondition(
 		Message:            message,
 		ObservedGeneration: generation,
 	})
+}
+
+// settingResolver reads Secrets and ConfigMaps from the API server, because the cache does not hold them.
+func (r *reconciler) settingResolver(ctx context.Context, namespace string) model.SettingResolver {
+	type source struct {
+		kind, name string
+	}
+	read := map[source]map[string]string{}
+	data := func(kind, name string) (map[string]string, error) {
+		key := source{kind, name}
+		if values, found := read[key]; found {
+			return values, nil
+		}
+		values := map[string]string{}
+		switch kind {
+		case "Secret":
+			secret := &core.Secret{}
+			err := r.apiReader.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, secret)
+			if client.IgnoreNotFound(err) != nil {
+				return nil, err
+			}
+			for k, v := range secret.Data {
+				values[k] = string(v)
+			}
+		default:
+			configMap := &core.ConfigMap{}
+			err := r.apiReader.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, configMap)
+			if client.IgnoreNotFound(err) != nil {
+				return nil, err
+			}
+			values = configMap.Data
+		}
+		read[key] = values
+		return values, nil
+	}
+	return func(env core.EnvVar) (string, bool, error) {
+		if env.ValueFrom == nil {
+			return env.Value, true, nil
+		}
+		var (
+			values map[string]string
+			key    string
+			err    error
+		)
+		switch {
+		case env.ValueFrom.SecretKeyRef != nil:
+			ref := env.ValueFrom.SecretKeyRef
+			values, err = data("Secret", ref.Name)
+			key = ref.Key
+		case env.ValueFrom.ConfigMapKeyRef != nil:
+			ref := env.ValueFrom.ConfigMapKeyRef
+			values, err = data("ConfigMap", ref.Name)
+			key = ref.Key
+		default:
+			return "", false, nil
+		}
+		if err != nil {
+			return "", false, err
+		}
+		value, found := values[key]
+		return value, found, nil
+	}
 }

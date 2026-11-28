@@ -17,6 +17,8 @@ package chbackup
 import (
 	"fmt"
 	"time"
+
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 const (
@@ -28,52 +30,18 @@ const (
 )
 
 const (
-	// pendingRequeueInterval paces an operation waiting for its installation to become ready or
-	// for another operation on its cluster to finish. A restore also waits that long for a CronJob it
-	// holds to be suspended, so that the CronJob controller, which acts on its own cache, sees it.
 	pendingRequeueInterval = 15 * time.Second
 	// targetRequeueInterval paces an operation whose installation cannot run it as configured:
 	// only a change to the installation can unblock it.
-	targetRequeueInterval = time.Minute
-	// runningRequeueInterval is a safety net under the Job watch, which reports progress itself.
-	runningRequeueInterval = time.Minute
-	// topologyRecheckInterval is a safety net under the installation watch: a schedule refreshes
-	// the hosts of its CronJob this often, as a relisted watch can hide the completion of a
-	// reconcile that changed them.
+	targetRequeueInterval   = time.Minute
+	runningRequeueInterval  = 30 * time.Second
 	topologyRecheckInterval = 10 * time.Minute
-	// jobStartTimeout bounds how long a Job may go without a pod that started: a pod admission
-	// refuses, or whose image cannot be pulled, would otherwise hold its operation, and every other
-	// operation on its cluster, until the Job's active deadline.
-	jobStartTimeout = 10 * time.Minute
-	// jobNotStartedDeadlineSeconds is the active deadline a Job whose pod never started is stopped
-	// with, the shortest one the API accepts.
-	jobNotStartedDeadlineSeconds int64 = 1
-	// startTimeoutRecheckDelay places the recheck of a run waiting for its pod past the run's start
-	// timeout, so that the recheck finds the timeout expired rather than just short of it.
-	startTimeoutRecheckDelay = time.Second
-	// dueRecheckDelay places the recheck of a backup waiting for the time it is due, or for its starting
+	// dueRecheckDelay places the recheck of a backup waiting for its scheduled time, or for its starting
 	// deadline, just past that time, so that the recheck finds it passed.
 	dueRecheckDelay = time.Second
-	// dueRecheckCap bounds the wait for the time a backup is due between two rechecks: a timer measures
+	// dueRecheckCap bounds the wait for the scheduled time of a backup between two rechecks: a timer measures
 	// the time that passes, and the wall clock may jump meanwhile.
 	dueRecheckCap = time.Hour
-)
-
-const (
-	// terminationMessageMaxLength bounds the part of a Job's termination message a status and an
-	// event take over. kubelet keeps up to 4096 bytes, which may be the tail of the Job's log.
-	terminationMessageMaxLength = 1024
-	// terminationMessageHeadLength is how much of terminationMessageMaxLength a termination message
-	// cut short keeps from its start; the rest comes from its end.
-	terminationMessageHeadLength = 256
-	// truncationMarker marks where a termination message was cut short.
-	truncationMarker = "..."
-)
-
-// Kinds the status messages name.
-const (
-	kindJob     = "Job"
-	kindCronJob = "CronJob"
 )
 
 // messageValidated is the message of a passed Validated condition.
@@ -85,35 +53,55 @@ func staleOwnerMessage(kind, name string) string {
 	return fmt.Sprintf("%s %s belongs to a deleted owner, or is deleted itself, and awaits garbage collection", kind, name)
 }
 
-// unknownOwner names, in a message, the owner of an object that tells no controller.
-const unknownOwner = "another resource"
-
-// nameConflictMessage explains why an operation cannot run on a cluster: the object of the name it needs
-// there belongs to the named owner. The joined names of two resources and their clusters may coincide,
-// as "a-b" with cluster "c" and "a" with cluster "b-c" do, and only renaming one of them parts them.
-func nameConflictMessage(kind, name, owner string) string {
-	return fmt.Sprintf("the %s name %s is taken by %s: the two names joined with their clusters coincide; rename one of them", kind, name, owner)
-}
-
-// orphanMessage explains why an operation cannot run on a cluster: no resource controls the object of the
-// name it needs there, so no garbage collection ever removes it, and only deleting it makes way.
-func orphanMessage(kind, name string) string {
-	return fmt.Sprintf("the %s name %s is taken by a %s no resource controls, which no garbage collection removes: delete it",
-		kind, name, kind)
-}
-
 // operationInProgressMessage explains the wait for another operation on a cluster of the installation.
 func operationInProgressMessage(chiName, cluster string) string {
 	return fmt.Sprintf("another backup or restore of cluster %s of ClickHouseInstallation %s is in progress", cluster, chiName)
 }
 
-// accessRestoreInProgressMessage explains the wait of a backup for a restore of the access entities of the
-// installation, which they belong to as a whole, to finish.
-func accessRestoreInProgressMessage(chiName, restore string) string {
-	return fmt.Sprintf("ClickHouseRestore %s restores the access entities of ClickHouseInstallation %s, which no backup "+
-		"may capture half restored", restore, chiName)
+func accessRestoreInProgressMessage(chiName, cluster, restore string) string {
+	return fmt.Sprintf("backup of cluster %s of ClickHouseInstallation %s waits for ClickHouseRestore %s, which restores "+
+		"the access entities of cluster %s, which no backup may capture half restored", cluster, chiName, restore, cluster)
 }
 
 // operationLockClusterSeparator separates the installation from the cluster in the key of an
 // operation lock: no namespace, installation or cluster name holds it.
 const operationLockClusterSeparator = "/"
+
+const (
+	reasonScheduledBackupSucceeded = "ScheduledBackupSucceeded"
+	reasonScheduledBackupFailed    = "ScheduledBackupFailed"
+	reasonScheduledBackupStarted   = "ScheduledBackupStarted"
+	reasonScheduledRunSkipped      = "ScheduledRunSkipped"
+	reasonScheduleActive           = "ScheduleActive"
+	reasonScheduleSuspended        = "ScheduleSuspended"
+	reasonScheduleAborted          = "ScheduleAborted"
+	reasonDeletionRemoteBackupKept = "DeletionRemoteBackupKept"
+	reasonDeletionStoppingRuns     = "DeletionStoppingRuns"
+	reasonDeletionCleanup          = "DeletionCleanup"
+	reasonDeletionCleanedUp        = "DeletionCleanedUp"
+	reasonDeletionLeftover         = "DeletionLeftover"
+	reasonDeletionWaitingForRun    = "DeletionWaitingForRun"
+	reasonDeletionRunFinished      = "DeletionRunFinished"
+	reasonTaskIDRerun              = "TaskIDRerun"
+	reasonTaskIDReset              = "TaskIDReset"
+	reasonTaskIDIgnored            = "TaskIDIgnored"
+)
+
+func abortReason(reason string) bool {
+	switch reason {
+	case api.BackupReasonFailed, api.BackupReasonFailedUnchanged, api.BackupReasonPartiallyCompleted:
+		return false
+	}
+	return true
+}
+
+func failurePhase(reason string) api.OperationPhase {
+	if abortReason(reason) {
+		return api.OperationPhaseAborted
+	}
+	return api.OperationPhaseFailed
+}
+
+func failedPhase(phase api.OperationPhase) bool {
+	return (phase == api.OperationPhaseFailed) || (phase == api.OperationPhaseAborted)
+}

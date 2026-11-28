@@ -121,7 +121,7 @@ func (w *worker) ensureBackupSecret(ctx context.Context, cr *api.ClickHouseInsta
 }
 
 // reconcileSecretKeepValues reconciles core.Secret whose values, once generated, must never change: ClickHouse,
-// the sidecars and the backup Jobs pick them up at different times, so a new password would lock one out of
+// the sidecars and the integration tables pick them up at different times, so a new password would lock one out of
 // the other until every pod restarted. An existing Secret only gets the keys it lacks or has empty, and an
 // error reading it is returned rather than taken for its absence. Reports whether the Secret has been changed.
 func (w *worker) reconcileSecretKeepValues(ctx context.Context, cr api.ICustomResource, secret *core.Secret) (bool, error) {

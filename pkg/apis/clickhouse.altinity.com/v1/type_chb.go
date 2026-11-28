@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"slices"
+	"strings"
 	"time"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +38,7 @@ const (
 	// data is identical across replicas.
 	ReplicaSelectionFirstPerShard ReplicaSelection = "FirstPerShard"
 	// ReplicaSelectionAllReplicas backs up every replica of every shard.
+	// A shard counts as backed up when one of its replicas made the backup.
 	// Required for clusters that hold non-replicated (plain MergeTree) or local
 	// Distributed tables, which differ between replicas.
 	ReplicaSelectionAllReplicas ReplicaSelection = "AllReplicas"
@@ -50,48 +53,111 @@ const (
 	OperationPhaseRunning   OperationPhase = "Running"
 	OperationPhaseCompleted OperationPhase = "Completed"
 	OperationPhaseFailed    OperationPhase = "Failed"
+	// OperationPhaseAborted: stopped or never started for a reason other than a failure, such as an invalid spec.
+	OperationPhaseAborted OperationPhase = "Aborted"
 )
 
 // IsTerminal reports whether the operation has finished, successfully or not.
 func (p OperationPhase) IsTerminal() bool {
-	return (p == OperationPhaseCompleted) || (p == OperationPhaseFailed)
+	return (p == OperationPhaseCompleted) || (p == OperationPhaseFailed) || (p == OperationPhaseAborted)
 }
 
-// OperationClusterStatus is the observed state of a backup or a restore on one of the clusters it
-// targets. Every cluster runs in a Job of its own.
 type OperationClusterStatus struct {
 	// Name is the name of the cluster.
-	Name string `json:"name" yaml:"name"`
-	// Phase is one of Pending, Running, Completed, Failed.
+	Name  string         `json:"name" yaml:"name"`
 	Phase OperationPhase `json:"phase,omitempty" yaml:"phase,omitempty"`
-	// JobName is the Job that drives the operation on the cluster: the backup or restore Job, then,
-	// while a backup is verified, the verify Job.
-	JobName string `json:"jobName,omitempty" yaml:"jobName,omitempty"`
-	// Hosts are the hosts of the cluster the Job drives.
-	Hosts []string `json:"hosts,omitempty" yaml:"hosts,omitempty"`
-	// ConfigSecret is the Secret of the clickhouse-backup configuration of the cluster the Job keeps the backup by, or
-	// reads it by, as the Job was built: it tells the storage the backup lies in.
-	ConfigSecret string `json:"configSecret,omitempty" yaml:"configSecret,omitempty"`
-	// StartTime is when the Job of the cluster started.
-	StartTime *meta.Time `json:"startTime,omitempty" yaml:"startTime,omitempty"`
-	// CompletionTime is when the Job of the cluster finished.
+	Hosts []string       `json:"hosts,omitempty" yaml:"hosts,omitempty"`
+	// ConfigSecret is recorded at start and identifies the storage that holds the backup.
+	ConfigSecret   string     `json:"configSecret,omitempty" yaml:"configSecret,omitempty"`
+	StartTime      *meta.Time `json:"startTime,omitempty" yaml:"startTime,omitempty"`
 	CompletionTime *meta.Time `json:"completionTime,omitempty" yaml:"completionTime,omitempty"`
 	// Reason tells, in one word, why the cluster waits, or how its operation went.
 	Reason string `json:"reason,omitempty" yaml:"reason,omitempty"`
 	// Message tells the same in a sentence.
 	Message string `json:"message,omitempty" yaml:"message,omitempty"`
+	// Run lets the operator resume the run after a restart.
+	Run *BackupRunStatus `json:"run,omitempty" yaml:"run,omitempty"`
+}
+
+// BackupRunOperation is what a run does on the sidecars of a cluster.
+type BackupRunOperation string
+
+const (
+	BackupRunOperationBackup  BackupRunOperation = "backup"
+	BackupRunOperationRestore BackupRunOperation = "restore"
+	BackupRunOperationDelete  BackupRunOperation = "delete"
+)
+
+// BackupRunStep is the step of a run, such as create, upload or download.
+type BackupRunStep string
+
+type BackupRunStatus struct {
+	Operation BackupRunOperation `json:"operation" yaml:"operation"`
+	Step      BackupRunStep      `json:"step,omitempty" yaml:"step,omitempty"`
+	// Mutated is true when a command that changes state may have reached a sidecar.
+	Mutated bool            `json:"mutated,omitempty" yaml:"mutated,omitempty"`
+	Hosts   []BackupRunHost `json:"hosts,omitempty" yaml:"hosts,omitempty"`
+	// Actions keep the last command per host and step.
+	Actions []BackupRunAction `json:"actions,omitempty" yaml:"actions,omitempty"`
+	// Plan holds decisions made before anything changed, so steps after a restart follow them.
+	Plan *BackupRunPlan `json:"plan,omitempty" yaml:"plan,omitempty"`
+}
+
+// BackupRunPlan holds the decisions a run made before it changed anything.
+type BackupRunPlan struct {
+	// BackupName, Key and NamingPrefix name the backup a backup run makes.
+	BackupName   string `json:"backupName,omitempty" yaml:"backupName,omitempty"`
+	Key          string `json:"key,omitempty" yaml:"key,omitempty"`
+	NamingPrefix string `json:"namingPrefix,omitempty" yaml:"namingPrefix,omitempty"`
+	// SourceEnv points a restore at the storage path of the installation that made the backup.
+	SourceEnv string `json:"sourceEnv,omitempty" yaml:"sourceEnv,omitempty"`
+	// ActionEnv holds the --env flags every restore command gets.
+	ActionEnv string `json:"actionEnv,omitempty" yaml:"actionEnv,omitempty"`
+	// HadLocal are the hosts that held a complete local copy, so they skip the download.
+	HadLocal []string `json:"hadLocal,omitempty" yaml:"hadLocal,omitempty"`
+	// Resumed are the hosts that resume a partial local copy.
+	Resumed []string `json:"resumed,omitempty" yaml:"resumed,omitempty"`
+	// Replaced are the hosts that download again over a copy an earlier run left.
+	Replaced []string `json:"replaced,omitempty" yaml:"replaced,omitempty"`
+	// SchemaCopies are the hosts that hold a local copy of the schema alone.
+	SchemaCopies []string `json:"schemaCopies,omitempty" yaml:"schemaCopies,omitempty"`
+	// DataHosts restore the data of their shard. CopyHosts copy it to detached.
+	DataHosts []string `json:"dataHosts,omitempty" yaml:"dataHosts,omitempty"`
+	CopyHosts []string `json:"copyHosts,omitempty" yaml:"copyHosts,omitempty"`
+	// CopyToDetached is true when the replicas of a shard copy its data to detached.
+	CopyToDetached bool `json:"copyToDetached,omitempty" yaml:"copyToDetached,omitempty"`
+	// Listed is true when the copies of the backup in the storage were listed, so HoldsRBAC is known.
+	Listed bool `json:"listed,omitempty" yaml:"listed,omitempty"`
+	// HoldsRBAC is true when the backup holds access entities.
+	HoldsRBAC bool `json:"holdsRBAC,omitempty" yaml:"holdsRBAC,omitempty"`
+	// GiveUp is true when a delete run goes on past failures, as the installation is deleted.
+	GiveUp bool `json:"giveUp,omitempty" yaml:"giveUp,omitempty"`
+}
+
+type BackupRunHost struct {
+	Host   string `json:"host" yaml:"host"`
+	Backup string `json:"backup,omitempty" yaml:"backup,omitempty"`
+	// Base is the backup this one is incremental from, empty for a full backup.
+	Base string `json:"base,omitempty" yaml:"base,omitempty"`
+}
+
+type BackupRunAction struct {
+	Step    BackupRunStep `json:"step" yaml:"step"`
+	Host    string        `json:"host" yaml:"host"`
+	Command string        `json:"command" yaml:"command"`
+	// TimeFrom is the host ClickHouse time (UTC) just before the insert; the command row is the first at or after it.
+	TimeFrom string `json:"timeFrom" yaml:"timeFrom"`
+	Status   string `json:"status,omitempty" yaml:"status,omitempty"`
+	Error    string `json:"error,omitempty" yaml:"error,omitempty"`
 }
 
 // Condition types used across backup/restore custom resources.
 const (
 	// BackupConditionValidated is True once spec preflight checks have passed.
 	BackupConditionValidated = "Validated"
-	// BackupConditionJobCreated is True once the operator has created the driving Job/CronJob.
-	BackupConditionJobCreated = "JobCreated"
+	BackupConditionStarted   = "Started"
 	// BackupConditionReady is True once the operation finished successfully.
 	BackupConditionReady = "Ready"
-	// BackupConditionVerified is True once a backup has passed verification (spec.verify).
-	BackupConditionVerified = "Verified"
 	// BackupConditionLastBackupSucceeded tells whether the last finished run of a schedule succeeded.
 	BackupConditionLastBackupSucceeded = "LastBackupSucceeded"
 )
@@ -113,7 +179,7 @@ const (
 	// BackupReasonWaitingForScheduledTime: the backup waits for the time it is scheduled at.
 	BackupReasonWaitingForScheduledTime = "WaitingForScheduledTime"
 	// BackupReasonStartingDeadlineExceeded: the backup did not start within startingDeadlineSeconds of the
-	// time it was due.
+	// scheduled time.
 	BackupReasonStartingDeadlineExceeded = "StartingDeadlineExceeded"
 	// BackupReasonCHINotReady: the target installation has not completed its reconcile.
 	BackupReasonCHINotReady = "CHINotReady"
@@ -124,29 +190,23 @@ const (
 	BackupReasonClusterNotFound = "ClusterNotFound"
 	// BackupReasonBackupDisabled: backup is not enabled on the target cluster(s).
 	BackupReasonBackupDisabled = "BackupDisabled"
-	// BackupReasonNoBackupStorage: the target cluster(s) turn backup on without the settings of a
-	// storage, neither configSecretRef nor podTemplate, which leaves their backup off.
+	// BackupReasonNoBackupStorage: the target clusters enable backup without storageConfig, so the backup cannot run.
 	BackupReasonNoBackupStorage = "NoBackupStorage"
 	// BackupReasonNoTargetHosts: the target resolves to no hosts.
 	BackupReasonNoTargetHosts = "NoTargetHosts"
-	// BackupReasonOperationInProgress: another operation of the cluster runs (a backup, its verification or a restore),
-	// or, for a backup or a verification, a restore of access entities, which waits for every cluster of the
-	// installation; a restore also waits for a scheduled run of the installation whose backup it reads.
+	// BackupReasonNoClickHouseAccess: the operator config sets no clickhouse.access credentials, which backup needs.
+	BackupReasonNoClickHouseAccess = "NoClickHouseAccess"
+	// BackupReasonOperationInProgress: another backup or restore runs on the cluster, or an RBAC restore of the
+	// installation, or a scheduled run of the restore source installation.
 	BackupReasonOperationInProgress = "OperationInProgress"
-	// BackupReasonWaitingForGarbageCollection: a Job or CronJob of the expected name belongs to another
-	// owner, typically a deleted predecessor of the same name, and awaits garbage collection.
+	// BackupReasonWaitingForGarbageCollection: the ClickHouseRestore name a recovery needs is held by a deleted owner.
 	BackupReasonWaitingForGarbageCollection = "WaitingForGarbageCollection"
-	// BackupReasonNameConflict: a Job, CronJob or ClickHouseRestore of the name the operation needs on a
-	// cluster belongs to another resource, which no garbage collection removes: the joined names of two
-	// resources and their clusters coincide. The operation cannot run on that cluster until one of them
-	// is renamed.
+	// BackupReasonNameConflict: two resource names joined with their cluster names collide; one must be renamed.
 	BackupReasonNameConflict = "NameConflict"
-	// BackupReasonWaitingForSchedules: a restore waits until every schedule it holds - of the clusters it restores, or of
-	// every cluster for access entities, and of the clusters of the installation whose backup it reads - holds its runs.
+	// BackupReasonWaitingForSchedules: a restore waits until every schedule it holds has paused its runs.
 	BackupReasonWaitingForSchedules = "WaitingForSchedules"
-	// BackupReasonJobCreated: the driving Job or CronJob was created, or, on an installation, the
-	// ClickHouseRestore that recovers it.
-	BackupReasonJobCreated = "JobCreated"
+	// BackupReasonStarted: on an installation, it means the ClickHouseRestore that recovers it was created.
+	BackupReasonStarted = "Started"
 	// BackupReasonCompleted: the operation finished successfully.
 	BackupReasonCompleted = "Completed"
 	// BackupReasonPartiallyCompleted: the operation finished on every cluster it targets, successfully
@@ -158,39 +218,19 @@ const (
 	// BackupReasonCompletedWithoutData: a backup finished successfully and holds no data on any host:
 	// its tables pattern matches no table, or none of the tables it backs up holds data.
 	BackupReasonCompletedWithoutData = "CompletedWithoutData"
-	// BackupReasonJobFailed: the driving Job failed.
-	BackupReasonJobFailed = "JobFailed"
-	// BackupReasonJobFailedUnchanged: the driving Job of a restore failed before it changed
-	// anything: a check failed, or no sidecar can have received a request that changes something.
-	BackupReasonJobFailedUnchanged = "JobFailedUnchanged"
-	// BackupReasonJobLost: the driving Job disappeared before it finished.
-	BackupReasonJobLost = "JobLost"
-	// BackupReasonJobNotStarted: the driving Job's pod never started (admission, image pull, quota).
-	BackupReasonJobNotStarted = "JobNotStarted"
-	// BackupReasonDeadlineExceeded: the driving Job ran past activeDeadlineSeconds.
-	BackupReasonDeadlineExceeded = "DeadlineExceeded"
-	// BackupReasonVerifying: the verification Job is running.
-	BackupReasonVerifying = "Verifying"
-	// BackupReasonVerified: the backup passed verification.
-	BackupReasonVerified = "Verified"
-	// BackupReasonVerificationFailed: the backup failed verification.
-	BackupReasonVerificationFailed = "VerificationFailed"
-	// BackupReasonScheduled: the schedule's CronJob is active.
-	BackupReasonScheduled = "Scheduled"
-	// BackupReasonLastBackupFailed: the last finished run of the schedule failed. The CronJob stays
-	// active and runs the schedule on.
-	BackupReasonLastBackupFailed = "LastBackupFailed"
-	// BackupReasonLastBackupWithoutData: the last finished run of the schedule succeeded and made a
-	// backup that holds no data. The CronJob runs the schedule on.
+	BackupReasonFailed               = "Failed"
+	// BackupReasonFailedUnchanged: failed before any state-changing command can have reached a sidecar.
+	BackupReasonFailedUnchanged = "FailedUnchanged"
+	// BackupReasonStoragePathConflict: two replicas, shards or clusters would write one backup name to one storage path.
+	// A schedule stays aborted until its storage settings change.
+	BackupReasonStoragePathConflict   = "StoragePathConflict"
+	BackupReasonDeadlineExceeded      = "DeadlineExceeded"
+	BackupReasonScheduled             = "Scheduled"
+	BackupReasonLastBackupFailed      = "LastBackupFailed"
 	BackupReasonLastBackupWithoutData = "LastBackupWithoutData"
 	// BackupReasonSuspended: the schedule is suspended by its spec.
 	BackupReasonSuspended = "Suspended"
-	// BackupReasonSuspendedForRestore: the schedule is held on a cluster while a restore of the cluster
-	// is validated and about to start, or runs, while the cluster waits to be restored from the backup
-	// spec.backup.recovery names, and while a restore of another installation of the namespace that
-	// reads the backup of the cluster may start, or runs. A CronJob a restore held stays suspended
-	// through a reconcile of the installation once no restore holds it any longer, until the reconcile
-	// completes.
+	// BackupReasonSuspendedForRestore: a restore or recovery of the cluster, or a restore reading its backup, is pending or runs.
 	BackupReasonSuspendedForRestore = "SuspendedForRestore"
 	// BackupReasonSuspendedForFailedRestore: the schedule is held on a cluster by a restore of the
 	// cluster that failed and may have left it partly restored, until that restore is deleted.
@@ -204,26 +244,31 @@ const (
 	// retention no longer prunes the backups they made. Only the event that announces it
 	// carries this reason; the schedule's status keeps the hosts.
 	BackupReasonUnprunedHosts = "UnprunedHosts"
+	// BackupReasonRetentionHeld: after a schedule or time zone change, retention keeps what the old rules kept
+	// until it expires or spec.retention.releaseHeld. Event only.
+	BackupReasonRetentionHeld = "RetentionHeld"
+	// BackupReasonRetentionHeldExpired: every backup a held change kept has expired. Event only.
+	BackupReasonRetentionHeldExpired = "RetentionHeldExpired"
 )
 
 const (
-	// defaultBackupActiveDeadlineSeconds bounds a backup/restore Job when the spec sets no deadline.
 	defaultBackupActiveDeadlineSeconds int64 = 24 * 60 * 60
 	// backupTablesMaxLength bounds the --tables pattern. Mirrored by the CRD schema maxLength.
 	backupTablesMaxLength = 1024
+	BackupTablesMaxItems  = 64 // mirrored by the CRD schema maxItems
 	// BackupNameMaxLength bounds backup names. Mirrored by the CRD schema maxLength.
 	BackupNameMaxLength = 128
 	// BackupStartingDeadlineMaxSeconds bounds startingDeadlineSeconds, so the deadline it makes stays a time.Duration:
 	// the CRD schema maximum mirrors it, which the API server enforces before the operator reads a spec.
 	BackupStartingDeadlineMaxSeconds = math.MaxInt32
-	// BackupNameScheduleSuffix is the form of the suffix a scheduled run appends to the backup name prefix, the time
-	// the run was due, as messages tell it.
-	BackupNameScheduleSuffix = "-YYYYMMDD-HHMMSS"
+	BackupActiveDeadlineMaxSeconds   = math.MaxInt32 // mirrored by the CRD schema maximum
+	// BackupNameScheduleSuffix is the form of the suffix a scheduled run appends to the backup name prefix, the
+	// scheduled time of the run, as messages tell it.
+	BackupNameScheduleSuffix = "-YYYYMMDDHHMMSS"
 	// BackupNameScheduleSuffixLength is the length of the suffix a scheduled run appends.
 	BackupNameScheduleSuffixLength = len(BackupNameScheduleSuffix)
-	// BackupNamePrefixMaxLength leaves room for the schedule suffix, so a generated name still fits
-	// BackupNameMaxLength. Mirrored by the CRD schema maxLength.
-	BackupNamePrefixMaxLength = BackupNameMaxLength - BackupNameScheduleSuffixLength
+	// BackupNamePrefixMaxLength leaves room for the suffix and the "T" of a one-time run. Mirrored by the CRD maxLength.
+	BackupNamePrefixMaxLength = BackupNameMaxLength - BackupNameScheduleSuffixLength - 1
 	// BackupSourceInstallationMaxLength and BackupSourceNamespaceMaxLength bound the installation, and its
 	// namespace, a restore reads the backup of: an object name and a namespace name. Mirrored by the CRD schema
 	// maxLength.
@@ -244,18 +289,17 @@ var (
 	// line of clickhouse-backup actions. No "..", which clickhouse-backup strips from names, so
 	// the backup would land under a different name. Mirrored by the CRD schema patterns.
 	backupNameRegexp = regexp.MustCompile(`^[A-Za-z0-9](\.?[A-Za-z0-9_-])*\.?$`)
-	// backupTablesRegexp bounds clickhouse-backup --tables patterns: db.table, db.*, comma-separated.
-	// No leading "-": a Job passes the pattern as an argument, which must never read as a flag.
-	backupTablesRegexp = regexp.MustCompile(`^[A-Za-z0-9_.*?,][A-Za-z0-9_.*?,-]*$`)
-	// scheduledBackupNameRegexp matches the end of the names the runs of a schedule make, "-YYYYMMDD-HHMMSS", which
-	// the retention of a schedule prunes: a one-off backup of such a name would join the series of the schedule whose
-	// prefix it carries, and push out the backups the schedule made.
-	scheduledBackupNameRegexp = regexp.MustCompile(`-[0-9]{8}-[0-9]{6}$`)
+	// No "," because it joins the patterns of a list. No leading "-", so the argument never reads as a flag.
+	backupTablesRegexp = regexp.MustCompile(`^[A-Za-z0-9_.*?][A-Za-z0-9_.*?-]*$`)
+	// A one-off backup with a scheduled-run name would join that schedule's retention and push out its backups.
+	scheduledBackupNameRegexp = regexp.MustCompile(`-[0-9]{14}$`)
 	// backupPartitionRegexp bounds one clickhouse-backup --partitions id.
 	backupPartitionRegexp = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
-	// backupSourceRegexp bounds the installation and the namespace a restore reads the backup of: the values of the
-	// {installation} and {namespace} macros of the storage paths there, which a Job puts into the command line of
-	// clickhouse-backup actions. Mirrored by the CRD schema patterns.
+	backupEngineRegexp    = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,127}$`) // mirrored by the CRD schema patterns
+	// No ":" or ",", which separate the mapping pairs. Mirrored by the CRD schema patterns.
+	backupDatabaseRegexp   = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_-]{0,127}$`)
+	restoreSystemDatabases = map[string]bool{"system": true, "information_schema": true, "_temporary_and_external_tables": true}
+	// Fills the {installation} and {namespace} macros in clickhouse-backup command lines. Mirrored by the CRD schema patterns.
 	backupSourceRegexp = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
 )
 
@@ -279,22 +323,38 @@ func validateBackupSource(field, value string, maxLength int) error {
 	return nil
 }
 
-// validateTables checks an optional clickhouse-backup table pattern against the allowed character set
-// and length.
-func validateTables(tables string) error {
-	if (len(tables) > backupTablesMaxLength) || ((tables != "") && !backupTablesRegexp.MatchString(tables)) {
-		return fmt.Errorf("%w: tables %q must match %s and be at most %d characters", ErrInvalidBackupSpec,
-			tables, backupTablesRegexp, backupTablesMaxLength)
+func validateTables(field string, tables []string) error {
+	if len(tables) > BackupTablesMaxItems {
+		return fmt.Errorf("%w: %s holds more than %d patterns", ErrInvalidBackupSpec, field, BackupTablesMaxItems)
+	}
+	for _, pattern := range tables {
+		if !backupTablesRegexp.MatchString(pattern) {
+			return fmt.Errorf("%w: %s %q must match %s", ErrInvalidBackupSpec, field, pattern, backupTablesRegexp)
+		}
+	}
+	if joined := strings.Join(tables, ","); len(joined) > backupTablesMaxLength {
+		return fmt.Errorf("%w: %s must be at most %d characters joined by commas", ErrInvalidBackupSpec, field, backupTablesMaxLength)
 	}
 	return nil
 }
 
-// activeDeadlineSeconds returns the Job deadline a spec sets, defaulting to 24 hours.
+func validateEngines(field string, engines []string) error {
+	if len(engines) > BackupTablesMaxItems {
+		return fmt.Errorf("%w: %s holds more than %d engines", ErrInvalidBackupSpec, field, BackupTablesMaxItems)
+	}
+	for _, engine := range engines {
+		if !backupEngineRegexp.MatchString(engine) {
+			return fmt.Errorf("%w: %s %q must match %s", ErrInvalidBackupSpec, field, engine, backupEngineRegexp)
+		}
+	}
+	return nil
+}
+
 func activeDeadlineSeconds(deadline *int64) int64 {
 	if (deadline == nil) || (*deadline <= 0) {
 		return defaultBackupActiveDeadlineSeconds
 	}
-	return *deadline
+	return min(*deadline, BackupActiveDeadlineMaxSeconds)
 }
 
 // validateStringBool checks an optional on/off field of a spec. Its CRD schema accepts any value, as it takes a
@@ -306,10 +366,12 @@ func validateStringBool(field string, value *types.StringBool) error {
 	return nil
 }
 
-// validateActiveDeadlineSeconds checks the optional Job deadline a spec sets.
 func validateActiveDeadlineSeconds(deadline *int64) error {
 	if (deadline != nil) && (*deadline <= 0) {
 		return ErrActiveDeadlineNotPositive
+	}
+	if (deadline != nil) && (*deadline > BackupActiveDeadlineMaxSeconds) {
+		return fmt.Errorf("%w: activeDeadlineSeconds must be at most %d", ErrInvalidBackupSpec, BackupActiveDeadlineMaxSeconds)
 	}
 	return nil
 }
@@ -320,12 +382,14 @@ type BackupOptions struct {
 	SchemaOnly *types.StringBool `json:"schemaOnly,omitempty" yaml:"schemaOnly,omitempty"`
 	// ReplicaSelection controls which replicas are backed up. Defaults to FirstPerShard.
 	ReplicaSelection ReplicaSelection `json:"replicaSelection,omitempty" yaml:"replicaSelection,omitempty"`
-	// Tables optionally restricts the backup to tables matching this clickhouse-backup
-	// pattern (e.g. "db.table", "db.*"). Empty backs up everything.
-	Tables string `json:"tables,omitempty" yaml:"tables,omitempty"`
+	// Tables are clickhouse-backup patterns such as "db.*". Empty backs up all tables.
+	Tables []string `json:"tables,omitempty" yaml:"tables,omitempty"`
+	// SkipTables are clickhouse-backup patterns. System databases are always skipped.
+	SkipTables       []string `json:"skipTables,omitempty" yaml:"skipTables,omitempty"`
+	SkipTableEngines []string `json:"skipTableEngines,omitempty" yaml:"skipTableEngines,omitempty"`
 	// Partitions optionally restricts the backup to the given partition ids.
 	Partitions []string `json:"partitions,omitempty" yaml:"partitions,omitempty"`
-	// ActiveDeadlineSeconds bounds how long a backup Job may run. Defaults to 24 hours.
+	// ActiveDeadlineSeconds applies per cluster. Default 24 hours.
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" yaml:"activeDeadlineSeconds,omitempty"`
 }
 
@@ -337,7 +401,6 @@ func (o *BackupOptions) GetReplicaSelection() ReplicaSelection {
 	return o.ReplicaSelection
 }
 
-// GetActiveDeadlineSeconds returns the Job deadline, defaulting to 24 hours.
 func (o *BackupOptions) GetActiveDeadlineSeconds() int64 {
 	if o == nil {
 		return defaultBackupActiveDeadlineSeconds
@@ -348,7 +411,7 @@ func (o *BackupOptions) GetActiveDeadlineSeconds() int64 {
 // isSet reports whether any of the options is set.
 func (o *BackupOptions) isSet() bool {
 	return (o != nil) &&
-		((o.SchemaOnly != nil) || (o.ReplicaSelection != "") || (o.Tables != "") || (o.Partitions != nil) || (o.ActiveDeadlineSeconds != nil))
+		((o.SchemaOnly != nil) || (o.ReplicaSelection != "") || (o.Tables != nil) || (o.SkipTables != nil) || (o.SkipTableEngines != nil) || (o.Partitions != nil) || (o.ActiveDeadlineSeconds != nil))
 }
 
 // Validate checks the options against the allowed character sets and values.
@@ -365,7 +428,13 @@ func (o *BackupOptions) Validate() error {
 		return fmt.Errorf("%w: replicaSelection %q is not one of %s, %s", ErrInvalidBackupSpec,
 			o.ReplicaSelection, ReplicaSelectionFirstPerShard, ReplicaSelectionAllReplicas)
 	}
-	if err := validateTables(o.Tables); err != nil {
+	if err := validateTables("tables", o.Tables); err != nil {
+		return err
+	}
+	if err := validateTables("skipTables", o.SkipTables); err != nil {
+		return err
+	}
+	if err := validateEngines("skipTableEngines", o.SkipTableEngines); err != nil {
 		return err
 	}
 	for _, partition := range o.Partitions {
@@ -378,10 +447,7 @@ func (o *BackupOptions) Validate() error {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClickHouseBackup defines a one-off backup of a ClickHouseInstallation. The operator
-// reconciles it into a Kubernetes Job per cluster that drives the clickhouse-backup sidecar the
-// operator runs in every backup-enabled cluster, creating and uploading a backup. Every
-// cluster backs up under the same backup name.
+// ClickHouseBackup is a one-off backup of a ClickHouseInstallation.
 type ClickHouseBackup struct {
 	meta.TypeMeta   `json:",inline"            yaml:",inline"`
 	meta.ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
@@ -395,33 +461,29 @@ type ClickHouseBackupSpec struct {
 	// ClickHouseInstallation is the name of the target CHI in the same namespace, immutable. Exactly one of it and
 	// ScheduleRef is set.
 	ClickHouseInstallation string `json:"clickHouseInstallation,omitempty" yaml:"clickHouseInstallation,omitempty"`
-	// ScheduleRef names a ClickHouseBackupSchedule in the same namespace whose backup this one makes once,
-	// immutable: the installation, the backup options, the backup name prefix and, unless Cluster narrows them to
-	// one, the clusters are the schedule's, as they are when the backup is validated. Its backup stays out of the
-	// schedule's retention.
+	// ScheduleRef runs a ClickHouseBackupSchedule once, with its installation, clusters, options and name prefix. Immutable.
+	// Schedule retention deletes it once it is older than the oldest backup the schedule keeps.
 	ScheduleRef *BackupScheduleRef `json:"scheduleRef,omitempty" yaml:"scheduleRef,omitempty"`
-	// Cluster optionally restricts the backup to one cluster of the CHI, immutable. Empty backs up
-	// every backup-enabled cluster, each in a Job of its own. With ScheduleRef, one of the clusters the
-	// schedule backs up.
+	// Cluster is immutable. Empty backs up every backup-enabled cluster. With ScheduleRef, it must be a schedule cluster.
 	Cluster string `json:"cluster,omitempty" yaml:"cluster,omitempty"`
 	// BackupName is the optional explicit backup name. When empty the operator generates a
-	// deterministic name from the CR name and the time the backup is due. A name ending like the backups of a
-	// schedule, "-YYYYMMDD-HHMMSS", is refused, and so is any name with ScheduleRef: such a backup is always named
+	// deterministic name from the CR name and the scheduled time. A name ending like the backups of a
+	// schedule, "-YYYYMMDDHHMMSS", is refused, and so is any name with ScheduleRef: such a backup is always named
 	// with the schedule's backup name prefix, which keeps it recognizable as the schedule's.
 	BackupName string `json:"backupName,omitempty" yaml:"backupName,omitempty"`
 	// DiffFromRemote, when set to the name of a backup in the storage, makes this an
 	// incremental backup (clickhouse-backup --diff-from-remote).
 	DiffFromRemote string `json:"diffFromRemote,omitempty" yaml:"diffFromRemote,omitempty"`
-	// Verify, when true, runs a verification job after the backup that downloads the
-	// backup and checks its integrity (without touching cluster data).
-	Verify *types.StringBool `json:"verify,omitempty" yaml:"verify,omitempty"`
-	// ScheduledTime is the RFC 3339 time, with its offset, the backup is due at. Empty makes it due when it is
-	// created. It can be changed until the backup is validated, at that time or later.
+	// ScheduledTime is the RFC 3339 time, with its offset, the backup is scheduled at. Empty makes the time it is
+	// created the scheduled time. It can be changed until the backup is validated, at that time or later.
 	ScheduledTime string `json:"scheduledTime,omitempty" yaml:"scheduledTime,omitempty"`
-	// StartingDeadlineSeconds bounds how late the backup may start on a cluster, counted from the time it is due:
-	// a cluster whose Job is not created by then fails, as does the backup when it is not validated by then.
-	// Unset waits as long as it takes.
+	// StartingDeadlineSeconds counts from the scheduled time. A cluster not started by then fails. Unset means no limit.
 	StartingDeadlineSeconds *int64 `json:"startingDeadlineSeconds,omitempty" yaml:"startingDeadlineSeconds,omitempty"`
+	// ConfigOverrides are KEY=VALUE clickhouse-backup env vars for this backup, such as S3_STORAGE_CLASS=STANDARD_IA.
+	ConfigOverrides []string        `json:"configOverrides,omitempty" yaml:"configOverrides,omitempty"`
+	Timeouts        *BackupTimeouts `json:"timeouts,omitempty" yaml:"timeouts,omitempty"`
+	// A new TaskID reruns a finished backup: a completed one under a new name, a failed one on its failed clusters.
+	TaskID *types.Id `json:"taskID,omitempty" yaml:"taskID,omitempty"`
 
 	BackupOptions `json:",inline" yaml:",inline"`
 }
@@ -440,9 +502,10 @@ func (spec *ClickHouseBackupSpec) GetScheduleName() string {
 	return spec.ScheduleRef.Name
 }
 
-// DueTime returns the time the backup is due: the scheduled time, or the creation time without one. A scheduled
-// time that does not parse, which validation refuses, counts as none.
 func (chb *ClickHouseBackup) DueTime() time.Time {
+	if chb.Status.RerunTime != nil {
+		return chb.Status.RerunTime.Time
+	}
 	if due, err := time.Parse(time.RFC3339, chb.Spec.ScheduledTime); err == nil {
 		return due
 	}
@@ -501,10 +564,16 @@ func (spec *ClickHouseBackupSpec) Validate() error {
 		return fmt.Errorf("%w: scheduleRef.name %q is not the name of a resource", ErrInvalidBackupSpec, spec.ScheduleRef.Name)
 	case spec.BackupOptions.isSet():
 		return fmt.Errorf("%w: a backup that runs a schedule takes its options from the schedule: schemaOnly, "+
-			"replicaSelection, tables, partitions and activeDeadlineSeconds are not set with scheduleRef", ErrInvalidBackupSpec)
+			"replicaSelection, tables, skipTables, skipTableEngines, partitions and activeDeadlineSeconds are not set with scheduleRef", ErrInvalidBackupSpec)
 	case spec.BackupName != "":
 		return fmt.Errorf("%w: a backup that runs a schedule is named with the schedule's backupNamePrefix: "+
 			"backupName is not set with scheduleRef", ErrInvalidBackupSpec)
+	case len(spec.ConfigOverrides) > 0:
+		return fmt.Errorf("%w: a backup that runs a schedule takes no configOverrides: they are not set with scheduleRef",
+			ErrInvalidBackupSpec)
+	}
+	if err := ValidateConfigOverrides("configOverrides", spec.ConfigOverrides); err != nil {
+		return err
 	}
 	if err := validateBackupName("backupName", spec.BackupName, BackupNameMaxLength); err != nil {
 		return err
@@ -516,9 +585,6 @@ func (spec *ClickHouseBackupSpec) Validate() error {
 	if err := validateBackupName("diffFromRemote", spec.DiffFromRemote, BackupNameMaxLength); err != nil {
 		return err
 	}
-	if err := validateStringBool("verify", spec.Verify); err != nil {
-		return err
-	}
 	if spec.ScheduledTime != "" {
 		if _, err := time.Parse(time.RFC3339, spec.ScheduledTime); err != nil {
 			return fmt.Errorf("%w: scheduledTime %q is not an RFC 3339 time with its offset", ErrInvalidBackupSpec, spec.ScheduledTime)
@@ -527,12 +593,14 @@ func (spec *ClickHouseBackupSpec) Validate() error {
 	if (spec.StartingDeadlineSeconds != nil) && ((*spec.StartingDeadlineSeconds < 0) || (*spec.StartingDeadlineSeconds > BackupStartingDeadlineMaxSeconds)) {
 		return fmt.Errorf("%w: startingDeadlineSeconds must be between 0 and %d", ErrInvalidBackupSpec, BackupStartingDeadlineMaxSeconds)
 	}
+	if err := spec.Timeouts.Validate(); err != nil {
+		return err
+	}
 	return spec.BackupOptions.Validate()
 }
 
 // ClickHouseBackupStatus defines the observed state of a ClickHouseBackup.
 type ClickHouseBackupStatus struct {
-	// Phase is one of Pending, Running, Completed, Failed.
 	Phase OperationPhase `json:"phase,omitempty" yaml:"phase,omitempty"`
 	// BackupName is the resolved backup name.
 	BackupName string `json:"backupName,omitempty" yaml:"backupName,omitempty"`
@@ -542,15 +610,111 @@ type ClickHouseBackupStatus struct {
 	// Clusters are the clusters the backup targets, resolved once it is validated, and its state on each.
 	// +listType=map
 	// +listMapKey=name
-	Clusters []OperationClusterStatus `json:"clusters,omitempty" yaml:"clusters,omitempty"`
-	// StartTime is when the first backup Job started.
-	StartTime *meta.Time `json:"startTime,omitempty" yaml:"startTime,omitempty"`
+	Clusters  []OperationClusterStatus `json:"clusters,omitempty" yaml:"clusters,omitempty"`
+	StartTime *meta.Time               `json:"startTime,omitempty" yaml:"startTime,omitempty"`
 	// CompletionTime is when the backup finished on every cluster.
 	CompletionTime *meta.Time `json:"completionTime,omitempty" yaml:"completionTime,omitempty"`
 	// DurationSeconds is the backup duration in seconds (completion - start).
 	DurationSeconds int64 `json:"durationSeconds,omitempty" yaml:"durationSeconds,omitempty"`
 	// Conditions represent the latest available observations of the backup state.
 	Conditions []meta.Condition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	// RerunTime is the scheduled time set by the last spec.taskID rerun.
+	RerunTime *meta.Time `json:"rerunTime,omitempty" yaml:"rerunTime,omitempty"`
+	// PreviousBackupNames stay in the storage until retention or a manual delete removes them.
+	PreviousBackupNames []string            `json:"previousBackupNames,omitempty" yaml:"previousBackupNames,omitempty"`
+	PreviousRuns        []BackupPreviousRun `json:"previousRuns,omitempty" yaml:"previousRuns,omitempty"`
+	// Backups is the backup in the storage of each cluster, as the run listed it when it completed.
+	Backups []StoredBackup `json:"backups,omitempty" yaml:"backups,omitempty"`
+	// BackupsListTime is when a run last listed Backups.
+	BackupsListTime *meta.Time `json:"backupsListTime,omitempty" yaml:"backupsListTime,omitempty"`
+
+	BackupTaskStatus `json:",inline" yaml:",inline"`
+}
+
+// StoredBackupState tells whether every shard holds a backup.
+type StoredBackupState string
+
+const (
+	// StoredBackupComplete: every shard holds the backup, and no host reports it broken.
+	StoredBackupComplete StoredBackupState = "Complete"
+	// StoredBackupIncomplete: a shard does not hold the backup. A run may still write it.
+	StoredBackupIncomplete StoredBackupState = "Incomplete"
+	// StoredBackupBroken: a host reports the backup broken.
+	StoredBackupBroken StoredBackupState = "Broken"
+)
+
+// StoredBackupsMax is the maximum length of status.backups. The newest backups are kept.
+const StoredBackupsMax = 1024
+
+// StoredBackup is a backup in the remote storage of a cluster, as a run listed it in system.backup_list.
+type StoredBackup struct {
+	// Cluster is the cluster whose storage holds the backup.
+	Cluster string `json:"cluster" yaml:"cluster"`
+	// Name is the backup name. With a naming template, the name of the backup of the first shard.
+	Name string `json:"name" yaml:"name"`
+	// Created is the earliest creation time that a shard lists.
+	Created *meta.Time `json:"created,omitempty" yaml:"created,omitempty"`
+	// Size is the sum of the sizes that the hosts list, in bytes.
+	Size  int64             `json:"size,omitempty" yaml:"size,omitempty"`
+	State StoredBackupState `json:"state,omitempty" yaml:"state,omitempty"`
+	// Base is the backup that an incremental backup needs. Empty for a full backup.
+	Base string `json:"base,omitempty" yaml:"base,omitempty"`
+}
+
+// ReplaceStoredBackups replaces the backups of the cluster in the list with the backups given. The result is newest
+// first, at most StoredBackupsMax long.
+func ReplaceStoredBackups(list []StoredBackup, cluster string, backups []StoredBackup) []StoredBackup {
+	var result []StoredBackup
+	for _, backup := range list {
+		if backup.Cluster != cluster {
+			result = append(result, backup)
+		}
+	}
+	for _, backup := range backups {
+		backup.Cluster = cluster
+		result = append(result, backup)
+	}
+	SortStoredBackups(result)
+	if len(result) > StoredBackupsMax {
+		result = result[:StoredBackupsMax]
+	}
+	return result
+}
+
+// KeepStoredBackupsOf drops the backups of the clusters that are not given.
+func KeepStoredBackupsOf(list []StoredBackup, clusters []string) []StoredBackup {
+	var result []StoredBackup
+	for _, backup := range list {
+		if slices.Contains(clusters, backup.Cluster) {
+			result = append(result, backup)
+		}
+	}
+	return result
+}
+
+// SortStoredBackups sorts the list newest first, then by cluster and name.
+func SortStoredBackups(list []StoredBackup) {
+	created := func(backup StoredBackup) time.Time {
+		if backup.Created == nil {
+			return time.Time{}
+		}
+		return backup.Created.Time
+	}
+	slices.SortStableFunc(list, func(x, y StoredBackup) int {
+		if c := created(y).Compare(created(x)); c != 0 {
+			return c
+		}
+		if c := strings.Compare(x.Cluster, y.Cluster); c != 0 {
+			return c
+		}
+		return strings.Compare(y.Name, x.Name)
+	})
+}
+
+func (status *ClickHouseBackupStatus) PushPreviousBackupName(name string) {
+	if name != "" {
+		status.PreviousBackupNames = pushBounded(status.PreviousBackupNames, name)
+	}
 }
 
 // BackupScheduleRecord is what a backup that runs a schedule takes from it: the backup is made with these, whatever
@@ -566,6 +730,14 @@ type BackupScheduleRecord struct {
 	Cluster string `json:"cluster,omitempty" yaml:"cluster,omitempty"`
 	// BackupNamePrefix is the backup name prefix of the schedule, which names the backup.
 	BackupNamePrefix string `json:"backupNamePrefix,omitempty" yaml:"backupNamePrefix,omitempty"`
+	// Schedules decide whether the backup is incremental and which backups retention keeps.
+	Schedules         []BackupScheduleEntry  `json:"schedules,omitempty" yaml:"schedules,omitempty"`
+	Time              string                 `json:"time,omitempty" yaml:"time,omitempty"`
+	TimeZone          string                 `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
+	KeepBackups       []BackupRetentionPin   `json:"keepBackups,omitempty" yaml:"keepBackups,omitempty"`
+	PreviousSchedules []RetiredScheduleRules `json:"previousSchedules,omitempty" yaml:"previousSchedules,omitempty"`
+	// The backup timeouts override these field by field.
+	Timeouts *BackupTimeouts `json:"timeouts,omitempty" yaml:"timeouts,omitempty"`
 
 	BackupOptions `json:",inline" yaml:",inline"`
 }
@@ -592,6 +764,13 @@ func (record *BackupScheduleRecord) GetBackupNamePrefix() string {
 		return ""
 	}
 	return record.BackupNamePrefix
+}
+
+func (record *BackupScheduleRecord) GetTimeouts() *BackupTimeouts {
+	if record == nil {
+		return nil
+	}
+	return record.Timeouts
 }
 
 // GetBackupOptions returns the options the record holds, nil-safe.

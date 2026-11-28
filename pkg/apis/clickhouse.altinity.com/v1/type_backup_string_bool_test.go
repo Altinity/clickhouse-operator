@@ -35,20 +35,16 @@ var backupStringBoolFields = []struct {
 	// reads the field and what Validate makes of the spec
 	decode func(t *testing.T, value string) (bool, error)
 }{
-	{"verify", false, func(t *testing.T, value string) (bool, error) {
-		spec := decodeBackupSpec[ClickHouseBackupSpec](t, `{"clickHouseInstallation":"chi","verify":`+value+`}`)
-		return spec.Verify.IsTrue(), spec.Validate()
-	}},
 	{"schemaOnly", false, func(t *testing.T, value string) (bool, error) {
 		spec := decodeBackupSpec[ClickHouseBackupSpec](t, `{"clickHouseInstallation":"chi","schemaOnly":`+value+`}`)
 		return spec.SchemaOnly.IsTrue(), spec.Validate()
 	}},
 	{"suspend", false, func(t *testing.T, value string) (bool, error) {
-		spec := decodeBackupSpec[ClickHouseBackupScheduleSpec](t, `{"clickHouseInstallation":"chi","schedule":"0 2 * * *","suspend":`+value+`}`)
+		spec := decodeBackupSpec[ClickHouseBackupScheduleSpec](t, `{"clickHouseInstallation":"chi","schedules":[{"period":"daily","keep":1}],"time":"02:00","suspend":`+value+`}`)
 		return spec.IsSuspended(), spec.Validate()
 	}},
 	{"schemaOnly", false, func(t *testing.T, value string) (bool, error) {
-		spec := decodeBackupSpec[ClickHouseBackupScheduleSpec](t, `{"clickHouseInstallation":"chi","schedule":"0 2 * * *","schemaOnly":`+value+`}`)
+		spec := decodeBackupSpec[ClickHouseBackupScheduleSpec](t, `{"clickHouseInstallation":"chi","schedules":[{"period":"daily","keep":1}],"time":"02:00","schemaOnly":`+value+`}`)
 		return spec.SchemaOnly.IsTrue(), spec.Validate()
 	}},
 	{"schemaOnly", false, func(t *testing.T, value string) (bool, error) {
@@ -62,6 +58,14 @@ var backupStringBoolFields = []struct {
 	{"validateTopology", true, func(t *testing.T, value string) (bool, error) {
 		spec := decodeBackupSpec[ClickHouseRestoreSpec](t, `{"clickHouseInstallation":"chi","backupName":"b","validateTopology":`+value+`}`)
 		return spec.IsTopologyValidationEnabled(), spec.Validate()
+	}},
+	{"replicatedCopyToDetached", true, func(t *testing.T, value string) (bool, error) {
+		spec := decodeBackupSpec[ClickHouseRestoreSpec](t, `{"clickHouseInstallation":"chi","backupName":"b","replicatedCopyToDetached":`+value+`}`)
+		return spec.IsReplicatedCopyToDetached(), spec.Validate()
+	}},
+	{"resumeDownload", true, func(t *testing.T, value string) (bool, error) {
+		spec := decodeBackupSpec[ClickHouseRestoreSpec](t, `{"clickHouseInstallation":"chi","backupName":"b","resumeDownload":`+value+`}`)
+		return spec.IsResumeDownload(), spec.Validate()
 	}},
 	{"rbac", false, func(t *testing.T, value string) (bool, error) {
 		spec := decodeBackupSpec[ClickHouseRestoreSpec](t, `{"clickHouseInstallation":"chi","backupName":"b","rbac":`+value+`}`)
@@ -112,12 +116,12 @@ func TestBackupSpecStringBools(t *testing.T) {
 func TestBackupListDecodesPastAMalformedOnOffField(t *testing.T) {
 	list := &ClickHouseBackupList{}
 	require.NoError(t, json.Unmarshal([]byte(`{"items": [
-		{"metadata": {"name": "good"}, "spec": {"clickHouseInstallation": "chi", "verify": true}},
-		{"metadata": {"name": "bad"}, "spec": {"clickHouseInstallation": "chi", "verify": {"nested": 1}}}
+		{"metadata": {"name": "good"}, "spec": {"clickHouseInstallation": "chi", "schemaOnly": true}},
+		{"metadata": {"name": "bad"}, "spec": {"clickHouseInstallation": "chi", "schemaOnly": {"nested": 1}}}
 	]}`), list))
 	require.Len(t, list.Items, 2)
 	require.NoError(t, list.Items[0].Spec.Validate())
-	require.True(t, list.Items[0].Spec.Verify.IsTrue())
+	require.True(t, list.Items[0].Spec.SchemaOnly.IsTrue())
 	require.ErrorIs(t, list.Items[1].Spec.Validate(), ErrInvalidBackupSpec)
 }
 
