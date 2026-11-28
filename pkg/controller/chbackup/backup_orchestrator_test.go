@@ -31,6 +31,7 @@ import (
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chbackup"
@@ -351,7 +352,7 @@ func runOf(t *testing.T, sc *fakeSidecars, spec *model.RunSpec, status *api.Back
 		event: func(eventType, reason, message string) {
 			events = append(events, postedEvent{eventType, reason, message})
 		},
-		logPrefix: t.Name(),
+		log:       log.V(1).M(t.Name()),
 		clock:     clock.RealClock{},
 		poll:      time.Millisecond,
 		startedAt: time.Date(2026, time.November, 12, 0, 0, 0, 0, time.UTC),
@@ -527,7 +528,7 @@ func retentionOn(t *testing.T, sc *fakeSidecars, made string, pins []api.BackupR
 		event: func(eventType, reason, message string) {
 			events = append(events, postedEvent{eventType, reason, message})
 		},
-		logPrefix: t.Name(), clock: clock.RealClock{}, poll: time.Millisecond, backupNames: map[string]string{}}
+		log: log.V(1).M(t.Name()), clock: clock.RealClock{}, poll: time.Millisecond, backupNames: map[string]string{}}
 	o.retention(context.Background())
 	return events
 }

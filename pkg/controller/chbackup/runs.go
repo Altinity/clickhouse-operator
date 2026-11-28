@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chbackup"
 )
@@ -259,7 +260,7 @@ func (r *runRegistry) start(
 			default:
 			}
 		},
-		logPrefix: key.String(),
+		log:       log.V(1).M(key.String()),
 		clock:     r.clock,
 		poll:      r.poll,
 		startedAt: startedAt,

@@ -51,12 +51,12 @@ func (o *orchestrator) deleteUnfinished(ctx context.Context) error {
 		o.eventf(core.EventTypeWarning, "OrchestratorDeletionLeft", "%s: what the unfinished backup %s left there is left: %v; %s",
 			host.Host, host.Backup, err, deleteBackupByHand(host.Backup))
 		if unreachable && !o.bestEffort {
-			o.logf("%s does not answer: every host left is tried once", host.Host)
+			o.log.Info("%s does not answer: every host left is tried once", host.Host)
 			o.bestEffort = true
 		}
 	}
 	if len(left) > 0 {
-		return failf("left on %s", strings.Join(left, "; "))
+		return fmt.Errorf("left on %s", strings.Join(left, "; "))
 	}
 	return nil
 }
@@ -115,7 +115,7 @@ func (o *orchestrator) kill(ctx context.Context, host, command string) error {
 		return fmt.Errorf("cannot read the time of ClickHouse: %s", describeQueryError(err))
 	}
 	o.record(api.BackupRunAction{Step: stepKill, Host: host, Command: kill, TimeFrom: timeFrom})
-	o.logf("%s: %s", host, kill)
+	o.log.Info("%s: %s", host, kill)
 	o.eventf(core.EventTypeNormal, "OrchestratorCommand", "%s: %s", host, kill)
 	pushErr := o.sc.Push(ctx, host, kill, o.httpReceiveTimeout())
 	polls := max(o.errorResponsesMax(), 1)

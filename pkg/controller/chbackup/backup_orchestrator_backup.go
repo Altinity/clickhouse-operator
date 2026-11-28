@@ -97,15 +97,15 @@ func (o *orchestrator) backup(ctx context.Context) error {
 			if len(failed) == 0 {
 				failed = unmade
 			}
-			return failf("backup %s failed on %s: %s", name, strings.Join(failed, ", "), strings.Join(failures, "; "))
+			return fmt.Errorf("backup %s failed on %s: %s", name, strings.Join(failed, ", "), strings.Join(failures, "; "))
 		}
 		if len(unmade) > 0 {
-			o.warnf("backup %s failed on %s, whose shards other replicas backed up: %s", name, strings.Join(unmade, ", "),
+			o.log.Warning("backup %s failed on %s, whose shards other replicas backed up: %s", name, strings.Join(unmade, ", "),
 				strings.Join(failures, "; "))
 			o.eventf(core.EventTypeWarning, "OrchestratorReplicaFailed", "backup %s failed on %s, whose shards other replicas backed up",
 				name, strings.Join(unmade, ", "))
 		}
-		o.logf("backup %s completed on %d shard(s)", name, len(hostNames)-len(unmade))
+		o.log.Info("backup %s completed on %d shard(s)", name, len(hostNames)-len(unmade))
 		o.setStep(stepReport)
 	}
 	var made []string
@@ -161,7 +161,7 @@ func (o *orchestrator) planBackup(ctx context.Context) (*backupPlan, error) {
 	case spec.BackupName != "":
 		key, prefix, err := naming.Key("backup name", spec.BackupName, spec.Prefix)
 		if err != nil {
-			return nil, failf("%v", err)
+			return nil, err
 		}
 		plan.key, plan.namingPrefix = key, prefix
 	case naming.IsTemplate():
@@ -172,7 +172,7 @@ func (o *orchestrator) planBackup(ctx context.Context) (*backupPlan, error) {
 	for _, host := range hosts {
 		name, err := naming.HostName(host, plan.key, plan.namingPrefix)
 		if err != nil {
-			return nil, failf("%v", err)
+			return nil, err
 		}
 		o.backupNames[host] = name
 	}
@@ -180,25 +180,25 @@ func (o *orchestrator) planBackup(ctx context.Context) (*backupPlan, error) {
 	if naming.IsTemplate() {
 		name, err := naming.FirstName(plan.key, plan.namingPrefix)
 		if err != nil {
-			return nil, failf("%v", err)
+			return nil, err
 		}
 		plan.name = name
 		var named []string
 		for _, host := range hosts {
 			named = append(named, host+"="+o.backupNames[host])
 		}
-		o.logf("backup %s: named by the naming template '%s', %s", plan.name, naming.Template, strings.Join(named, " "))
+		o.log.Info("backup %s: named by the naming template '%s', %s", plan.name, naming.Template, strings.Join(named, " "))
 	}
 
 	bases := map[string]string{}
 	if spec.DiffFromRemote != "" {
 		key, prefix, err := naming.Key("diffFromRemote", spec.DiffFromRemote, spec.Prefix)
 		if err != nil {
-			return nil, failf("%v", err)
+			return nil, err
 		}
 		for _, host := range hosts {
 			if bases[host], err = naming.HostName(host, key, prefix); err != nil {
-				return nil, failf("%v", err)
+				return nil, err
 			}
 		}
 	}
@@ -207,21 +207,21 @@ func (o *orchestrator) planBackup(ctx context.Context) (*backupPlan, error) {
 	switch {
 	case (len(spec.Entries) > 0) && spec.RunsSchedule:
 		if winner := model.IncrementalEntry(spec.Entries); winner < 0 {
-			o.logf("backup %s: runs the schedule now, which has no incremental entry: the backup is full", plan.name)
+			o.log.Info("backup %s: runs the schedule now, which has no incremental entry: the backup is full", plan.name)
 		} else if spec.DiffFromRemote == "" {
-			o.logf("backup %s: runs the schedule now, incremental as its %s entry", plan.name, spec.Entries[winner].Period)
+			o.log.Info("backup %s: runs the schedule now, incremental as its %s entry", plan.name, spec.Entries[winner].Period)
 			incremental, keep = true, spec.Entries[winner].Keep
 		}
 	case len(spec.Entries) > 0:
 		winner, matched := model.WinnerEntry(spec.Entries, slotTag, naming.Tolerance())
 		if winner < 0 {
-			o.logf("backup %s: the scheduled time %s belongs to no schedule entry, the backup is full", plan.name, slotTag)
+			o.log.Info("backup %s: the scheduled time %s belongs to no schedule entry, the backup is full", plan.name, slotTag)
 		} else {
 			lighter := ""
 			if len(matched) > 1 {
 				lighter = " and lighter ones"
 			}
-			o.logf("backup %s: the scheduled time %s belongs to the %s entry%s", plan.name, slotTag, spec.Entries[winner].Period, lighter)
+			o.log.Info("backup %s: the scheduled time %s belongs to the %s entry%s", plan.name, slotTag, spec.Entries[winner].Period, lighter)
 			if spec.Entries[winner].Incremental && (spec.DiffFromRemote == "") {
 				incremental, keep = true, spec.Entries[winner].Keep
 			}
@@ -230,7 +230,7 @@ func (o *orchestrator) planBackup(ctx context.Context) (*backupPlan, error) {
 	}
 	flags := configOverrides(overrides)
 	if flags != "" {
-		o.logf("backup %s: made with the config overrides%s", plan.name, flags)
+		o.log.Info("backup %s: made with the config overrides%s", plan.name, flags)
 		o.eventf(core.EventTypeNormal, "OrchestratorConfigOverrides", "backup %s is made with the config overrides%s", plan.name, flags)
 	}
 	if err := o.checkPaths(); err != nil {
@@ -241,37 +241,37 @@ func (o *orchestrator) planBackup(ctx context.Context) (*backupPlan, error) {
 	}
 
 	o.eventf(core.EventTypeNormal, "OrchestratorBackupStarted", "backup %s on %d host(s)", plan.name, len(hosts))
-	o.logf("backup %s: preflight on %d host(s)", plan.name, len(hosts))
+	o.log.Info("backup %s: preflight on %d host(s)", plan.name, len(hosts))
 	required := map[string]map[string]string{}
 	left := &leftCopies{remote: map[string]bool{}, local: map[string]bool{}}
 	for _, host := range hosts {
 		rows, err := o.list(ctx, host, "remote")
 		if err != nil {
-			return nil, failf("preflight failed on %s: %v", host, err)
+			return nil, fmt.Errorf("preflight failed on %s: %v", host, err)
 		}
 		earlier := o.leftByEarlierRun(host, o.backupNames[host])
 		if findBackup(rows, o.backupNames[host]) != nil {
 			if !earlier {
-				return nil, failf("backup %s already exists in the storage of %s", o.backupNames[host], host)
+				return nil, fmt.Errorf("backup %s already exists in the storage of %s", o.backupNames[host], host)
 			}
 			left.remote[host] = true
 		}
 		if naming.IsTemplate() {
 			for _, row := range rows {
 				if parsed, ok := naming.Parse(row.Name, plan.namingPrefix); ok && (parsed.Tag == plan.key) && !(earlier && (row.Name == o.backupNames[host])) {
-					return nil, failf("backup %s, of the same time as %s, already exists in the storage of %s", row.Name, plan.name, host)
+					return nil, fmt.Errorf("backup %s, of the same time as %s, already exists in the storage of %s", row.Name, plan.name, host)
 				}
 			}
 		}
 		if earlier {
 			present, err := o.listed(ctx, host, "local", o.backupNames[host])
 			if err != nil {
-				return nil, failf("preflight failed on %s: %v", host, err)
+				return nil, fmt.Errorf("preflight failed on %s: %v", host, err)
 			}
 			left.local[host] = present
 		}
 		if (spec.DiffFromRemote != "") && (findBackup(rows, bases[host]) == nil) {
-			return nil, failf("base backup %s is missing in the storage of %s", bases[host], host)
+			return nil, fmt.Errorf("base backup %s is missing in the storage of %s", bases[host], host)
 		}
 		if incremental {
 			required[host] = map[string]string{}
@@ -291,14 +291,14 @@ func (o *orchestrator) planBackup(ctx context.Context) (*backupPlan, error) {
 			for _, host := range hosts {
 				name, err := naming.HostName(host, base, plan.namingPrefix)
 				if err != nil {
-					return nil, failf("%v", err)
+					return nil, err
 				}
 				bases[host] = name
 			}
-			o.logf("backup %s: incremental from %s, which ends a chain of %d incremental backups", plan.name, bases[hosts[0]], chain)
+			o.log.Info("backup %s: incremental from %s, which ends a chain of %d incremental backups", plan.name, bases[hosts[0]], chain)
 			o.eventf(core.EventTypeNormal, "OrchestratorIncrementalBase", "%s is incremental from %s", plan.name, bases[hosts[0]])
 		} else {
-			o.logf("backup %s: full, as the chain of incremental backups is %d long, of %d at most, or there is no base every "+
+			o.log.Info("backup %s: full, as the chain of incremental backups is %d long, of %d at most, or there is no base every "+
 				"host holds", plan.name, chain, keep)
 			o.eventf(core.EventTypeNormal, "OrchestratorIncrementalFull", "%s is a full backup", plan.name)
 		}
@@ -347,7 +347,7 @@ func (o *orchestrator) replaceLeft(ctx context.Context, hosts []string, left *le
 		name := o.backupNames[host]
 		if left.local[host] {
 			if err := o.deleteBackup(ctx, stepReplaceLocal, host, "local", name); err != nil {
-				return failf("%s: cannot delete the local copy of %s an earlier run of the backup left: %v", host, name, err)
+				return fmt.Errorf("%s: cannot delete the local copy of %s an earlier run of the backup left: %v", host, name, err)
 			}
 			o.eventf(core.EventTypeNormal, "OrchestratorRerunReplaced", "%s: the local copy of %s an earlier run of the backup left deleted", host, name)
 		}
@@ -356,7 +356,7 @@ func (o *orchestrator) replaceLeft(ctx context.Context, hosts []string, left *le
 			continue
 		}
 		if err := o.deleteBackup(ctx, stepReplaceRemote, host, "remote", name); err != nil {
-			return failf("%s: cannot delete the remote copy of %s an earlier run of the backup left: %v", host, name, err)
+			return fmt.Errorf("%s: cannot delete the remote copy of %s an earlier run of the backup left: %v", host, name, err)
 		}
 		deletedRemote[shard] = true
 		o.eventf(core.EventTypeNormal, "OrchestratorRerunReplaced", "%s: the remote copy of %s an earlier run of the backup left deleted", host, name)
@@ -380,7 +380,7 @@ func (o *orchestrator) dropFailedBackup(ctx context.Context, hosts []string) {
 				"left: %v; delete it by hand with %s", host, name, err, deleteByHand(name))
 			continue
 		case !present:
-			o.logf("%s: no local copy of the failed backup %s to delete", host, name)
+			o.log.Info("%s: no local copy of the failed backup %s to delete", host, name)
 			continue
 		}
 		if err := o.cleanup(ctx, stepDropFailed, host, name); err != nil {
@@ -390,7 +390,7 @@ func (o *orchestrator) dropFailedBackup(ctx context.Context, hosts []string) {
 		}
 		o.eventf(core.EventTypeNormal, "OrchestratorFailedBackupDeleted", "%s: the local copy of the failed backup %s deleted", host, name)
 	}
-	o.logf("what the failed backup left in the remote storage of %s is left to retention, which deletes an incomplete backup "+
+	o.log.Info("what the failed backup left in the remote storage of %s is left to retention, which deletes an incomplete backup "+
 		"once a complete one is newer", strings.Join(names, " "))
 	o.eventf(core.EventTypeNormal, "OrchestratorFailedBackupRemoteLeft", "what the failed backup left in the remote storage of %s, "+
 		"listed as broken, is left to the retention of its schedule, which deletes an incomplete backup once a complete one is "+
@@ -528,7 +528,7 @@ func (o *orchestrator) reportData(ctx context.Context, hosts []string, name stri
 		return key, backup == o.backupNames[host]
 	}, nil)
 	if len(unlisted) > 0 {
-		o.logf("whether %s holds data is unknown: %s cannot be listed", name, strings.Join(unlisted, " "))
+		o.log.Info("whether %s holds data is unknown: %s cannot be listed", name, strings.Join(unlisted, " "))
 		return
 	}
 	var keys []string
@@ -539,7 +539,7 @@ func (o *orchestrator) reportData(ctx context.Context, hosts []string, name stri
 	if !sets.Complete[key] || sets.WithData[key] {
 		return
 	}
-	o.warnf("%s holds no data", name)
+	o.log.Warning("%s holds no data", name)
 	o.eventf(core.EventTypeWarning, "OrchestratorNoData", "%s holds no data", name)
 	o.outcome.noData = noDataCause(o.spec)
 }
@@ -574,7 +574,7 @@ func (o *orchestrator) writing(ctx context.Context, sets model.BackupSets, made 
 			return err
 		})
 		if err != nil {
-			o.warnf("%s: retention leaves every incomplete backup, as system.backup_actions cannot tell whether a create_remote "+
+			o.log.Warning("%s: retention leaves every incomplete backup, as system.backup_actions cannot tell whether a create_remote "+
 				"or an upload still writes one: %v", host, err)
 			for _, key := range incomplete {
 				writing[key] = true
@@ -587,7 +587,7 @@ func (o *orchestrator) writing(ctx context.Context, sets model.BackupSets, made 
 				continue
 			}
 			if i := slices.IndexFunc(rows, func(row actionRow) bool { return row.running() && writes(row.Command, name) }); i >= 0 {
-				o.logf("%s: %s is incomplete, and a command in progress writes it: %s", host, name, rows[i].Command)
+				o.log.Info("%s: %s is incomplete, and a command in progress writes it: %s", host, name, rows[i].Command)
 				writing[key] = true
 			}
 		}
@@ -606,16 +606,16 @@ func (o *orchestrator) retention(ctx context.Context) {
 	case len(spec.Entries) == 0:
 		return
 	case spec.RestoreInProgress:
-		o.warnf("retention skipped: a restore of the cluster is in progress")
+		o.log.Warning("retention skipped: a restore of the cluster is in progress")
 		return
 	case spec.Prefix == "":
-		o.warnf("retention skipped: the schedule has no backup name prefix")
+		o.log.Warning("retention skipped: the schedule has no backup name prefix")
 		return
 	case len(spec.RetentionHosts) == 0:
-		o.warnf("retention skipped: no host")
+		o.log.Warning("retention skipped: no host")
 		return
 	}
-	o.logf("retention: keeping the newest %s-* backup, the newest backups of the scheduled times of every schedule entry it keeps, "+
+	o.log.Info("retention: keeping the newest %s-* backup, the newest backups of the scheduled times of every schedule entry it keeps, "+
 		"and the backups made at once no older than the oldest of those", spec.Prefix)
 	o.bestEffort = true
 	defer func() { o.bestEffort = false }()
@@ -627,8 +627,9 @@ func (o *orchestrator) retention(ctx context.Context) {
 		return t
 	})
 	if len(unlisted) > 0 {
-		o.warnf("retention skipped: %s cannot be listed, backups are left as they are", strings.Join(unlisted, " "))
-		o.eventf(core.EventTypeWarning, "OrchestratorRetentionSkipped", "%s", o.lastWarning)
+		message := fmt.Sprintf("retention skipped: %s cannot be listed, backups are left as they are", strings.Join(unlisted, " "))
+		o.log.Warning("%s", message)
+		o.eventf(core.EventTypeWarning, "OrchestratorRetentionSkipped", "%s", message)
 		return
 	}
 	retention := model.Retention{
@@ -665,17 +666,18 @@ func (o *orchestrator) retention(ctx context.Context) {
 			held = append(held, api.HeldBackup{Name: name, Expires: expires})
 		}
 		o.outcome.held = held
-		o.warnf("retention holds %d backup(s) the schedule kept before a change of it, which it would delete now, each until it "+
+		message := fmt.Sprintf("retention holds %d backup(s) the schedule kept before a change of it, which it would delete now, each until it "+
 			"expires as the schedule before would have deleted it: %s; keep those to keep longer in spec.retention.keepBackups, "+
 			"or release the change at once with spec.retention.releaseHeld", len(names), heldReport(names))
-		o.eventf(core.EventTypeWarning, "OrchestratorRetentionHeld", "%s", o.lastWarning)
+		o.log.Warning("%s", message)
+		o.eventf(core.EventTypeWarning, "OrchestratorRetentionHeld", "%s", message)
 	}
 	if len(plan.Expired) > 0 {
 		var names []string
 		for _, key := range plan.Expired {
 			names = append(names, nameOf(key))
 		}
-		o.logf("retention deletes %d backup(s) whose hold for a change of the schedule or pin of spec.retention.keepBackups "+
+		o.log.Info("retention deletes %d backup(s) whose hold for a change of the schedule or pin of spec.retention.keepBackups "+
 			"has expired: %s", len(names), heldReport(names))
 		o.eventf(core.EventTypeNormal, "OrchestratorRetentionHeldExpired", "the hold for a change of the schedule or the pin of "+
 			"spec.retention.keepBackups of %d backup(s) has expired, retention deletes them: %s", len(names), heldReport(names))
@@ -685,7 +687,7 @@ func (o *orchestrator) retention(ctx context.Context) {
 		for _, key := range plan.Writing {
 			names = append(names, nameOf(key))
 		}
-		o.logf("retention leaves %d incomplete backup(s) a create_remote or an upload may still write: %s", len(names),
+		o.log.Info("retention leaves %d incomplete backup(s) a create_remote or an upload may still write: %s", len(names),
 			heldReport(names))
 		o.eventf(core.EventTypeNormal, "OrchestratorRetentionIncompleteKept", "retention leaves %d incomplete backup(s) a "+
 			"create_remote or an upload still writes, or of a host whose system.backup_actions cannot be read: %s", len(names),
@@ -697,7 +699,7 @@ func (o *orchestrator) retention(ctx context.Context) {
 	for _, host := range spec.RetentionHosts {
 		rows, err := o.list(ctx, host, "remote")
 		if err != nil {
-			o.warnf("%s: retention failed, backups are left as they are", host)
+			o.log.Warning("%s: retention failed, backups are left as they are", host)
 			for _, key := range obsolete {
 				undeleted[key] = true
 			}
@@ -713,7 +715,7 @@ func (o *orchestrator) retention(ctx context.Context) {
 				o.eventf(core.EventTypeWarning, "OrchestratorRetentionFailed", "%s: retention failed to delete %s: %v", host, name, err)
 				continue
 			}
-			o.logf("%s: retention deleted %s", host, name)
+			o.log.Info("%s: retention deleted %s", host, name)
 			o.eventf(core.EventTypeNormal, "OrchestratorRetentionDeleted", "%s: retention deleted %s", host, name)
 		}
 	}

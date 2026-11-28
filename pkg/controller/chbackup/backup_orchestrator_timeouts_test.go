@@ -28,6 +28,7 @@ import (
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chbackup"
 )
@@ -36,7 +37,7 @@ import (
 func testOrchestrator(t *testing.T, sc *fakeSidecars, spec *model.RunSpec) *orchestrator {
 	t.Helper()
 	return &orchestrator{spec: spec, sc: sc, mu: &sync.Mutex{}, status: &api.BackupRunStatus{Operation: spec.Operation},
-		event: func(string, string, string) {}, logPrefix: t.Name(), clock: clock.RealClock{}, poll: time.Millisecond,
+		event: func(string, string, string) {}, log: log.V(1).M(t.Name()), clock: clock.RealClock{}, poll: time.Millisecond,
 		startedAt: time.Date(2026, time.November, 12, 0, 0, 0, 0, time.UTC)}
 }
 

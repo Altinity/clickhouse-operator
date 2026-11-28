@@ -51,11 +51,11 @@ func (o *orchestrator) restore(ctx context.Context) error {
 	hosts := o.restoreHosts()
 	key, prefix, err := spec.Naming.Key("backup name", spec.BackupName, "")
 	if err != nil {
-		return failf("%v", err)
+		return err
 	}
 	for _, host := range hosts.all {
 		if o.backupNames[host], err = spec.Naming.HostName(host, key, prefix); err != nil {
-			return failf("%v", err)
+			return err
 		}
 	}
 	if o.step() == "" {
@@ -85,7 +85,7 @@ func (o *orchestrator) restore(ctx context.Context) error {
 			failed, failures := o.runAll(ctx, stepDownload, downloads, false, o.commandOf(stepDownload))
 			if len(failed) > 0 {
 				o.keepDownloads()
-				return failf("download of %s failed on %s: %s", name, strings.Join(failed, ", "), strings.Join(failures, "; "))
+				return fmt.Errorf("download of %s failed on %s: %s", name, strings.Join(failed, ", "), strings.Join(failures, "; "))
 			}
 		}
 		o.setStep(stepSchema)
@@ -94,7 +94,7 @@ func (o *orchestrator) restore(ctx context.Context) error {
 		for _, host := range hosts.schema {
 			if err := o.runOne(ctx, stepSchema, host, o.restoreCommand(stepSchema, host), true); err != nil {
 				o.keepDownloads()
-				return failf("schema restore of %s failed on %s: %v", name, host, err)
+				return fmt.Errorf("schema restore of %s failed on %s: %v", name, host, err)
 			}
 		}
 		o.setStep(stepCopy)
@@ -108,7 +108,7 @@ func (o *orchestrator) restore(ctx context.Context) error {
 				failed, failures := o.runAll(ctx, stepCopy, copies, true, o.commandOf(stepCopy))
 				if len(failed) > 0 {
 					o.keepDownloads()
-					return failf("copy of the data of %s to detached failed on %s: %s", name, strings.Join(failed, ", "),
+					return fmt.Errorf("copy of the data of %s to detached failed on %s: %s", name, strings.Join(failed, ", "),
 						strings.Join(failures, "; "))
 				}
 			}
@@ -120,7 +120,7 @@ func (o *orchestrator) restore(ctx context.Context) error {
 			failed, failures := o.runData(ctx, hosts.data)
 			if len(failed) > 0 {
 				o.keepDownloads()
-				return failf("data restore of %s failed on %s: %s", name, strings.Join(failed, ", "), strings.Join(failures, "; "))
+				return fmt.Errorf("data restore of %s failed on %s: %s", name, strings.Join(failed, ", "), strings.Join(failures, "; "))
 			}
 		}
 		o.setStep(stepCleanup)
@@ -130,12 +130,12 @@ func (o *orchestrator) restore(ctx context.Context) error {
 		backup := o.backupNames[host]
 		if present, err := o.listed(ctx, host, "local", backup); (err == nil) && present {
 			if err := o.deleteBackup(ctx, stepCleanup, host, "local", backup); err != nil {
-				o.warnf("%s: the downloaded copy of %s is left on local disk", host, backup)
+				o.log.Warning("%s: the downloaded copy of %s is left on local disk", host, backup)
 			}
 		}
 	}
 	o.bestEffort = false
-	o.logf("restore %s completed", name)
+	o.log.Info("restore %s completed", name)
 	o.eventf(core.EventTypeNormal, "OrchestratorRestoreCompleted", "restore %s completed", name)
 	o.reportRBAC()
 	return nil
@@ -203,14 +203,14 @@ func (o *orchestrator) dropSchemaCopies(ctx context.Context, downloads []string)
 		}
 		present, err := o.listed(ctx, host, "local", name)
 		if err != nil {
-			return failf("cannot list the local backups of %s: %v", host, err)
+			return fmt.Errorf("cannot list the local backups of %s: %v", host, err)
 		}
 		if !present {
 			continue
 		}
-		o.logf("%s: holds a local copy of the schema of %s alone, which it deletes to download the data too", host, name)
+		o.log.Info("%s: holds a local copy of the schema of %s alone, which it deletes to download the data too", host, name)
 		if err := o.deleteBackup(ctx, stepReplaceLocal, host, "local", name); err != nil {
-			return failf("%s: cannot delete the local copy of the schema of %s an earlier run downloaded, to download the data "+
+			return fmt.Errorf("%s: cannot delete the local copy of the schema of %s an earlier run downloaded, to download the data "+
 				"too: %v", host, name, err)
 		}
 	}
@@ -227,7 +227,7 @@ func (o *orchestrator) chooseDataHosts(ctx context.Context) {
 			if err == nil {
 				break
 			}
-			o.logf("%s: does not answer (%v), restoring the data of its shard on %s instead", shard[chosen], err, shard[chosen+1])
+			o.log.Info("%s: does not answer (%v), restoring the data of its shard on %s instead", shard[chosen], err, shard[chosen+1])
 		}
 		if chosen > 0 {
 			o.eventf(core.EventTypeNormal, "OrchestratorReplicaFallback", "%s does not answer, the data of its shard is restored "+
@@ -266,7 +266,7 @@ submit:
 				o.eventf(core.EventTypeWarning, "OrchestratorHostFailed", "%s: %s failed: %v", host, stepData, err)
 				break submit
 			}
-			o.logf("%s: the restore of the data cannot be submitted (%v), restoring the data of its shard on %s instead", host, err, next)
+			o.log.Info("%s: the restore of the data cannot be submitted (%v), restoring the data of its shard on %s instead", host, err, next)
 			o.eventf(core.EventTypeNormal, "OrchestratorReplicaFallback", "%s does not take the restore of the data, the data of its "+
 				"shard is restored on %s, over its copy of it to detached", host, next)
 			data[i] = next
@@ -297,10 +297,11 @@ func (o *orchestrator) reportRBAC() {
 	switch {
 	case o.spec.RestoreRBAC:
 	case !o.plan().Listed:
-		o.logf("whether %s holds access entities is unknown: its copies in the storage were not listed", o.spec.BackupName)
+		o.log.Info("whether %s holds access entities is unknown: its copies in the storage were not listed", o.spec.BackupName)
 	case o.plan().HoldsRBAC:
-		o.warnf("%s holds access entities - users, roles, grants - which this restore did not restore", o.spec.BackupName)
-		o.eventf(core.EventTypeWarning, "OrchestratorRBACNotRestored", "%s", o.lastWarning)
+		message := fmt.Sprintf("%s holds access entities - users, roles, grants - which this restore did not restore", o.spec.BackupName)
+		o.log.Warning("%s", message)
+		o.eventf(core.EventTypeWarning, "OrchestratorRBACNotRestored", "%s", message)
 		o.outcome.rbacNotRestored = true
 	}
 }
@@ -377,7 +378,7 @@ func (o *orchestrator) planRestore(ctx context.Context, hosts restoreHosts) erro
 		return err
 	}
 	o.eventf(core.EventTypeNormal, "OrchestratorRestoreStarted", "restore %s on %d host(s)", name, len(hosts.all))
-	o.logf("restore %s: preflight on %d host(s)", name, len(hosts.all))
+	o.log.Info("restore %s: preflight on %d host(s)", name, len(hosts.all))
 	var replaced []string
 	if !spec.ResumeDownload {
 		var err error
@@ -410,32 +411,32 @@ func (o *orchestrator) planRestore(ctx context.Context, hosts restoreHosts) erro
 				}
 				rows, err := o.list(ctx, host, "local")
 				if err != nil {
-					return failf("preflight failed on %s: %v", host, err)
+					return fmt.Errorf("preflight failed on %s: %v", host, err)
 				}
 				if row = findBackup(rows, backup); row == nil {
-					return failf("preflight failed: backup %s is missing in %s: its download left no local copy", backup, where)
+					return fmt.Errorf("preflight failed: backup %s is missing in %s: its download left no local copy", backup, where)
 				}
 				if resumed && row.broken() {
-					o.logf("%s: the incomplete local copy of %s an earlier run of this restore downloaded, after its preflight found "+
+					o.log.Info("%s: the incomplete local copy of %s an earlier run of this restore downloaded, after its preflight found "+
 						"the backup in %s, is checked by its download, which resumes it", host, backup, where)
 					continue
 				}
 			} else {
 				rows, err := o.list(ctx, host, "remote")
 				if err != nil {
-					return failf("preflight failed on %s: %v", host, err)
+					return fmt.Errorf("preflight failed on %s: %v", host, err)
 				}
 				if row = findBackup(rows, backup); row == nil {
 					if strings.Contains(o.storagePaths.Path, "{replica}") {
-						return failf("preflight failed: backup %s is missing in the storage of %s: the storage path '%s' holds {replica}, "+
+						return fmt.Errorf("preflight failed: backup %s is missing in the storage of %s: the storage path '%s' holds {replica}, "+
 							"which gives every replica a path of its own, and the backup was made on the first replica of each shard only%s",
 							backup, host, o.storagePaths.Path, hint)
 					}
-					return failf("preflight failed: backup %s is missing in the storage of %s%s", backup, host, hint)
+					return fmt.Errorf("preflight failed: backup %s is missing in the storage of %s%s", backup, host, hint)
 				}
 			}
 			if row.broken() {
-				return failf("preflight failed: backup %s is %s in %s", backup, row.Desc, where)
+				return fmt.Errorf("preflight failed: backup %s is %s in %s", backup, row.Desc, where)
 			}
 			if row.RBACSize != 0 {
 				holdsRBAC = true
@@ -443,7 +444,7 @@ func (o *orchestrator) planRestore(ctx context.Context, hosts restoreHosts) erro
 		}
 	}
 	if len(spec.Partitions) > 0 {
-		o.logf("restore %s: restores the partitions %s into the tables as they are, without the schema, as the Altinity usual "+
+		o.log.Info("restore %s: restores the partitions %s into the tables as they are, without the schema, as the Altinity usual "+
 			"backup workflow does", name, strings.Join(spec.Partitions, ","))
 	}
 	copies := spec.ReplicatedCopyToDetached
@@ -466,7 +467,7 @@ func (o *orchestrator) planRestore(ctx context.Context, hosts restoreHosts) erro
 			switch {
 			case row == nil:
 			case row.broken():
-				o.logf("%s: holds an incomplete local copy of %s, whose download the restore resumes", host, o.backupNames[host])
+				o.log.Info("%s: holds an incomplete local copy of %s, whose download the restore resumes", host, o.backupNames[host])
 				resumed = append(resumed, host)
 			default:
 				hadLocal = append(hadLocal, host)
@@ -483,7 +484,7 @@ func (o *orchestrator) planRestore(ctx context.Context, hosts restoreHosts) erro
 		}
 	}
 	if flags := configOverrides(o.spec.ConfigOverrides); flags != "" {
-		o.logf("restore of %s: made with the config overrides%s", o.spec.BackupName, flags)
+		o.log.Info("restore of %s: made with the config overrides%s", o.spec.BackupName, flags)
 		o.eventf(core.EventTypeNormal, "OrchestratorConfigOverrides", "restore of %s is made with the config overrides%s", o.spec.BackupName, flags)
 	}
 	plan := api.BackupRunPlan{
@@ -558,32 +559,32 @@ func (o *orchestrator) sourcePaths() error {
 	name := spec.BackupName
 	if (installation == "") && (namespace == "") {
 		if (spec.SourceInstallation != "") || (spec.SourceNamespace != "") {
-			o.logf("WARNING: restore %s names its own installation as the one it restores the backup of, which it reads at its own "+
+			o.log.Info("WARNING: restore %s names its own installation as the one it restores the backup of, which it reads at its own "+
 				"storage paths", name)
 		}
 		return nil
 	}
 	self := o.storagePaths
 	if self.StoragePrefix == "" {
-		return failf("a restore from another installation needs the storage paths of the sidecars, which it reads the backup at with "+
+		return fmt.Errorf("a restore from another installation needs the storage paths of the sidecars, which it reads the backup at with "+
 			"the {installation} and {namespace} of that installation, and the storage path check cannot tell them: %s", self.Unknown)
 	}
 	sourcePath := sourceTemplate(self.Path, installation, namespace)
 	sourceObject := sourceTemplate(self.ObjectDiskPath, installation, namespace)
 	if (sourcePath == self.Path) && (sourceObject == self.ObjectDiskPath) {
-		o.logf("WARNING: the storage paths of cluster %s hold no {installation} or {namespace} that tells the installation restore %s "+
+		o.log.Info("WARNING: the storage paths of cluster %s hold no {installation} or {namespace} that tells the installation restore %s "+
 			"names apart from this one, so it reads them as they are: '%s'", self.ClusterName, name, self.Path)
 		return nil
 	}
 	if (sourcePath != self.Path) && (sourceObject != "") && (sourceObject == self.ObjectDiskPath) {
-		return failf("the object disk path '%s' of cluster %s holds no {installation} or {namespace} that tells the installation "+
+		return fmt.Errorf("the object disk path '%s' of cluster %s holds no {installation} or {namespace} that tells the installation "+
 			"restore %s names apart from this one, while the storage path does: deleting the copy the restore downloads would delete "+
 			"the object disk data of the backup; give the object disk path the macros of the storage path", self.ObjectDiskPath,
 			self.ClusterName, name)
 	}
 	for _, value := range []string{sourcePath, sourceObject} {
 		if (value != "") && !sourcePathRegexp.MatchString(value) {
-			return failf("the storage path '%s' of the installation restore %s reads the backup of cannot be set in a command of the "+
+			return fmt.Errorf("the storage path '%s' of the installation restore %s reads the backup of cannot be set in a command of the "+
 				"restore: only a path of letters, digits and _ . / { } - can", value, name)
 		}
 	}
@@ -591,7 +592,7 @@ func (o *orchestrator) sourcePaths() error {
 	if sourceObject != "" {
 		o.source.env += fmt.Sprintf(" --env=%s_OBJECT_DISK_PATH=%s", self.StoragePrefix, sourceObject)
 	}
-	o.logf("restore %s: reading the backup at the storage path '%s' of installation %s", name, sourcePath, o.sourceName())
+	o.log.Info("restore %s: reading the backup at the storage path '%s' of installation %s", name, sourcePath, o.sourceName())
 	return nil
 }
 
@@ -603,10 +604,10 @@ func (o *orchestrator) refuseLocalCopy(ctx context.Context, host string) error {
 	name := o.backupNames[host]
 	present, err := o.listed(ctx, host, "local", name)
 	if err != nil {
-		return failf("preflight failed on %s: %v", host, err)
+		return fmt.Errorf("preflight failed on %s: %v", host, err)
 	}
 	if present && o.downloaded(host, name) {
-		o.logf("%s: holds the local copy of %s this restore downloaded, whose download it resumes", host, name)
+		o.log.Info("%s: holds the local copy of %s this restore downloaded, whose download it resumes", host, name)
 		if o.downloadedEarlier(host, name, false) {
 			if o.source.resumesDownload == nil {
 				o.source.resumesDownload = map[string]bool{}
@@ -614,7 +615,7 @@ func (o *orchestrator) refuseLocalCopy(ctx context.Context, host string) error {
 			o.source.resumesDownload[host] = true
 		}
 	} else if present {
-		return failf("preflight failed: %s holds a local copy of %s, which a restore from the storage paths of another installation "+
+		return fmt.Errorf("preflight failed: %s holds a local copy of %s, which a restore from the storage paths of another installation "+
 			"would restore in place of the backup there; delete it (clickhouse-backup delete local %s) and restore again", host, name, name)
 	}
 	if o.source.localChecked == nil {
@@ -654,14 +655,14 @@ func (o *orchestrator) replaceEarlierDownloads(ctx context.Context, hosts []stri
 		}
 		present, err := o.listed(ctx, host, "local", name)
 		if err != nil {
-			return nil, failf("preflight failed on %s: %v", host, err)
+			return nil, fmt.Errorf("preflight failed on %s: %v", host, err)
 		}
 		if !present {
 			continue
 		}
-		o.logf("%s: deletes the local copy of %s an earlier run of the restore downloaded, to download the backup again", host, name)
+		o.log.Info("%s: deletes the local copy of %s an earlier run of the restore downloaded, to download the backup again", host, name)
 		if err := o.deleteBackup(ctx, stepReplaceLocal, host, "local", name); err != nil {
-			return nil, failf("%s: cannot delete the local copy of %s an earlier run of the restore downloaded, to download the backup "+
+			return nil, fmt.Errorf("%s: cannot delete the local copy of %s an earlier run of the restore downloaded, to download the backup "+
 				"again: %v", host, name, err)
 		}
 		o.eventf(core.EventTypeNormal, "OrchestratorRerunReplaced", "%s: the local copy of %s an earlier run of the restore "+
@@ -692,7 +693,7 @@ func (o *orchestrator) sourceCopy(ctx context.Context, host string) error {
 	o.source.schemaCopies = append(o.source.schemaCopies, host)
 	name := o.backupNames[host]
 	if err := o.runOne(ctx, stepSource, host, "download --schema --rbac "+o.source.env+" "+name, false); err != nil {
-		return failf("preflight failed: backup %s is missing in the storage of installation %s on %s, or cannot be read there: %v",
+		return fmt.Errorf("preflight failed: backup %s is missing in the storage of installation %s on %s, or cannot be read there: %v",
 			name, o.sourceName(), host, err)
 	}
 	return nil
@@ -715,11 +716,11 @@ func (o *orchestrator) dropSourceCopies(ctx context.Context, strict bool) error 
 		}
 		if strict {
 			if err := o.deleteBackup(ctx, stepSource+"-drop", host, "local", name); err != nil {
-				return failf("%s: cannot delete the copy of %s the preflight downloaded, which the restore would take for its own: %v",
+				return fmt.Errorf("%s: cannot delete the copy of %s the preflight downloaded, which the restore would take for its own: %v",
 					host, name, err)
 			}
 		} else if err := o.cleanup(ctx, stepSource+"-drop", host, name); err != nil {
-			o.logf("WARNING: %s: the copy of the schema of %s the preflight downloaded is left on local disk (%v), which refuses another "+
+			o.log.Info("WARNING: %s: the copy of the schema of %s the preflight downloaded is left on local disk (%v), which refuses another "+
 				"restore of %s from another installation until it is deleted with %s", host, name, err, name, deleteByHand(name))
 			o.eventf(core.EventTypeWarning, "OrchestratorSourceCopyLeft", "%s: the copy of the schema of %s the preflight downloaded is "+
 				"left: %v; delete it by hand with %s", host, name, err, deleteByHand(name))
@@ -747,7 +748,7 @@ func (o *orchestrator) keepDownloads() {
 	for _, host := range kept {
 		copies = append(copies, host+"="+o.backupNames[host])
 	}
-	o.logf("the restore failed and keeps the local copies it downloaded: %s", strings.Join(copies, " "))
+	o.log.Info("the restore failed and keeps the local copies it downloaded: %s", strings.Join(copies, " "))
 	o.eventf(core.EventTypeWarning, "OrchestratorRestoreDownloadsKept", "the failed restore keeps the local copies of the backup it "+
 		"downloaded, to look into and for a restore of the backup again to resume their download, on %s; delete each by hand on "+
 		"its host with %s", strings.Join(copies, " "), deleteByHand("<backup>"))

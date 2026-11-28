@@ -92,18 +92,6 @@ type runOutcome struct {
 	series []api.StoredBackup
 }
 
-type runFailure struct {
-	message string
-}
-
-func (f *runFailure) Error() string {
-	return f.message
-}
-
-func failf(format string, args ...any) error {
-	return &runFailure{message: fmt.Sprintf(format, args...)}
-}
-
 type orchestrator struct {
 	spec *model.RunSpec
 	sc   sidecars
@@ -112,7 +100,7 @@ type orchestrator struct {
 	status    *api.BackupRunStatus
 	event     func(eventType, reason, message string)
 	changed   func()
-	logPrefix string
+	log       log.Announcer
 	clock     clock.WithTicker
 	poll      time.Duration
 	startedAt time.Time
@@ -122,8 +110,6 @@ type orchestrator struct {
 	elapsed time.Duration
 
 	outcome runOutcome
-	// lastWarning is the last message of warnf, for the event that follows it.
-	lastWarning string
 	// bestEffort makes a failed command a warning, and the run goes on.
 	bestEffort bool
 	// backupNames maps a host to the name of its backup.
@@ -143,15 +129,6 @@ type restoreSource struct {
 	localChecked map[string]bool
 	// resumesDownload are the hosts that resume a download of an earlier run.
 	resumesDownload map[string]bool
-}
-
-func (o *orchestrator) logf(format string, args ...any) {
-	log.V(1).Info("%s: %s", o.logPrefix, fmt.Sprintf(format, args...))
-}
-
-func (o *orchestrator) warnf(format string, args ...any) {
-	o.lastWarning = fmt.Sprintf(format, args...)
-	log.V(1).Warning("%s: %s", o.logPrefix, o.lastWarning)
 }
 
 func (o *orchestrator) eventf(eventType, reason, format string, args ...any) {
@@ -249,7 +226,7 @@ func (o *orchestrator) retry(ctx context.Context, host, what string, f func() er
 		}
 		if !announced {
 			announced = true
-			o.logf("%s: cannot %s, retrying for %s: %s", host, what, o.unreachableTimeout(), describeQueryError(err))
+			o.log.Info("%s: cannot %s, retrying for %s: %s", host, what, o.unreachableTimeout(), describeQueryError(err))
 		}
 		if !o.sleep(ctx) {
 			return ctx.Err()
@@ -288,7 +265,6 @@ func (o *orchestrator) adoptFrom() string {
 }
 
 func (o *orchestrator) submit(ctx context.Context, step api.BackupRunStep, host, command string, mutates bool) (*api.BackupRunAction, error) {
-	o.lastWarning = ""
 	// An action recorded without a time was planned but never inserted.
 	if action := o.recorded(step, host, command); (action != nil) && (action.TimeFrom != "") {
 		return action, nil
@@ -308,7 +284,7 @@ func (o *orchestrator) submit(ctx context.Context, step api.BackupRunStep, host,
 			status.Mutated = status.Mutated || mutates
 		})
 		o.record(action)
-		o.logf("%s: %s already started at %s", host, command, row.Start)
+		o.log.Info("%s: %s already started at %s", host, command, row.Start)
 		return &action, nil
 	}
 	announced := false
@@ -325,7 +301,7 @@ func (o *orchestrator) submit(ctx context.Context, step api.BackupRunStep, host,
 			tries++
 			if !announced {
 				announced = true
-				o.logf("%s: another operation is in progress, waiting", host)
+				o.log.Info("%s: another operation is in progress, waiting", host)
 			}
 			if !o.sleepFor(ctx, busyBackoff(o.poll, tries)) {
 				return nil, ctx.Err()
@@ -344,12 +320,12 @@ func (o *orchestrator) submit(ctx context.Context, step api.BackupRunStep, host,
 			status.Mutated = status.Mutated || mutates
 		})
 		o.record(action)
-		o.logf("%s: %s", host, command)
+		o.log.Info("%s: %s", host, command)
 		o.eventf(core.EventTypeNormal, "OrchestratorCommand", "%s: %s", host, command)
 		err := o.sc.Push(ctx, host, command, o.httpReceiveTimeout())
 		if errors.Is(err, errSidecarBusy) {
 			tries++
-			o.logf("%s: sidecar busy, queueing %s", host, command)
+			o.log.Info("%s: sidecar busy, queueing %s", host, command)
 			if !o.sleepFor(ctx, busyBackoff(o.poll, tries)) {
 				return nil, ctx.Err()
 			}
@@ -359,7 +335,7 @@ func (o *orchestrator) submit(ctx context.Context, step api.BackupRunStep, host,
 		attempts := existenceAttempts
 		if (err != nil) && synchronous(command) {
 			attempts = max(o.errorResponsesMax(), existenceAttempts)
-			o.logf("%s: the insert of %s failed (%s), looking for its row in system.backup_actions", host, command,
+			o.log.Info("%s: the insert of %s failed (%s), looking for its row in system.backup_actions", host, command,
 				describeQueryError(err))
 		}
 		var failingSince time.Time
@@ -375,17 +351,18 @@ func (o *orchestrator) submit(ctx context.Context, step api.BackupRunStep, host,
 				}
 				if failingSince.IsZero() {
 					failingSince = o.clock.Now()
-					o.logf("%s: cannot read the row of %s, retrying for %s: %s", host, command, o.unreachableTimeout(),
+					o.log.Info("%s: cannot read the row of %s, retrying for %s: %s", host, command, o.unreachableTimeout(),
 						describeQueryError(findErr))
 				}
 				if o.clock.Since(failingSince) >= o.unreachableTimeout() {
-					o.warnf("%s: %s: cannot read its row in system.backup_actions for %s: %s", host, command,
+					failure := fmt.Errorf("%s: %s: cannot read its row in system.backup_actions for %s: %s", host, command,
 						o.unreachableTimeout(), describeQueryError(findErr))
-					return nil, errors.New(o.lastWarning)
+					o.log.Warning("%v", failure)
+					return nil, failure
 				}
 			case found != nil:
 				if err != nil {
-					o.logf("%s: %s reached the sidecar despite the failed insert, its status: %s", host, command, found.Status)
+					o.log.Info("%s: %s reached the sidecar despite the failed insert, its status: %s", host, command, found.Status)
 				}
 				return &action, nil
 			default:
@@ -396,12 +373,12 @@ func (o *orchestrator) submit(ctx context.Context, step api.BackupRunStep, host,
 				return nil, ctx.Err()
 			}
 		}
+		failure := fmt.Errorf("%s: %s: no response from the server", host, command)
 		if err != nil {
-			o.warnf("%s: %s failed: %v", host, command, err)
-		} else {
-			o.warnf("%s: %s: no response from the server", host, command)
+			failure = fmt.Errorf("%s: %s failed: %v", host, command, err)
 		}
-		return nil, errors.New(o.lastWarning)
+		o.log.Warning("%v", failure)
+		return nil, failure
 	}
 }
 
@@ -442,7 +419,7 @@ func (o *orchestrator) findLost(ctx context.Context, action *api.BackupRunAction
 			action.Host, action.Command, o.spec.Operation)
 	}
 	if usable, err := o.usable(ctx, action.Host, where, name); (err == nil) && usable {
-		o.logf("%s: %s completed before the sidecar restarted", action.Host, action.Command)
+		o.log.Info("%s: %s completed before the sidecar restarted", action.Host, action.Command)
 		return lostDone, nil
 	}
 	return lostFailed, fmt.Errorf("%s: the sidecar restarted during %s and resumed nothing, the outcome is unknown", action.Host,
@@ -477,7 +454,7 @@ func (o *orchestrator) wait(ctx context.Context, actions []*api.BackupRunAction,
 				}
 				if description != failure[action.Host] {
 					failure[action.Host] = description
-					o.logf("%s: cannot read the row of %s, retrying for %s from the first error: %s", action.Host,
+					o.log.Info("%s: cannot read the row of %s, retrying for %s from the first error: %s", action.Host,
 						action.Command, o.unreachableTimeout(), description)
 				}
 				if o.clock.Since(first) >= o.unreachableTimeout() {
@@ -489,13 +466,13 @@ func (o *orchestrator) wait(ctx context.Context, actions []*api.BackupRunAction,
 				continue
 			}
 			if _, failed := failing[action.Host]; failed {
-				o.logf("%s: system.backup_actions answers again", action.Host)
+				o.log.Info("%s: system.backup_actions answers again", action.Host)
 				delete(failing, action.Host)
 				delete(failure, action.Host)
 			}
 			if row == nil {
 				empty[action.Host]++
-				o.logf("%s: no row of %s started at %s or later in system.backup_actions, %d of %d polls in a row",
+				o.log.Info("%s: no row of %s started at %s or later in system.backup_actions, %d of %d polls in a row",
 					action.Host, action.Command, action.TimeFrom, empty[action.Host], o.errorResponsesMax())
 				if empty[action.Host] <= o.errorResponsesMax() {
 					running = append(running, action)
@@ -599,7 +576,7 @@ func (o *orchestrator) list(ctx context.Context, host, location string) ([]backu
 		return err
 	})
 	if err != nil {
-		o.warnf("%v", err)
+		o.log.Warning("%v", err)
 	}
 	return rows, err
 }
@@ -649,7 +626,7 @@ func (o *orchestrator) cleanupCommand(ctx context.Context, step api.BackupRunSte
 	}
 	action := api.BackupRunAction{Step: step, Host: host, Command: command, TimeFrom: timeFrom}
 	o.record(action)
-	o.logf("%s: %s", host, command)
+	o.log.Info("%s: %s", host, command)
 	o.eventf(core.EventTypeNormal, "OrchestratorCommand", "%s: %s", host, command)
 	pushErr := o.sc.Push(ctx, host, command, o.httpReceiveTimeout())
 	if errors.Is(pushErr, errSidecarBusy) {
@@ -697,7 +674,7 @@ func (o *orchestrator) run(ctx context.Context) runOutcome {
 	case api.BackupRunOperationDelete:
 		err = o.deleteUnfinished(ctx)
 	default:
-		err = failf("unknown operation %q", o.spec.Operation)
+		err = fmt.Errorf("unknown operation %q", o.spec.Operation)
 	}
 	if err != nil {
 		if o.source.env != "" && len(o.source.schemaCopies) > 0 {
@@ -758,7 +735,7 @@ func (o *orchestrator) fallBackHosts(ctx context.Context) []string {
 			continue
 		}
 		if err := o.sc.Ready(ctx, host); err != nil {
-			o.logf("%s: the preferred replica does not answer (%v), backing up %s instead", host, err, fallback)
+			o.log.Info("%s: the preferred replica does not answer (%v), backing up %s instead", host, err, fallback)
 			o.eventf(core.EventTypeNormal, "OrchestratorReplicaFallback", "%s does not answer, the backup of its shard runs on %s",
 				host, fallback)
 			hosts[i] = fallback
@@ -770,7 +747,7 @@ func (o *orchestrator) fallBackHosts(ctx context.Context) []string {
 func (o *orchestrator) ready(ctx context.Context, hosts []string) error {
 	for _, host := range hosts {
 		if err := o.retry(ctx, host, "drive the sidecar", func() error { return o.sc.Ready(ctx, host) }); err != nil {
-			return failf("preflight failed: %v", err)
+			return fmt.Errorf("preflight failed: %v", err)
 		}
 	}
 	return nil
@@ -783,14 +760,14 @@ func (o *orchestrator) checkPaths() error {
 	result, err := o.spec.PathCheck.Check()
 	o.storagePaths = result
 	for _, advice := range result.Advice {
-		o.logf("WARNING: %s", advice)
+		o.log.Info("WARNING: %s", advice)
 		o.eventf(core.EventTypeWarning, "OrchestratorStoragePathAdvice", "%s", advice)
 	}
 	if err != nil {
-		return failf("%v", err)
+		return err
 	}
 	if result.Log != "" {
-		o.logf("%s", result.Log)
+		o.log.Info("%s", result.Log)
 	}
 	return nil
 }
