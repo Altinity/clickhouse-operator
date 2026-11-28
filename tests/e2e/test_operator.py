@@ -9977,7 +9977,7 @@ def test_010088(self):
             ("OrchestratorBackupStarted", "OrchestratorBackupCompleted"),
         )
 
-        with When("A new installation to be recovered from that backup is created, with three schedules that run once a year"):
+        with When("A new installation to be recovered from that backup is created, with three schedules that run once a month"):
             def recover(data):
                 data["spec"]["backup"]["recovery"]["backupName"] = source_backup_name
 
