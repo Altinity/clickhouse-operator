@@ -133,7 +133,7 @@ func RecoveredFrom(recoveries []ClusterRecovery) string {
 // RecoveredFrom writes it; a value set by hand is read the same way.
 func RecoveredBackupNames(recoveredFrom string) []string {
 	var names []string
-	for _, entry := range strings.Split(recoveredFrom, recoveredFromSeparator) {
+	for entry := range strings.SplitSeq(recoveredFrom, recoveredFromSeparator) {
 		_, name, found := strings.Cut(entry, recoveredFromClusterSeparator)
 		if !found {
 			name = entry
@@ -155,10 +155,8 @@ func RecoveryRestoreName(chi *api.ClickHouseInstallation, cluster string) string
 // recovery restores a new installation, users, roles and grants included.
 func BuildRecoveryRestore(chi *api.ClickHouseInstallation, recovery ClusterRecovery) *api.ClickHouseRestore {
 	restore := &api.ClickHouseRestore{
-		ObjectMeta: meta.ObjectMeta{
-			Name:      RecoveryRestoreName(chi, recovery.Cluster),
-			Namespace: chi.GetNamespace(),
-		},
+		Name:      RecoveryRestoreName(chi, recovery.Cluster),
+		Namespace: chi.GetNamespace(),
 		Spec: api.ClickHouseRestoreSpec{
 			ClickHouseInstallation: chi.GetName(),
 			Cluster:                recovery.Cluster,
